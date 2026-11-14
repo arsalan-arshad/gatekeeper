@@ -1,0 +1,27 @@
+{
+  "name": "gatekeeper",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Open-source AI principal — a person's front door for inbound requests",
+  "license": "AGPL-3.0-only",
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "pnpm -r --parallel --filter @gatekeeper/api --filter @gatekeeper/web dev",
+    "build": "pnpm -r --filter @gatekeeper/db --filter @gatekeeper/api --filter @gatekeeper/web build",
+    "lint": "pnpm -r --if-present lint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "pnpm -r --if-present test",
+    "typecheck": "pnpm -r --if-present typecheck"
+  },
+  "devDependencies": {
+    "@gatekeeper/eslint-config": "workspace:*",
+    "eslint": "^9.22.0",
+    "prettier": "^3.5.3",
+    "typescript": "^5.8.2"
+  }
+}
