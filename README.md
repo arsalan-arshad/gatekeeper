@@ -1,8 +1,22 @@
 # Gatekeeper
 
+![Gatekeeper](./docs/media/github-banner.png)
+
 Open-source (**AGPL-3.0**) AI principal — a person's front door for inbound requests.
 
 **Your AI front door that says no for you.**
+
+<p>
+  <img src="./apps/web/public/icon-512.png" alt="Door mark" width="48" height="48" />
+  &nbsp;
+  <img src="./docs/media/art-door-mark.png" alt="Front door art" width="72" height="54" />
+  &nbsp;
+  <img src="./docs/media/art-ledger-trust.png" alt="Ledger trust art" width="72" height="54" />
+  &nbsp;
+  <img src="./docs/media/art-says-no.png" alt="Says no art" width="72" height="54" />
+</p>
+
+Brand & product art: [docs/media/](./docs/media/) · App icons & OG: [apps/web/public/](./apps/web/public/)
 
 Inspired by Andrew D'Souza's essay ["Principals"](https://www.andrewdsouza.com/): agents are untrusted; principals have their own reputation and can say no.
 
