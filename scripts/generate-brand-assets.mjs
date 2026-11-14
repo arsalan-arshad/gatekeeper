@@ -101,10 +101,14 @@ async function main() {
     width: 1280,
     height: 640,
   });
-  await svgToPng(join(mediaSvg, 'art-principal-mark.svg'), join(mediaDir, 'art-principal-mark.png'), {
-    width: 1200,
-    height: 900,
-  });
+  await svgToPng(
+    join(mediaSvg, 'art-principal-mark.svg'),
+    join(mediaDir, 'art-principal-mark.png'),
+    {
+      width: 1200,
+      height: 900,
+    },
+  );
   await svgToPng(join(mediaSvg, 'art-ledger-trust.svg'), join(mediaDir, 'art-ledger-trust.png'), {
     width: 1200,
     height: 900,
