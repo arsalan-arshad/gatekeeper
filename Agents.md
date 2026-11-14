@@ -1,0 +1,7 @@
+Project: Gatekeeper — an open-source (AGPL-3.0) "AI principal" that acts as a person's front door. Inspired by Andrew D'Souza's essay "Principals": agents are untrusted; principals have their own reputation and can say no.
+What it does: anyone (human or AI agent) who wants to reach a user sends a request to that user's Gatekeeper. Gatekeeper judges it against the user's plain-English rules, rejects spam/bad fits, and only delivers double-opt-in intros. Its public ledger (requests, accept rate, spam blocked) is its reputation.
+Audience: worldwide, starting with one niche (indie SaaS founders / remote tech hiring).
+Constraints: solo developer, near-zero budget. Use free tiers. No paid LLM by default.
+Stack: Node.js + TypeScript + Fastify (API), Next.js + Tailwind (web), Postgres + pgvector on Railway (Hobby), Drizzle ORM, Gemini Flash free tier as default LLM + Gemini embeddings (Groq as fallback, xAI optional later) behind a swappable llm.ts, Resend for email, Auth.js magic links, Lemon Squeezy/Paddle for payments (Stripe not available in Pakistan), GitHub Actions CI.
+Monetization (later): free for receivers, Pro $9/mo (custom rules, more inboxes), senders pay per accepted intro, optional $1 sender stake refunded on accept, forfeited on spam.
+Rules: never commit secrets (.env.example only), keep LLM calls rate-limited and cached, privacy first (never reveal a receiver's private rules), write tests for core logic, keep code simple and well-documented for contributors.
