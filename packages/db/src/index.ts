@@ -3,6 +3,7 @@ import postgres from 'postgres';
 
 import * as schema from './schema.js';
 
+export * from './migrate.js';
 export * from './pgvector.js';
 export * from './schema.js';
 

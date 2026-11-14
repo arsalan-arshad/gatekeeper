@@ -63,6 +63,18 @@ Swappable providers via `LLM_PROVIDER` (`gemini` default, `groq`, `xai`). Embedd
 pnpm --filter @gatekeeper/api test
 ```
 
+### Database (`packages/db`)
+
+Schema: `users`, `gate_rules`, `requests`, `api_keys`, plus monthly `ledger_stats` view. Migrations enable **pgvector**.
+
+```bash
+# requires DATABASE_URL (Postgres with permission to create the vector extension)
+export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/gatekeeper
+pnpm --filter @gatekeeper/db db:migrate
+```
+
+Regenerate SQL after schema edits: `pnpm --filter @gatekeeper/db db:generate`
+
 ## Deploy (Railway)
 
 Each app has a `railway.toml`:
