@@ -25,6 +25,21 @@ export type LedgerPayload = {
   months: LedgerMonth[];
 };
 
+const EMPTY_TOTALS: LedgerTotals = {
+  requestCount: 0,
+  deliveredCount: 0,
+  acceptedCount: 0,
+  spamCount: 0,
+  helpfulCount: 0,
+  acceptRate: 0,
+  trustScore: null,
+};
+
+/** Public ledger fallback when the API is unreachable — never requires auth. */
+export function emptyGlobalLedger(): LedgerPayload {
+  return { scope: 'global', totals: { ...EMPTY_TOTALS }, months: [] };
+}
+
 export function formatPercent(rate: number | null): string {
   if (rate === null || Number.isNaN(rate)) return '—';
   return `${Math.round(rate * 100)}%`;
