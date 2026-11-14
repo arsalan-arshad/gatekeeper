@@ -2,7 +2,9 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  transpilePackages: ['@gatekeeper/db'],
+  // Keep the workspace DB package outside the Next webpack graph. Bundling it
+  // pulls in migrate.js → ../drizzle, which webpack cannot resolve.
+  serverExternalPackages: ['@gatekeeper/db'],
   async rewrites() {
     return [
       {
