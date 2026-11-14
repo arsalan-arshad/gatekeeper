@@ -80,8 +80,12 @@ async function main() {
     height: 32,
   });
 
-  const ico16 = await sharp(await readFile(join(publicDir, 'favicon-16.png'))).png().toBuffer();
-  const ico32 = await sharp(await readFile(join(publicDir, 'favicon-32.png'))).png().toBuffer();
+  const ico16 = await sharp(await readFile(join(publicDir, 'favicon-16.png')))
+    .png()
+    .toBuffer();
+  const ico32 = await sharp(await readFile(join(publicDir, 'favicon-32.png')))
+    .png()
+    .toBuffer();
   const icoBuf = await toIco([ico16, ico32]);
   await writeFile(join(publicDir, 'favicon.ico'), icoBuf);
   console.log('wrote apps/web/public/favicon.ico');
