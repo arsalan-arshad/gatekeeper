@@ -13,12 +13,20 @@ export default function HomePage() {
         {BRAND.tagline}
       </h1>
       <p className="max-w-xl text-lg text-[var(--muted)]">{BRAND.summary}</p>
-      <Link
-        href="/start"
-        className="w-fit rounded-md bg-[var(--accent)] px-4 py-2 font-medium text-black"
-      >
-        Start your Gatekeeper
-      </Link>
+      <div className="flex flex-wrap gap-3">
+        <Link
+          href="/start"
+          className="w-fit rounded-md bg-[var(--accent)] px-4 py-2 font-medium text-black"
+        >
+          Start your Gatekeeper
+        </Link>
+        <Link
+          href="/dashboard/keys"
+          className="w-fit rounded-md border border-white/20 px-4 py-2 font-medium text-[var(--fg)]"
+        >
+          API keys
+        </Link>
+      </div>
     </main>
   );
 }

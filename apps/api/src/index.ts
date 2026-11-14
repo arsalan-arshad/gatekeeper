@@ -3,6 +3,10 @@ import { pathToFileURL } from 'node:url';
 import cors from '@fastify/cors';
 import Fastify from 'fastify';
 
+import { buildLlmsTxt } from './llms-txt.js';
+import { buildOpenApiDocument } from './openapi.js';
+import { registerAgentRoutes } from './routes/agent.js';
+import { registerKeyRoutes } from './routes/keys.js';
 import { registerOnboardingRoutes } from './routes/onboarding.js';
 import { registerOptInRoutes } from './routes/opt-in.js';
 import { registerPublicRoutes } from './routes/public.js';
@@ -15,7 +19,13 @@ export async function buildServer() {
 
   await app.register(cors, {
     origin: true,
-    allowedHeaders: ['content-type', 'x-user-email', 'x-internal-secret'],
+    allowedHeaders: [
+      'content-type',
+      'x-user-email',
+      'x-internal-secret',
+      'x-api-key',
+      'authorization',
+    ],
   });
 
   app.get('/health', async () => ({
@@ -23,9 +33,21 @@ export async function buildServer() {
     service: 'gatekeeper-api',
   }));
 
+  const apiBase = (process.env.API_URL ?? `http://localhost:${port}`).replace(/\/$/, '');
+  const appBase = (process.env.APP_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+
+  app.get('/openapi.json', async () => buildOpenApiDocument(apiBase));
+
+  app.get('/llms.txt', async (_request, reply) => {
+    reply.type('text/plain; charset=utf-8');
+    return buildLlmsTxt({ apiBase, appBase });
+  });
+
   await registerOnboardingRoutes(app);
   await registerPublicRoutes(app);
   await registerOptInRoutes(app);
+  await registerAgentRoutes(app);
+  await registerKeyRoutes(app);
 
   return app;
 }
