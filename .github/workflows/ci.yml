@@ -39,5 +39,9 @@ jobs:
       - name: Format check
         run: pnpm format:check
 
+      # Workspace packages export compiled dist/; build before tests that import them.
+      - name: Build packages
+        run: pnpm --filter @gatekeeper/db build
+
       - name: Test
         run: pnpm test

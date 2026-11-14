@@ -32,9 +32,6 @@ yarn-error.log*
 coverage
 .nyc_output
 
-# Drizzle
-drizzle/meta
-
 # Misc
 *.pem
 .turbo
