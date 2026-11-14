@@ -63,7 +63,18 @@ Swappable providers via `LLM_PROVIDER` (`gemini` default, `groq`, `xai`). Embedd
 pnpm --filter @gatekeeper/api test
 ```
 
+### Judging engine
+
+```bash
+pnpm --filter @gatekeeper/api test
+# focused:
+node --import tsx --test apps/api/src/judge.test.ts
+```
+
+`judgeRequest` embeds the inbound message, scores cosine similarity vs the profile embedding, asks the LLM for strict JSON, then accepts only when `score >= min_relevance` and no deal-breaker was hit. `reason_public` is sanitized so private gate rules never leak.
+
 ### Onboarding (`/start`)
+
 
 1. Start API + web: `pnpm dev`
 2. Set `DATABASE_URL`, `AUTH_SECRET`, and optionally `GEMINI_API_KEY` / `RESEND_API_KEY` in `.env` (see `.env.example`).
