@@ -80,6 +80,8 @@ test('intro email goes to both parties after receiver accept', async () => {
     senderEmail: 'maya@example.com',
     senderName: 'Maya',
     message: 'Let’s swap billing notes.',
+    requestId: '33333333-3333-3333-3333-333333333333',
+    env: { API_URL: 'http://localhost:4000', AUTH_SECRET: 'test-secret' },
   });
 
   const [email] = getConsoleEmailLog();
@@ -87,4 +89,7 @@ test('intro email goes to both parties after receiver accept', async () => {
   assert.deepEqual(email.to, ['ada@example.com', 'maya@example.com']);
   assert.match(email.text, /You're connected via Gatekeeper/);
   assert.match(email.text, /billing notes/);
+  assert.match(email.text, /was this intro helpful/i);
+  assert.match(email.text, /helpful=true/);
+  assert.match(email.text, /helpful=false/);
 });

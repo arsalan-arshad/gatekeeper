@@ -6,6 +6,10 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
+        source: '/@:handle/ledger',
+        destination: '/u/:handle/ledger',
+      },
+      {
         source: '/@:handle',
         destination: '/u/:handle',
       },

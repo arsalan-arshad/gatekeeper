@@ -100,6 +100,7 @@ export async function registerOptInRoutes(app: FastifyInstance): Promise<void> {
       senderEmail: row.senderContact,
       senderName: row.senderName,
       message: row.message,
+      requestId: id,
     });
 
     await db.update(requests).set({ status: 'accepted' }).where(eq(requests.id, id));

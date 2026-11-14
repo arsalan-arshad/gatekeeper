@@ -1,6 +1,6 @@
-import type { JudgeDecision, JudgeResult } from './judge.js';
 import type { EmailSender } from './email.js';
-import { createOptInToken } from './tokens.js';
+import type { JudgeDecision, JudgeResult } from './judge.js';
+import { createHelpfulToken, createOptInToken } from './tokens.js';
 
 function escapeHtml(value: string): string {
   return value
@@ -114,6 +114,19 @@ export async function sendRejectEmailToSender(
   return send({ to: input.senderEmail, subject, text, html });
 }
 
+export function buildHelpfulLinks(
+  requestId: string,
+  env: NodeJS.ProcessEnv = process.env,
+): { yesUrl: string; noUrl: string } {
+  const base = getPublicBaseUrl(env);
+  const yes = createHelpfulToken({ requestId, helpful: true }, { env });
+  const no = createHelpfulToken({ requestId, helpful: false }, { env });
+  return {
+    yesUrl: `${base}/v1/requests/${requestId}/helpful?helpful=true&token=${encodeURIComponent(yes)}`,
+    noUrl: `${base}/v1/requests/${requestId}/helpful?helpful=false&token=${encodeURIComponent(no)}`,
+  };
+}
+
 export async function sendIntroEmailToBoth(
   send: EmailSender,
   input: {
@@ -122,8 +135,11 @@ export async function sendIntroEmailToBoth(
     senderEmail: string;
     senderName: string;
     message: string;
+    requestId: string;
+    env?: NodeJS.ProcessEnv;
   },
 ) {
+  const { yesUrl, noUrl } = buildHelpfulLinks(input.requestId, input.env);
   const subject = `Intro: ${input.senderName} ↔ ${input.receiverName}`;
   const text = [
     `You're connected via Gatekeeper.`,
@@ -136,6 +152,10 @@ export async function sendIntroEmailToBoth(
     `Reply-all to continue the conversation.`,
     `${input.receiverName}: ${input.receiverEmail}`,
     `${input.senderName}: ${input.senderEmail}`,
+    '',
+    `${input.receiverName} — was this intro helpful?`,
+    `Yes: ${yesUrl}`,
+    `No: ${noUrl}`,
   ].join('\n');
 
   const html = `
@@ -149,6 +169,12 @@ export async function sendIntroEmailToBoth(
       <li>${escapeHtml(input.receiverName)}: ${escapeHtml(input.receiverEmail)}</li>
       <li>${escapeHtml(input.senderName)}: ${escapeHtml(input.senderEmail)}</li>
     </ul>
+    <p><strong>${escapeHtml(input.receiverName)}</strong> — was this intro helpful?</p>
+    <p>
+      <a href="${escapeHtml(yesUrl)}">Yes, helpful</a>
+      &nbsp;·&nbsp;
+      <a href="${escapeHtml(noUrl)}">No</a>
+    </p>
   `;
 
   return send({
