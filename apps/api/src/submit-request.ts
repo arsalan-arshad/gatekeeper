@@ -8,6 +8,13 @@ import { createEmailSender } from './email.js';
 import { judgeRequest } from './judge.js';
 import { createLlm } from './llm.js';
 import { sendReceiverOptInEmail, sendRejectEmailToSender, statusAfterJudgment } from './opt-in.js';
+import {
+  forfeitStakeToReceiver,
+  holdSenderStake,
+  paymentsEnabled,
+  refundStake,
+  stakeCentsFromEnv,
+} from './payments.js';
 
 export const introBodySchema = z.object({
   handle: z
@@ -26,6 +33,8 @@ export const introBodySchema = z.object({
   senderName: z.string().min(1).max(120),
   senderContact: z.string().min(1).max(320),
   message: z.string().min(1).max(5000),
+  /** Optional anti-spam stake in cents when PAYMENTS_ENABLED (e.g. 100 = $1). */
+  stakeCents: z.number().int().min(0).max(10_000).optional(),
 });
 
 export type IntroBody = z.infer<typeof introBodySchema>;
@@ -36,6 +45,7 @@ export type SubmitRequestResult = {
     status: string;
     decision: string | null;
     aiScore: number | null;
+    stakeCents?: number;
     createdAt: Date;
   };
   judgment: {
@@ -69,6 +79,18 @@ export async function submitIntroRequest(options: {
     return { ok: false, status: 409, error: 'User has not finished onboarding' };
   }
 
+  const stakeCents = paymentsEnabled() ? (options.body.stakeCents ?? 0) : 0;
+
+  if (stakeCents > 0) {
+    const held = await holdSenderStake({
+      senderEmail: options.body.senderContact,
+      stakeCents,
+    });
+    if (!held.ok) {
+      return { ok: false, status: 402, error: held.error };
+    }
+  }
+
   const [created] = await db
     .insert(requests)
     .values({
@@ -78,12 +100,14 @@ export async function submitIntroRequest(options: {
       targetUserId: user.id,
       message: options.body.message,
       apiKeyId: options.apiKeyId ?? null,
+      stakeCents,
       status: 'pending',
     })
     .returning({
       id: requests.id,
       status: requests.status,
       createdAt: requests.createdAt,
+      stakeCents: requests.stakeCents,
     });
 
   let judgment;
@@ -109,6 +133,10 @@ export async function submitIntroRequest(options: {
     );
   } catch (error) {
     options.log?.error({ err: error }, 'judgeRequest failed');
+    if (stakeCents > 0) {
+      await refundStake(options.body.senderContact, stakeCents);
+      await db.update(requests).set({ stakeCents: 0 }).where(eq(requests.id, created!.id));
+    }
     return {
       ok: true,
       result: {
@@ -117,6 +145,7 @@ export async function submitIntroRequest(options: {
           status: created!.status,
           decision: null,
           aiScore: null,
+          stakeCents: 0,
           createdAt: created!.createdAt,
         },
         judgment: null,
@@ -124,6 +153,19 @@ export async function submitIntroRequest(options: {
         error: 'Judging temporarily unavailable; request saved as pending',
       },
     };
+  }
+
+  // Stake: spam → receiver credits; reject → refund; accept → held until receiver opt-in.
+  if (stakeCents > 0) {
+    if (judgment.decision === 'spam') {
+      await forfeitStakeToReceiver({
+        receiverEmail: user.email,
+        stakeCents,
+      });
+    } else if (judgment.decision !== 'accept') {
+      await refundStake(options.body.senderContact, stakeCents);
+      await db.update(requests).set({ stakeCents: 0 }).where(eq(requests.id, created!.id));
+    }
   }
 
   const nextStatus = statusAfterJudgment(judgment.decision);
@@ -141,6 +183,7 @@ export async function submitIntroRequest(options: {
       status: requests.status,
       decision: requests.decision,
       aiScore: requests.aiScore,
+      stakeCents: requests.stakeCents,
       createdAt: requests.createdAt,
     });
 
@@ -189,4 +232,8 @@ export async function submitIntroRequest(options: {
       email,
     },
   };
+}
+
+export function defaultStakeCents(): number {
+  return stakeCentsFromEnv();
 }

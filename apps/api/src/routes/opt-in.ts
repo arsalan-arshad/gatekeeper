@@ -5,6 +5,7 @@ import type { FastifyInstance } from 'fastify';
 import { getDb } from '../db.js';
 import { createEmailSender } from '../email.js';
 import { sendIntroEmailToBoth } from '../opt-in.js';
+import { refundStake, settleAcceptedIntro } from '../payments.js';
 import { verifyOptInToken, type OptInAction } from '../tokens.js';
 
 function htmlPage(title: string, body: string): string {
@@ -82,13 +83,35 @@ export async function registerOptInRoutes(app: FastifyInstance): Promise<void> {
     }
 
     if (action === 'decline') {
-      await db.update(requests).set({ status: 'declined' }).where(eq(requests.id, id));
+      if (row.stakeCents > 0) {
+        await refundStake(row.senderContact, row.stakeCents);
+      }
+      await db
+        .update(requests)
+        .set({ status: 'declined', stakeCents: 0 })
+        .where(eq(requests.id, id));
       return reply
         .type('text/html')
         .send(
           htmlPage(
             'Declined',
             '<p>Declined. No intro email was sent. Thanks for keeping your Gatekeeper sharp.</p>',
+          ),
+        );
+    }
+
+    const settlement = await settleAcceptedIntro({
+      senderEmail: row.senderContact,
+      stakeCents: row.stakeCents,
+    });
+    if (!settlement.ok) {
+      return reply
+        .status(402)
+        .type('text/html')
+        .send(
+          htmlPage(
+            'Payment required',
+            `<p>Could not complete the intro: ${settlement.error}. Ask the sender to buy credits, then try Accept again.</p>`,
           ),
         );
     }
@@ -103,7 +126,7 @@ export async function registerOptInRoutes(app: FastifyInstance): Promise<void> {
       requestId: id,
     });
 
-    await db.update(requests).set({ status: 'accepted' }).where(eq(requests.id, id));
+    await db.update(requests).set({ status: 'accepted', stakeCents: 0 }).where(eq(requests.id, id));
 
     return reply
       .type('text/html')
