@@ -2,7 +2,13 @@
 
 Open-source (**AGPL-3.0**) AI principal — a person's front door for inbound requests.
 
+**Your AI front door that says no for you.**
+
 Inspired by Andrew D'Souza's essay ["Principals"](https://www.andrewdsouza.com/): agents are untrusted; principals have their own reputation and can say no.
+
+![Gatekeeper demo](./docs/media/demo.gif)
+
+> Placeholder GIF — replace with a real recording. See [docs/LAUNCH.md](./docs/LAUNCH.md) and `./scripts/generate-demo-gif-placeholder.sh`.
 
 ## What it does
 
@@ -148,15 +154,22 @@ node --import tsx --test apps/api/src/judge.test.ts
 ### Database (`packages/db`)
 
 
-Schema: `users`, `gate_rules`, `requests`, `api_keys`, plus monthly `ledger_stats` view. Migrations enable **pgvector**.
+Schema: `users`, `gate_rules`, `requests`, `api_keys`, `abuse_events`, plus monthly `ledger_stats` view. Migrations enable **pgvector**.
 
 ```bash
 # requires DATABASE_URL (Postgres with permission to create the vector extension)
 export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/gatekeeper
 pnpm --filter @gatekeeper/db db:migrate
+pnpm --filter @gatekeeper/db db:seed   # demo users @ada @jonas @mira
 ```
 
 Regenerate SQL after schema edits: `pnpm --filter @gatekeeper/db db:generate`
+
+### Launch checklist
+
+Production go-live steps (Railway, domain, Resend verification, demo GIF): **[docs/LAUNCH.md](./docs/LAUNCH.md)**.
+
+Privacy: [/privacy](http://localhost:3000/privacy) when running locally.
 
 ## Deploy (Railway)
 
@@ -165,7 +178,7 @@ Each app has a `railway.toml`:
 - `apps/api` — build `@gatekeeper/db` then `@gatekeeper/api`; start API; health at `/health`
 - `apps/web` — build and start Next.js; health at `/`
 
-Set env vars from `.env.example` in Railway for both services (and attach a Postgres + pgvector plugin for `DATABASE_URL`).
+Set env vars from `.env.example` in Railway for both services (and attach a Postgres + pgvector plugin for `DATABASE_URL`). Full checklist: [docs/LAUNCH.md](./docs/LAUNCH.md).
 
 ## License
 

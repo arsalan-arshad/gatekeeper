@@ -29,6 +29,13 @@
       "when": 1794682311867,
       "tag": "0003_optimal_ultimatum",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794682594496,
+      "tag": "0004_superb_maverick",
+      "breakpoints": true
     }
   ]
 }

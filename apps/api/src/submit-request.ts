@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import type { FastifyBaseLogger } from 'fastify';
 import { z } from 'zod';
 
+import { logAbuse } from './abuse-log.js';
 import { getDb } from './db.js';
 import { createEmailSender } from './email.js';
 import { judgeRequest } from './judge.js';
@@ -15,6 +16,7 @@ import {
   refundStake,
   stakeCentsFromEnv,
 } from './payments.js';
+import { MESSAGE_MAX_CHARS } from './request-limits.js';
 
 export const introBodySchema = z.object({
   handle: z
@@ -32,7 +34,7 @@ export const introBodySchema = z.object({
   senderType: z.enum(['human', 'agent']).default('human'),
   senderName: z.string().min(1).max(120),
   senderContact: z.string().min(1).max(320),
-  message: z.string().min(1).max(5000),
+  message: z.string().min(1).max(MESSAGE_MAX_CHARS),
   /** Optional anti-spam stake in cents when PAYMENTS_ENABLED (e.g. 100 = $1). */
   stakeCents: z.number().int().min(0).max(10_000).optional(),
 });
@@ -62,6 +64,7 @@ export async function submitIntroRequest(options: {
   handle: string;
   body: Omit<IntroBody, 'handle' | 'targetHandle'>;
   apiKeyId?: string | null;
+  clientIp?: string | null;
   log?: FastifyBaseLogger;
 }): Promise<
   { ok: true; result: SubmitRequestResult } | { ok: false; status: number; error: string }
@@ -186,6 +189,17 @@ export async function submitIntroRequest(options: {
       stakeCents: requests.stakeCents,
       createdAt: requests.createdAt,
     });
+
+  if (judgment.decision === 'spam') {
+    await logAbuse({
+      kind: 'spam_decision',
+      ip: options.clientIp,
+      apiKeyId: options.apiKeyId,
+      targetUserId: user.id,
+      detail: `request_id=${created!.id} score=${judgment.score}`,
+      log: options.log,
+    });
+  }
 
   const send = createEmailSender();
   let email: { kind: string; id: string; mode: string } | null = null;
