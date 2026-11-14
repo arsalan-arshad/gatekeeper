@@ -1,36 +1,29 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none" role="img" aria-label="Gatekeeper">
   <defs>
-    <radialGradient id="bg" cx="50%" cy="42%" r="68%">
-      <stop offset="0%" stop-color="#14241c"/>
-      <stop offset="55%" stop-color="#0b1210"/>
-      <stop offset="100%" stop-color="#060a08"/>
-    </radialGradient>
-    <linearGradient id="doorFace" x1="50%" y1="0%" x2="50%" y2="100%">
-      <stop offset="0%" stop-color="#1a2c24"/>
-      <stop offset="55%" stop-color="#0d1713"/>
-      <stop offset="100%" stop-color="#080e0b"/>
+    <linearGradient id="ink" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#14181c"/>
+      <stop offset="55%" stop-color="#0a0c0e"/>
+      <stop offset="100%" stop-color="#050607"/>
     </linearGradient>
-    <linearGradient id="rim" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#5fd4a4" stop-opacity="0.95"/>
-      <stop offset="45%" stop-color="#5fd4a4" stop-opacity="0.35"/>
-      <stop offset="100%" stop-color="#1b6b4f" stop-opacity="0.55"/>
+    <linearGradient id="plate" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#1a2228"/>
+      <stop offset="100%" stop-color="#0c1014"/>
     </linearGradient>
-    <radialGradient id="glow" cx="50%" cy="38%" r="55%">
-      <stop offset="0%" stop-color="#5fd4a4" stop-opacity="0.42"/>
-      <stop offset="55%" stop-color="#5fd4a4" stop-opacity="0.08"/>
-      <stop offset="100%" stop-color="#5fd4a4" stop-opacity="0"/>
-    </radialGradient>
-    <linearGradient id="sheen" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#eef3ef" stop-opacity="0"/>
-      <stop offset="45%" stop-color="#eef3ef" stop-opacity="0.16"/>
-      <stop offset="100%" stop-color="#eef3ef" stop-opacity="0"/>
+    <linearGradient id="signal" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#5affb0"/>
+      <stop offset="100%" stop-color="#2ad48a"/>
     </linearGradient>
   </defs>
-  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
-  <ellipse cx="256" cy="250" rx="190" ry="210" fill="url(#glow)"/>
-  <path d="M146 456 V236 A110 110 0 0 1 366 236 V456 Z" fill="url(#doorFace)" stroke="url(#rim)" stroke-width="6"/>
-  <path d="M186 430 V248 A70 70 0 0 1 326 248 V430 Z" fill="#060a08" stroke="#eef3ef" stroke-opacity="0.1" stroke-width="3"/>
-  <path d="M196 250 A60 60 0 0 1 316 250" stroke="#5fd4a4" stroke-opacity="0.35" stroke-width="4" stroke-linecap="round"/>
-  <path d="M168 430 V250 A88 88 0 0 1 256 162 V430 Z" fill="url(#sheen)"/>
-  <circle cx="302" cy="330" r="7" fill="#5fd4a4" fill-opacity="0.85"/>
+  <rect width="512" height="512" rx="64" fill="url(#ink)"/>
+  <rect x="22" y="22" width="468" height="468" rx="48" stroke="#3a4550" stroke-width="3" fill="none"/>
+  <rect x="44" y="44" width="424" height="424" rx="36" fill="url(#plate)" stroke="#252d34" stroke-width="2"/>
+  <g>
+    <rect x="128" y="118" width="256" height="32" fill="url(#signal)"/>
+    <rect x="144" y="150" width="28" height="248" fill="#e8eee9"/>
+    <rect x="214" y="150" width="28" height="248" fill="#c5cdc7"/>
+    <rect x="270" y="150" width="28" height="248" fill="#c5cdc7"/>
+    <rect x="340" y="150" width="28" height="248" fill="#e8eee9"/>
+    <rect x="128" y="248" width="256" height="28" fill="url(#signal)"/>
+    <rect x="128" y="398" width="256" height="20" fill="#5a6560"/>
+  </g>
 </svg>

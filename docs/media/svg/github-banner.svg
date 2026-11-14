@@ -1,55 +1,42 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" fill="none" role="img" aria-label="Gatekeeper GitHub banner">
   <defs>
-    <linearGradient id="sky" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#07110e"/>
-      <stop offset="40%" stop-color="#0b1210"/>
-      <stop offset="100%" stop-color="#101a16"/>
+    <linearGradient id="field" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#060809"/>
+      <stop offset="50%" stop-color="#0b0f13"/>
+      <stop offset="100%" stop-color="#12181f"/>
     </linearGradient>
-    <radialGradient id="mintBloom" cx="58%" cy="45%" r="48%">
-      <stop offset="0%" stop-color="#5fd4a4" stop-opacity="0.2"/>
-      <stop offset="60%" stop-color="#5fd4a4" stop-opacity="0.04"/>
-      <stop offset="100%" stop-color="#5fd4a4" stop-opacity="0"/>
-    </radialGradient>
-    <radialGradient id="deepBloom" cx="12%" cy="85%" r="38%">
-      <stop offset="0%" stop-color="#1b6b4f" stop-opacity="0.32"/>
-      <stop offset="100%" stop-color="#1b6b4f" stop-opacity="0"/>
-    </radialGradient>
-    <linearGradient id="doorFace" x1="50%" y1="0%" x2="50%" y2="100%">
-      <stop offset="0%" stop-color="#1a2c24"/>
-      <stop offset="55%" stop-color="#0d1713"/>
-      <stop offset="100%" stop-color="#080e0b"/>
+    <linearGradient id="plate" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#1a2228"/>
+      <stop offset="100%" stop-color="#0c1014"/>
     </linearGradient>
-    <linearGradient id="rim" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#5fd4a4" stop-opacity="0.95"/>
-      <stop offset="50%" stop-color="#5fd4a4" stop-opacity="0.3"/>
-      <stop offset="100%" stop-color="#1b6b4f" stop-opacity="0.55"/>
+    <linearGradient id="signal" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#5affb0"/>
+      <stop offset="100%" stop-color="#2ad48a"/>
     </linearGradient>
-    <radialGradient id="doorGlow" cx="50%" cy="40%" r="60%">
-      <stop offset="0%" stop-color="#5fd4a4" stop-opacity="0.4"/>
-      <stop offset="100%" stop-color="#5fd4a4" stop-opacity="0"/>
-    </radialGradient>
-    <linearGradient id="sheen" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#eef3ef" stop-opacity="0"/>
-      <stop offset="42%" stop-color="#eef3ef" stop-opacity="0.15"/>
-      <stop offset="100%" stop-color="#eef3ef" stop-opacity="0"/>
-    </linearGradient>
+    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
+      <path d="M48 0 H0 V48" fill="none" stroke="#5affb0" stroke-opacity="0.035" stroke-width="1"/>
+    </pattern>
   </defs>
 
-  <rect width="1280" height="640" fill="url(#sky)"/>
-  <rect width="1280" height="640" fill="url(#mintBloom)"/>
-  <rect width="1280" height="640" fill="url(#deepBloom)"/>
+  <rect width="1280" height="640" fill="url(#field)"/>
+  <rect width="1280" height="640" fill="url(#grid)"/>
+  <rect x="0" y="0" width="1280" height="5" fill="#5affb0"/>
+  <rect x="0" y="635" width="1280" height="5" fill="#252d34"/>
 
-  <!-- centered door -->
-  <g transform="translate(520, 48)">
-    <ellipse cx="120" cy="260" rx="200" ry="260" fill="url(#doorGlow)"/>
-    <path d="M20 560 V200 A100 100 0 0 1 220 200 V560 Z" fill="url(#doorFace)" stroke="url(#rim)" stroke-width="5"/>
-    <path d="M54 530 V220 A66 66 0 0 1 186 220 V530 Z" fill="#050805" stroke="#eef3ef" stroke-opacity="0.08" stroke-width="2.5"/>
-    <path d="M68 228 A52 52 0 0 1 172 228" stroke="#5fd4a4" stroke-opacity="0.35" stroke-width="3.5" stroke-linecap="round"/>
-    <path d="M36 530 V220 A84 84 0 0 1 120 136 V530 Z" fill="url(#sheen)"/>
-    <circle cx="168" cy="340" r="5.5" fill="#5fd4a4" fill-opacity="0.9"/>
+  <g transform="translate(516, 70)">
+    <rect width="248" height="248" rx="32" fill="#050607" stroke="#3a4550" stroke-width="3"/>
+    <rect x="14" y="14" width="220" height="220" rx="22" fill="url(#plate)"/>
+    <rect x="56" y="48" width="136" height="18" fill="url(#signal)"/>
+    <rect x="64" y="66" width="14" height="128" fill="#e8eee9"/>
+    <rect x="98" y="66" width="14" height="128" fill="#c5cdc7"/>
+    <rect x="136" y="66" width="14" height="128" fill="#c5cdc7"/>
+    <rect x="170" y="66" width="14" height="128" fill="#e8eee9"/>
+    <rect x="56" y="116" width="136" height="16" fill="url(#signal)"/>
+    <rect x="56" y="194" width="136" height="12" fill="#5a6560"/>
   </g>
 
-  <text x="640" y="90" text-anchor="middle" fill="#5fd4a4" font-family="IBM Plex Sans, ui-sans-serif, system-ui, sans-serif" font-size="16" font-weight="600" letter-spacing="8">OPEN SOURCE · AGPL-3.0</text>
-  <text x="640" y="580" text-anchor="middle" fill="#eef3ef" font-family="Syne, IBM Plex Sans, ui-sans-serif, system-ui, sans-serif" font-size="56" font-weight="800">Gatekeeper</text>
-  <text x="640" y="620" text-anchor="middle" fill="#8fa198" font-family="IBM Plex Sans, ui-sans-serif, system-ui, sans-serif" font-size="22">Your AI front door that says no for you</text>
+  <text x="640" y="380" text-anchor="middle" fill="#5affb0" font-family="IBM Plex Sans, ui-sans-serif, system-ui, sans-serif" font-size="16" font-weight="600" letter-spacing="8">OPEN SOURCE · AI PRINCIPAL</text>
+  <text x="640" y="470" text-anchor="middle" fill="#e8eee9" font-family="Syne, IBM Plex Sans, ui-sans-serif, system-ui, sans-serif" font-size="76" font-weight="800">Gatekeeper</text>
+  <text x="640" y="530" text-anchor="middle" fill="#9aa49c" font-family="IBM Plex Sans, ui-sans-serif, system-ui, sans-serif" font-size="26">The front door that can refuse</text>
+  <text x="640" y="580" text-anchor="middle" fill="#6b7870" font-family="IBM Plex Sans, ui-sans-serif, system-ui, sans-serif" font-size="18" letter-spacing="3">AUTHORITY · JUDGMENT · REPUTATION</text>
 </svg>

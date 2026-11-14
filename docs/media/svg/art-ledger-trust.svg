@@ -1,68 +1,65 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900" fill="none" role="img" aria-label="Gatekeeper ledger and trust">
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900" fill="none" role="img" aria-label="Gatekeeper public reputation ledger">
   <defs>
-    <linearGradient id="sky" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#07110e"/>
-      <stop offset="55%" stop-color="#0b1210"/>
-      <stop offset="100%" stop-color="#101a16"/>
+    <linearGradient id="field" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#060809"/>
+      <stop offset="55%" stop-color="#0b0f13"/>
+      <stop offset="100%" stop-color="#12181f"/>
     </linearGradient>
-    <radialGradient id="bloom" cx="68%" cy="40%" r="42%">
-      <stop offset="0%" stop-color="#5fd4a4" stop-opacity="0.18"/>
-      <stop offset="100%" stop-color="#5fd4a4" stop-opacity="0"/>
-    </radialGradient>
-    <linearGradient id="doorFace" x1="50%" y1="0%" x2="50%" y2="100%">
-      <stop offset="0%" stop-color="#1a2c24"/>
-      <stop offset="100%" stop-color="#080e0b"/>
-    </linearGradient>
-    <linearGradient id="rim" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#5fd4a4" stop-opacity="0.85"/>
-      <stop offset="100%" stop-color="#1b6b4f" stop-opacity="0.5"/>
+    <linearGradient id="plate" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#1a2228"/>
+      <stop offset="100%" stop-color="#0c1014"/>
     </linearGradient>
     <linearGradient id="panel" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#14241c" stop-opacity="0.95"/>
-      <stop offset="100%" stop-color="#0b1210" stop-opacity="0.9"/>
+      <stop offset="0%" stop-color="#12181e"/>
+      <stop offset="100%" stop-color="#090d11"/>
     </linearGradient>
+    <linearGradient id="signal" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#5affb0"/>
+      <stop offset="100%" stop-color="#2ad48a"/>
+    </linearGradient>
+    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
+      <path d="M48 0 H0 V48" fill="none" stroke="#5affb0" stroke-opacity="0.035" stroke-width="1"/>
+    </pattern>
   </defs>
 
-  <rect width="1200" height="900" fill="url(#sky)"/>
-  <rect width="1200" height="900" fill="url(#bloom)"/>
+  <rect width="1200" height="900" fill="url(#field)"/>
+  <rect width="1200" height="900" fill="url(#grid)"/>
+  <rect x="0" y="0" width="8" height="900" fill="#5affb0"/>
 
-  <!-- subtle ledger grid behind -->
-  <g stroke="#5fd4a4" stroke-opacity="0.07" stroke-width="1">
-    <path d="M80 180 H520"/><path d="M80 240 H520"/><path d="M80 300 H520"/><path d="M80 360 H520"/><path d="M80 420 H520"/><path d="M80 480 H520"/><path d="M80 540 H520"/>
-  </g>
+  <rect x="72" y="120" width="560" height="560" fill="url(#panel)" stroke="#2a343c" stroke-width="2"/>
+  <rect x="72" y="120" width="560" height="5" fill="#5affb0"/>
+  <text x="104" y="180" fill="#5affb0" font-family="IBM Plex Sans, ui-sans-serif, system-ui, sans-serif" font-size="16" font-weight="600" letter-spacing="5">PUBLIC REPUTATION</text>
+  <text x="104" y="240" fill="#e8eee9" font-family="Syne, IBM Plex Sans, ui-sans-serif, system-ui, sans-serif" font-size="40" font-weight="700">Ledger</text>
 
-  <!-- ledger panel -->
-  <rect x="72" y="140" width="480" height="520" rx="18" fill="url(#panel)" stroke="#5fd4a4" stroke-opacity="0.22" stroke-width="2"/>
-  <text x="104" y="198" fill="#5fd4a4" font-family="IBM Plex Sans, ui-sans-serif, system-ui, sans-serif" font-size="18" font-weight="600" letter-spacing="4">PUBLIC LEDGER</text>
-
-  <!-- rows -->
   <g font-family="IBM Plex Sans, ui-sans-serif, system-ui, sans-serif">
-    <text x="104" y="270" fill="#eef3ef" font-size="22">Requests seen</text>
-    <text x="500" y="270" text-anchor="end" fill="#5fd4a4" font-size="22" font-weight="600">1,284</text>
-    <text x="104" y="340" fill="#eef3ef" font-size="22">Spam blocked</text>
-    <text x="500" y="340" text-anchor="end" fill="#5fd4a4" font-size="22" font-weight="600">917</text>
-    <text x="104" y="410" fill="#eef3ef" font-size="22">Accept rate</text>
-    <text x="500" y="410" text-anchor="end" fill="#5fd4a4" font-size="22" font-weight="600">18%</text>
-    <text x="104" y="480" fill="#eef3ef" font-size="22">Trust score</text>
-    <text x="500" y="480" text-anchor="end" fill="#5fd4a4" font-size="22" font-weight="600">0.91</text>
+    <line x1="104" y1="280" x2="600" y2="280" stroke="#2a343c" stroke-width="1"/>
+    <text x="104" y="330" fill="#9aa49c" font-size="20">Requests judged</text>
+    <text x="600" y="330" text-anchor="end" fill="#e8eee9" font-size="30" font-weight="600">1,284</text>
+    <line x1="104" y1="360" x2="600" y2="360" stroke="#2a343c" stroke-width="1"/>
+    <text x="104" y="410" fill="#9aa49c" font-size="20">Refused / spam</text>
+    <text x="600" y="410" text-anchor="end" fill="#5affb0" font-size="30" font-weight="600">917</text>
+    <line x1="104" y1="440" x2="600" y2="440" stroke="#2a343c" stroke-width="1"/>
+    <text x="104" y="490" fill="#9aa49c" font-size="20">Accept rate</text>
+    <text x="600" y="490" text-anchor="end" fill="#e8eee9" font-size="30" font-weight="600">18%</text>
+    <line x1="104" y1="520" x2="600" y2="520" stroke="#2a343c" stroke-width="1"/>
+    <text x="104" y="570" fill="#9aa49c" font-size="20">Trust score</text>
+    <text x="600" y="570" text-anchor="end" fill="#5affb0" font-size="30" font-weight="600">0.91</text>
+    <line x1="104" y1="600" x2="600" y2="600" stroke="#2a343c" stroke-width="1"/>
+  </g>
+  <text x="104" y="650" fill="#6b7870" font-family="IBM Plex Sans, ui-sans-serif, system-ui, sans-serif" font-size="16">Reputation is public. Gate rules stay private.</text>
+
+  <g transform="translate(740, 200)">
+    <rect width="340" height="340" rx="40" fill="#050607" stroke="#3a4550" stroke-width="3"/>
+    <rect x="18" y="18" width="304" height="304" rx="28" fill="url(#plate)"/>
+    <rect x="78" y="70" width="184" height="22" fill="url(#signal)"/>
+    <rect x="90" y="92" width="20" height="176" fill="#e8eee9"/>
+    <rect x="136" y="92" width="20" height="176" fill="#c5cdc7"/>
+    <rect x="184" y="92" width="20" height="176" fill="#c5cdc7"/>
+    <rect x="230" y="92" width="20" height="176" fill="#e8eee9"/>
+    <rect x="78" y="160" width="184" height="20" fill="url(#signal)"/>
+    <rect x="78" y="268" width="184" height="14" fill="#5a6560"/>
   </g>
 
-  <!-- trust bars -->
-  <rect x="104" y="540" width="400" height="10" rx="5" fill="#1b6b4f" fill-opacity="0.45"/>
-  <rect x="104" y="540" width="364" height="10" rx="5" fill="#5fd4a4"/>
-  <text x="104" y="590" fill="#8fa198" font-family="IBM Plex Sans, ui-sans-serif, system-ui, sans-serif" font-size="16">Reputation is public. Gate rules stay private.</text>
-
-  <!-- small door mark -->
-  <g transform="translate(760, 180)">
-    <ellipse cx="140" cy="260" rx="180" ry="240" fill="#5fd4a4" fill-opacity="0.12"/>
-    <path d="M40 560 V220 A100 100 0 0 1 240 220 V560 Z" fill="url(#doorFace)" stroke="url(#rim)" stroke-width="5"/>
-    <path d="M78 530 V242 A62 62 0 0 1 202 242 V530 Z" fill="#050805" stroke="#eef3ef" stroke-opacity="0.08" stroke-width="2"/>
-    <!-- ledger lines inside portal -->
-    <g stroke="#5fd4a4" stroke-opacity="0.25" stroke-width="2" stroke-linecap="round">
-      <path d="M100 320 H180"/><path d="M108 360 H172"/><path d="M100 400 H180"/><path d="M114 440 H166"/>
-    </g>
-    <circle cx="186" cy="360" r="5" fill="#5fd4a4"/>
-  </g>
-
-  <text x="600" y="840" text-anchor="middle" fill="#8fa198" font-family="IBM Plex Sans, ui-sans-serif, system-ui, sans-serif" font-size="24" letter-spacing="4">LEDGER · TRUST</text>
+  <text x="600" y="780" text-anchor="middle" fill="#e8eee9" font-family="Syne, IBM Plex Sans, ui-sans-serif, system-ui, sans-serif" font-size="40" font-weight="700">Reputation is the product</text>
+  <text x="600" y="835" text-anchor="middle" fill="#6b7870" font-family="IBM Plex Sans, ui-sans-serif, system-ui, sans-serif" font-size="18" letter-spacing="4">PUBLIC LEDGER · TRUST SCORE</text>
 </svg>

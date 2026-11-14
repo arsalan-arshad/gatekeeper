@@ -1,15 +1,15 @@
 # Media
 
-Brand and marketing assets for Gatekeeper (dark forest-green + mint, arched front-door motif).
+Brand and marketing assets for Gatekeeper — **principal seal** system (ink / steel / signal mint). Motif: a geometric gate that can close — authority, judgment, reputation.
 
 ## Banner & product art
 
 | File | Purpose |
 | --- | --- |
 | `github-banner.png` | GitHub / README header (~1280×640) |
-| `art-door-mark.png` | Product still — arched doorway mark |
-| `art-ledger-trust.png` | Product still — public ledger & trust |
-| `art-says-no.png` | Product still — closed door / says no |
+| `art-principal-mark.png` | Product still — principal seal |
+| `art-ledger-trust.png` | Product still — public reputation ledger |
+| `art-says-no.png` | Product still — closed gate / refuses agents |
 | `demo.gif` | README walkthrough loop |
 
 SVG sources for the docs stills live in [`svg/`](./svg/).
@@ -18,10 +18,10 @@ SVG sources for the docs stills live in [`svg/`](./svg/).
 
 Served from [`apps/web/public/`](../../apps/web/public/):
 
-- `favicon.ico`, `favicon-16.png`, `favicon-32.png`
+- `favicon.ico`, `favicon-16.png`, `favicon-32.png` (gate glyph readable at 16px)
 - `icon.svg`, `icon-512.png`, `apple-touch-icon.png`
 - `og.png` (1200×630 Open Graph / Twitter)
-- SVG sources under `apps/web/public/brand/`
+- SVG sources under `apps/web/public/brand/` (`principal-mark.svg`, `favicon-mark.svg`, `og.svg`)
 
 ## Regenerate
 

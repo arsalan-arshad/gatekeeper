@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none" role="img" aria-label="Gatekeeper principal seal">
+  <defs>
+    <linearGradient id="ink" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#14181c"/>
+      <stop offset="55%" stop-color="#0a0c0e"/>
+      <stop offset="100%" stop-color="#050607"/>
+    </linearGradient>
+    <linearGradient id="plate" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#1a2228"/>
+      <stop offset="100%" stop-color="#0c1014"/>
+    </linearGradient>
+    <linearGradient id="signal" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#5affb0"/>
+      <stop offset="100%" stop-color="#2ad48a"/>
+    </linearGradient>
+  </defs>
+
+  <!-- official seal plate -->
+  <rect width="512" height="512" rx="64" fill="url(#ink)"/>
+  <rect x="22" y="22" width="468" height="468" rx="48" stroke="#3a4550" stroke-width="3" fill="none"/>
+  <rect x="44" y="44" width="424" height="424" rx="36" fill="url(#plate)" stroke="#252d34" stroke-width="2"/>
+
+  <!-- portcullis: authority that can close -->
+  <g>
+    <!-- lintel -->
+    <rect x="128" y="118" width="256" height="32" fill="url(#signal)"/>
+    <!-- vertical bars -->
+    <rect x="144" y="150" width="28" height="248" fill="#e8eee9"/>
+    <rect x="214" y="150" width="28" height="248" fill="#c5cdc7"/>
+    <rect x="270" y="150" width="28" height="248" fill="#c5cdc7"/>
+    <rect x="340" y="150" width="28" height="248" fill="#e8eee9"/>
+    <!-- refusal rail -->
+    <rect x="128" y="248" width="256" height="28" fill="url(#signal)"/>
+    <!-- sill -->
+    <rect x="128" y="398" width="256" height="20" fill="#5a6560"/>
+  </g>
+</svg>
