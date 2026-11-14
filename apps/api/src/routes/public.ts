@@ -4,8 +4,10 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
 import { getDb } from '../db.js';
+import { createEmailSender } from '../email.js';
 import { judgeRequest } from '../judge.js';
 import { createLlm } from '../llm.js';
+import { sendReceiverOptInEmail, sendRejectEmailToSender, statusAfterJudgment } from '../opt-in.js';
 
 const introSchema = z.object({
   senderType: z.enum(['human', 'agent']).default('human'),
@@ -109,7 +111,7 @@ export async function registerPublicRoutes(app: FastifyInstance): Promise<void> 
       };
     }
 
-    const nextStatus = judgment.decision === 'accept' ? 'delivered' : 'pending';
+    const nextStatus = statusAfterJudgment(judgment.decision);
     const [updated] = await db
       .update(requests)
       .set({
@@ -127,6 +129,38 @@ export async function registerPublicRoutes(app: FastifyInstance): Promise<void> 
         createdAt: requests.createdAt,
       });
 
+    const send = createEmailSender();
+    let email: { kind: string; id: string; mode: string } | null = null;
+
+    try {
+      if (judgment.decision === 'accept') {
+        const result = await sendReceiverOptInEmail(send, {
+          receiverEmail: user.email,
+          receiverName: user.name,
+          senderName: parsed.data.senderName,
+          senderType: parsed.data.senderType,
+          message: parsed.data.message,
+          score: judgment.score,
+          requestId: created!.id,
+        });
+        email = { kind: 'receiver_opt_in', id: result.id, mode: result.mode };
+      } else {
+        const result = await sendRejectEmailToSender(send, {
+          senderEmail: parsed.data.senderContact,
+          senderName: parsed.data.senderName,
+          receiverName: user.name,
+          judgment: {
+            decision: judgment.decision,
+            reason_public: judgment.reason_public,
+            suggested_rewrite: judgment.suggested_rewrite,
+          },
+        });
+        email = { kind: 'sender_reject', id: result.id, mode: result.mode };
+      }
+    } catch (error) {
+      request.log.error({ err: error }, 'opt-in email failed');
+    }
+
     // Public response: never include reason_private or gate rules.
     return {
       request: updated,
@@ -136,6 +170,7 @@ export async function registerPublicRoutes(app: FastifyInstance): Promise<void> 
         reason_public: judgment.reason_public,
         suggested_rewrite: judgment.suggested_rewrite,
       },
+      email,
     };
   });
 }
