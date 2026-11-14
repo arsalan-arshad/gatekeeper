@@ -63,7 +63,21 @@ Swappable providers via `LLM_PROVIDER` (`gemini` default, `groq`, `xai`). Embedd
 pnpm --filter @gatekeeper/api test
 ```
 
+### Payments (Lemon Squeezy, feature-flagged)
+
+```bash
+# off by default
+PAYMENTS_ENABLED=false
+```
+
+When `PAYMENTS_ENABLED=true`, configure Lemon env vars (see `.env.example`), point webhooks to
+`POST /v1/payments/webhooks/lemon`, then use `/dashboard/billing` for Pro ($9/mo) and credit packs.
+Optional `stakeCents: 100` on intro requests holds $1 — refunded on accept, forfeited to the receiver on spam. Pay-per-accepted-intro deducts `INTRO_CREDIT_CENTS` from the sender when the receiver Accepts.
+
+With the flag off, checkout returns 503, stakes/credits are skipped, and webhooks no-op.
+
 ### Public ledger & trust
+
 
 - Global: http://localhost:3000/ledger  
 - Per user: http://localhost:3000/@handle/ledger  

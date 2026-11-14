@@ -25,6 +25,8 @@ export const requestStatusEnum = pgEnum('request_status', [
   'declined',
 ]);
 
+export const planEnum = pgEnum('plan', ['free', 'pro']);
+
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
   handle: text('handle').notNull().unique(),
@@ -37,6 +39,30 @@ export const users = pgTable('users', {
   profileEmbedding: vector('profile_embedding', {
     dimensions: PROFILE_EMBEDDING_DIMENSIONS,
   }),
+  /** Lemon Squeezy Pro subscription — only enforced when PAYMENTS_ENABLED. */
+  plan: planEnum('plan').notNull().default('free'),
+  lemonCustomerId: text('lemon_customer_id'),
+  lemonSubscriptionId: text('lemon_subscription_id'),
+});
+
+/**
+ * Wallet for senders (and receivers earning spam-stake credits).
+ * Keyed by email so agents/senders need not be Gatekeeper users.
+ */
+export const billingAccounts = pgTable('billing_accounts', {
+  email: text('email').primaryKey(),
+  creditsCents: integer('credits_cents').notNull().default(0),
+  lemonCustomerId: text('lemon_customer_id'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+/** Idempotent Lemon Squeezy webhook log. */
+export const paymentEvents = pgTable('payment_events', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  lemonEventId: text('lemon_event_id').notNull().unique(),
+  eventName: text('event_name').notNull(),
+  payload: text('payload').notNull(),
+  processedAt: timestamp('processed_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
 /** One editable ruleset per user (user_id is the primary key). */

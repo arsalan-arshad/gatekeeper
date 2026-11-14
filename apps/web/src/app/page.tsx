@@ -32,6 +32,12 @@ export default function HomePage() {
         >
           Public ledger
         </Link>
+        <Link
+          href="/dashboard/billing"
+          className="w-fit rounded-md border border-white/20 px-4 py-2 font-medium text-[var(--fg)]"
+        >
+          Billing
+        </Link>
       </div>
     </main>
   );

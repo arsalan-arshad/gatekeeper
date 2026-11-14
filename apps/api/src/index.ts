@@ -10,6 +10,7 @@ import { registerKeyRoutes } from './routes/keys.js';
 import { registerLedgerRoutes } from './routes/ledger.js';
 import { registerOnboardingRoutes } from './routes/onboarding.js';
 import { registerOptInRoutes } from './routes/opt-in.js';
+import { registerPaymentRoutes } from './routes/payments.js';
 import { registerPublicRoutes } from './routes/public.js';
 
 const port = Number(process.env.PORT ?? 4000);
@@ -26,7 +27,23 @@ export async function buildServer() {
       'x-internal-secret',
       'x-api-key',
       'authorization',
+      'x-signature',
     ],
+  });
+
+  // Preserve raw JSON for Lemon Squeezy HMAC verification.
+  app.addContentTypeParser('application/json', { parseAs: 'buffer' }, (request, body, done) => {
+    const raw = body.toString('utf8');
+    (request as { rawBody?: string }).rawBody = raw;
+    if (!raw) {
+      done(null, {});
+      return;
+    }
+    try {
+      done(null, JSON.parse(raw));
+    } catch (error) {
+      done(error as Error, undefined);
+    }
   });
 
   app.get('/health', async () => ({
@@ -50,6 +67,7 @@ export async function buildServer() {
   await registerAgentRoutes(app);
   await registerKeyRoutes(app);
   await registerLedgerRoutes(app);
+  await registerPaymentRoutes(app);
 
   return app;
 }
