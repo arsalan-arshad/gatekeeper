@@ -2,7 +2,15 @@ import Link from 'next/link';
 
 import { formatPercent, type LedgerPayload } from '@/lib/ledger';
 
-export function LedgerView({ data, title }: { data: LedgerPayload; title: string }) {
+export function LedgerView({
+  data,
+  title,
+  notice,
+}: {
+  data: LedgerPayload;
+  title: string;
+  notice?: string;
+}) {
   const { totals, months } = data;
 
   return (
@@ -31,6 +39,7 @@ export function LedgerView({ data, title }: { data: LedgerPayload; title: string
           Public reputation: requests, delivered intros, receiver accepts, spam blocked, and trust
           from helpful ratings. Private gate rules are never shown.
         </p>
+        {notice ? <p className="mt-3 text-sm text-[var(--muted)]">{notice}</p> : null}
       </div>
 
       <section className="grid gap-4 sm:grid-cols-2">

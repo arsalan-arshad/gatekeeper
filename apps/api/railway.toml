@@ -3,7 +3,8 @@ builder = "NIXPACKS"
 buildCommand = "pnpm --filter @gatekeeper/db build && pnpm --filter @gatekeeper/api build"
 
 [deploy]
-startCommand = "pnpm --filter @gatekeeper/api start"
+# Migrate (and create the app DB if missing) before serving traffic.
+startCommand = "pnpm --filter @gatekeeper/db db:migrate && pnpm --filter @gatekeeper/api start"
 healthcheckPath = "/health"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 5
