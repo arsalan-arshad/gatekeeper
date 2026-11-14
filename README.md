@@ -63,7 +63,16 @@ Swappable providers via `LLM_PROVIDER` (`gemini` default, `groq`, `xai`). Embedd
 pnpm --filter @gatekeeper/api test
 ```
 
+### Onboarding (`/start`)
+
+1. Start API + web: `pnpm dev`
+2. Set `DATABASE_URL`, `AUTH_SECRET`, and optionally `GEMINI_API_KEY` / `RESEND_API_KEY` in `.env` (see `.env.example`).
+3. Apply migrations: `pnpm --filter @gatekeeper/db db:migrate`
+4. Open [http://localhost:3000/start](http://localhost:3000/start), enter your email, then open the magic link (printed in the **web** console when `RESEND_API_KEY` is unset).
+5. Answer the five interview questions, edit your gate rules, publish — then visit `/@your-handle`.
+
 ### Database (`packages/db`)
+
 
 Schema: `users`, `gate_rules`, `requests`, `api_keys`, plus monthly `ledger_stats` view. Migrations enable **pgvector**.
 

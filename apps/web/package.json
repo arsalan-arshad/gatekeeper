@@ -9,12 +9,16 @@
     "start": "next start --port ${PORT:-3000}",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --import tsx --test src/lib/brand.test.ts"
+    "test": "node --import tsx --test src/lib/brand.test.ts src/lib/handle.test.ts"
   },
   "dependencies": {
+    "@auth/drizzle-adapter": "^1.11.3",
+    "@gatekeeper/db": "workspace:^",
     "next": "^15.2.2",
+    "next-auth": "5.0.0-beta.32",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "resend": "^6.38.1"
   },
   "devDependencies": {
     "@gatekeeper/tsconfig": "workspace:*",
