@@ -1,62 +1,68 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900" fill="none" role="img" aria-label="Gatekeeper says no">
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900" fill="none" role="img" aria-label="Gatekeeper refuses inbound agents">
   <defs>
-    <linearGradient id="sky" x1="10%" y1="0%" x2="90%" y2="100%">
-      <stop offset="0%" stop-color="#07110e"/>
-      <stop offset="50%" stop-color="#0b1210"/>
-      <stop offset="100%" stop-color="#101a16"/>
+    <linearGradient id="field" x1="10%" y1="0%" x2="90%" y2="100%">
+      <stop offset="0%" stop-color="#060809"/>
+      <stop offset="50%" stop-color="#0b0f13"/>
+      <stop offset="100%" stop-color="#12181f"/>
     </linearGradient>
-    <radialGradient id="bloom" cx="50%" cy="40%" r="48%">
-      <stop offset="0%" stop-color="#5fd4a4" stop-opacity="0.16"/>
-      <stop offset="100%" stop-color="#5fd4a4" stop-opacity="0"/>
-    </radialGradient>
-    <linearGradient id="doorFace" x1="50%" y1="0%" x2="50%" y2="100%">
-      <stop offset="0%" stop-color="#1a2c24"/>
-      <stop offset="55%" stop-color="#0d1713"/>
-      <stop offset="100%" stop-color="#080e0b"/>
+    <linearGradient id="plate" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#1a2228"/>
+      <stop offset="100%" stop-color="#0c1014"/>
     </linearGradient>
-    <linearGradient id="rim" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#5fd4a4" stop-opacity="0.7"/>
-      <stop offset="100%" stop-color="#1b6b4f" stop-opacity="0.55"/>
+    <linearGradient id="signal" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#5affb0"/>
+      <stop offset="100%" stop-color="#2ad48a"/>
     </linearGradient>
-    <linearGradient id="bar" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#5fd4a4" stop-opacity="0.15"/>
-      <stop offset="50%" stop-color="#5fd4a4" stop-opacity="0.95"/>
-      <stop offset="100%" stop-color="#5fd4a4" stop-opacity="0.15"/>
-    </linearGradient>
+    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
+      <path d="M48 0 H0 V48" fill="none" stroke="#5affb0" stroke-opacity="0.035" stroke-width="1"/>
+    </pattern>
   </defs>
 
-  <rect width="1200" height="900" fill="url(#sky)"/>
-  <rect width="1200" height="900" fill="url(#bloom)"/>
+  <rect width="1200" height="900" fill="url(#field)"/>
+  <rect width="1200" height="900" fill="url(#grid)"/>
+  <rect x="0" y="0" width="8" height="900" fill="#5affb0"/>
 
-  <!-- closed doorway -->
-  <g transform="translate(420, 70)">
-    <ellipse cx="180" cy="330" rx="250" ry="300" fill="#5fd4a4" fill-opacity="0.08"/>
-    <path d="M40 720 V270 A140 140 0 0 1 320 270 V720 Z" fill="url(#doorFace)" stroke="url(#rim)" stroke-width="7"/>
-    <!-- solid closed face instead of open portal -->
-    <path d="M92 680 V300 A88 88 0 0 1 268 300 V680 Z" fill="#0a1410" stroke="#eef3ef" stroke-opacity="0.06" stroke-width="3"/>
-    <!-- horizontal "no" bar across the portal -->
-    <rect x="70" y="430" width="220" height="18" rx="9" fill="url(#bar)"/>
-    <rect x="70" y="430" width="220" height="18" rx="9" stroke="#5fd4a4" stroke-opacity="0.55" stroke-width="2"/>
-    <!-- subtle X mark -->
-    <g stroke="#5fd4a4" stroke-opacity="0.55" stroke-width="5" stroke-linecap="round">
-      <path d="M150 390 L210 470"/>
-      <path d="M210 390 L150 470"/>
-    </g>
-    <circle cx="248" cy="540" r="7" fill="#1b6b4f"/>
-  </g>
-
-  <!-- inbound request chips bouncing off -->
+  <!-- rejected inbound agent cards -->
   <g font-family="IBM Plex Sans, ui-sans-serif, system-ui, sans-serif">
-    <rect x="120" y="280" width="220" height="52" rx="10" fill="#14241c" stroke="#8fa198" stroke-opacity="0.35" stroke-width="1.5"/>
-    <text x="230" y="312" text-anchor="middle" fill="#8fa198" font-size="18">cold pitch</text>
-
-    <rect x="90" y="380" width="240" height="52" rx="10" fill="#14241c" stroke="#8fa198" stroke-opacity="0.25" stroke-width="1.5" transform="rotate(-6 210 406)"/>
-    <text x="210" y="412" text-anchor="middle" fill="#8fa198" font-size="18" transform="rotate(-6 210 406)">spam agent</text>
-
-    <rect x="860" y="300" width="230" height="52" rx="10" fill="#14241c" stroke="#8fa198" stroke-opacity="0.3" stroke-width="1.5" transform="rotate(5 975 326)"/>
-    <text x="975" y="332" text-anchor="middle" fill="#8fa198" font-size="18" transform="rotate(5 975 326)">bad fit</text>
+    <g transform="translate(72, 210) rotate(-7)">
+      <rect width="250" height="78" fill="#10161c" stroke="#3a4550" stroke-width="2"/>
+      <rect width="6" height="78" fill="#5a6560"/>
+      <text x="28" y="32" fill="#6b7870" font-size="12" letter-spacing="2">AGENT · REJECTED</text>
+      <text x="28" y="58" fill="#c5cdc7" font-size="22">cold pitch bot</text>
+    </g>
+    <g transform="translate(48, 380) rotate(3)">
+      <rect width="270" height="78" fill="#10161c" stroke="#3a4550" stroke-width="2"/>
+      <rect width="6" height="78" fill="#5a6560"/>
+      <text x="28" y="32" fill="#6b7870" font-size="12" letter-spacing="2">AGENT · REJECTED</text>
+      <text x="28" y="58" fill="#c5cdc7" font-size="22">spam recruiter</text>
+    </g>
+    <g transform="translate(900, 230) rotate(6)">
+      <rect width="240" height="78" fill="#10161c" stroke="#3a4550" stroke-width="2"/>
+      <rect width="6" height="78" fill="#5a6560"/>
+      <text x="28" y="32" fill="#6b7870" font-size="12" letter-spacing="2">AGENT · REJECTED</text>
+      <text x="28" y="58" fill="#c5cdc7" font-size="22">bad-fit DM</text>
+    </g>
   </g>
 
-  <text x="600" y="820" text-anchor="middle" fill="#eef3ef" font-family="Syne, IBM Plex Sans, ui-sans-serif, system-ui, sans-serif" font-size="42" font-weight="700">Says no for you</text>
-  <text x="600" y="860" text-anchor="middle" fill="#8fa198" font-family="IBM Plex Sans, ui-sans-serif, system-ui, sans-serif" font-size="20">Spam and bad fits bounce at the door</text>
+  <!-- closed portcullis -->
+  <g transform="translate(390, 130)">
+    <rect width="420" height="460" rx="48" fill="#050607" stroke="#3a4550" stroke-width="4"/>
+    <rect x="22" y="22" width="376" height="416" rx="34" fill="url(#plate)"/>
+    <rect x="98" y="80" width="224" height="28" fill="url(#signal)"/>
+    <rect x="112" y="108" width="24" height="260" fill="#e8eee9"/>
+    <rect x="172" y="108" width="24" height="260" fill="#c5cdc7"/>
+    <rect x="224" y="108" width="24" height="260" fill="#c5cdc7"/>
+    <rect x="284" y="108" width="24" height="260" fill="#e8eee9"/>
+    <!-- heavy refusal rail -->
+    <rect x="86" y="210" width="248" height="32" fill="url(#signal)"/>
+    <g stroke="#050607" stroke-width="7" stroke-linecap="square">
+      <path d="M175 198 L245 254"/>
+      <path d="M245 198 L175 254"/>
+    </g>
+    <rect x="98" y="368" width="224" height="18" fill="#5a6560"/>
+  </g>
+
+  <text x="600" y="700" text-anchor="middle" fill="#e8eee9" font-family="Syne, IBM Plex Sans, ui-sans-serif, system-ui, sans-serif" font-size="52" font-weight="800">Says no for you</text>
+  <text x="600" y="760" text-anchor="middle" fill="#9aa49c" font-family="IBM Plex Sans, ui-sans-serif, system-ui, sans-serif" font-size="22">Inbound agents meet judgment first. Bad fits bounce.</text>
+  <text x="600" y="820" text-anchor="middle" fill="#5affb0" font-family="IBM Plex Sans, ui-sans-serif, system-ui, sans-serif" font-size="16" letter-spacing="5">AUTHORITY TO REFUSE</text>
 </svg>

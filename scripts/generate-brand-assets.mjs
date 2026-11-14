@@ -7,8 +7,8 @@
  *
  * Or: pnpm exec sharp is not required — this script imports sharp from
  * NODE_PATH / a local install. Prefer:
- *   npm install --prefix /tmp/gk-brand sharp to-ico && \
- *   NODE_PATH=/tmp/gk-brand/node_modules node scripts/generate-brand-assets.mjs
+ *   npm install --prefix /tmp/gatekeeper-brand sharp to-ico && \
+ *   NODE_PATH=/tmp/gatekeeper-brand/node_modules node scripts/generate-brand-assets.mjs
  */
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
@@ -60,17 +60,17 @@ async function main() {
   const mediaDir = join(root, 'docs/media');
   const mediaSvg = join(mediaDir, 'svg');
 
-  // App icons from door mark
-  await svgToPng(join(brandDir, 'door-mark.svg'), join(publicDir, 'icon-512.png'), {
+  // App icons from principal seal
+  await svgToPng(join(brandDir, 'principal-mark.svg'), join(publicDir, 'icon-512.png'), {
     width: 512,
     height: 512,
   });
-  await svgToPng(join(brandDir, 'door-mark.svg'), join(publicDir, 'apple-touch-icon.png'), {
+  await svgToPng(join(brandDir, 'principal-mark.svg'), join(publicDir, 'apple-touch-icon.png'), {
     width: 180,
     height: 180,
   });
 
-  // Favicons
+  // Favicons (hard-edged gate glyph, readable at 16px)
   await svgToPng(join(brandDir, 'favicon-mark.svg'), join(publicDir, 'favicon-16.png'), {
     width: 16,
     height: 16,
@@ -101,7 +101,7 @@ async function main() {
     width: 1280,
     height: 640,
   });
-  await svgToPng(join(mediaSvg, 'art-door-mark.svg'), join(mediaDir, 'art-door-mark.png'), {
+  await svgToPng(join(mediaSvg, 'art-principal-mark.svg'), join(mediaDir, 'art-principal-mark.png'), {
     width: 1200,
     height: 900,
   });

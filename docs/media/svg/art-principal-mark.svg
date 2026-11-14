@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900" fill="none" role="img" aria-label="Gatekeeper principal seal">
+  <defs>
+    <linearGradient id="field" x1="15%" y1="0%" x2="85%" y2="100%">
+      <stop offset="0%" stop-color="#060809"/>
+      <stop offset="55%" stop-color="#0b0f13"/>
+      <stop offset="100%" stop-color="#12181f"/>
+    </linearGradient>
+    <linearGradient id="plate" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#1a2228"/>
+      <stop offset="100%" stop-color="#0c1014"/>
+    </linearGradient>
+    <linearGradient id="signal" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#5affb0"/>
+      <stop offset="100%" stop-color="#2ad48a"/>
+    </linearGradient>
+    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
+      <path d="M48 0 H0 V48" fill="none" stroke="#5affb0" stroke-opacity="0.04" stroke-width="1"/>
+    </pattern>
+  </defs>
+
+  <rect width="1200" height="900" fill="url(#field)"/>
+  <rect width="1200" height="900" fill="url(#grid)"/>
+  <rect x="0" y="0" width="8" height="900" fill="#5affb0"/>
+
+  <g transform="translate(360, 100)">
+    <rect width="480" height="480" rx="56" fill="#050607" stroke="#3a4550" stroke-width="4"/>
+    <rect x="24" y="24" width="432" height="432" rx="40" fill="url(#plate)"/>
+    <rect x="112" y="100" width="256" height="32" fill="url(#signal)"/>
+    <rect x="128" y="132" width="28" height="248" fill="#e8eee9"/>
+    <rect x="198" y="132" width="28" height="248" fill="#c5cdc7"/>
+    <rect x="254" y="132" width="28" height="248" fill="#c5cdc7"/>
+    <rect x="324" y="132" width="28" height="248" fill="#e8eee9"/>
+    <rect x="112" y="232" width="256" height="28" fill="url(#signal)"/>
+    <rect x="112" y="380" width="256" height="20" fill="#5a6560"/>
+  </g>
+
+  <text x="600" y="680" text-anchor="middle" fill="#e8eee9" font-family="Syne, IBM Plex Sans, ui-sans-serif, system-ui, sans-serif" font-size="48" font-weight="800">Principal seal</text>
+  <text x="600" y="740" text-anchor="middle" fill="#5affb0" font-family="IBM Plex Sans, ui-sans-serif, system-ui, sans-serif" font-size="20" letter-spacing="5">AUTHORITY · JUDGMENT · REPUTATION</text>
+  <text x="600" y="800" text-anchor="middle" fill="#9aa49c" font-family="IBM Plex Sans, ui-sans-serif, system-ui, sans-serif" font-size="22">A gate that can close. An agent that can say no.</text>
+</svg>
