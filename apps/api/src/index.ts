@@ -7,6 +7,7 @@ import { buildLlmsTxt } from './llms-txt.js';
 import { buildOpenApiDocument } from './openapi.js';
 import { registerAgentRoutes } from './routes/agent.js';
 import { registerKeyRoutes } from './routes/keys.js';
+import { registerLedgerRoutes } from './routes/ledger.js';
 import { registerOnboardingRoutes } from './routes/onboarding.js';
 import { registerOptInRoutes } from './routes/opt-in.js';
 import { registerPublicRoutes } from './routes/public.js';
@@ -48,6 +49,7 @@ export async function buildServer() {
   await registerOptInRoutes(app);
   await registerAgentRoutes(app);
   await registerKeyRoutes(app);
+  await registerLedgerRoutes(app);
 
   return app;
 }

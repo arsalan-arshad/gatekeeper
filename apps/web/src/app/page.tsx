@@ -26,6 +26,12 @@ export default function HomePage() {
         >
           API keys
         </Link>
+        <Link
+          href="/ledger"
+          className="w-fit rounded-md border border-white/20 px-4 py-2 font-medium text-[var(--fg)]"
+        >
+          Public ledger
+        </Link>
       </div>
     </main>
   );

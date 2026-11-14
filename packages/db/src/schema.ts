@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+  boolean,
   doublePrecision,
   integer,
   pgEnum,
@@ -69,20 +70,26 @@ export const requests = pgTable('requests', {
   decision: decisionEnum('decision'),
   status: requestStatusEnum('status').notNull().default('pending'),
   stakeCents: integer('stake_cents').notNull().default(0),
+  /** Receiver 1-click helpful rating from the intro email; null = not rated. */
+  helpful: boolean('helpful'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
 /**
  * Monthly public-ledger aggregates per target user.
- * accept_rate = accepts / total requests in that month (0 when empty).
+ * - delivered = AI accepted (forwarded to receiver for opt-in)
+ * - accepted = receiver opted in
+ * - accept_rate = delivered / requests
+ * - trust uses helpful among delivered (computed in API all-time too)
  */
 export const ledgerStats = pgView('ledger_stats', {
   targetUserId: uuid('target_user_id').notNull(),
   month: timestamp('month', { withTimezone: true }).notNull(),
   requestCount: integer('request_count').notNull(),
-  acceptCount: integer('accept_count').notNull(),
-  rejectCount: integer('reject_count').notNull(),
+  deliveredCount: integer('delivered_count').notNull(),
+  acceptedCount: integer('accepted_count').notNull(),
   spamCount: integer('spam_count').notNull(),
+  helpfulCount: integer('helpful_count').notNull(),
   acceptRate: doublePrecision('accept_rate').notNull(),
 }).as(
   sql`
@@ -90,9 +97,10 @@ export const ledgerStats = pgView('ledger_stats', {
       target_user_id,
       date_trunc('month', created_at) AS month,
       count(*)::int AS request_count,
-      count(*) FILTER (WHERE decision = 'accept')::int AS accept_count,
-      count(*) FILTER (WHERE decision = 'reject')::int AS reject_count,
+      count(*) FILTER (WHERE decision = 'accept')::int AS delivered_count,
+      count(*) FILTER (WHERE status = 'accepted')::int AS accepted_count,
       count(*) FILTER (WHERE decision = 'spam')::int AS spam_count,
+      count(*) FILTER (WHERE helpful IS TRUE)::int AS helpful_count,
       CASE
         WHEN count(*) = 0 THEN 0::float8
         ELSE (count(*) FILTER (WHERE decision = 'accept'))::float8 / count(*)::float8

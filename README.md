@@ -63,7 +63,20 @@ Swappable providers via `LLM_PROVIDER` (`gemini` default, `groq`, `xai`). Embedd
 pnpm --filter @gatekeeper/api test
 ```
 
+### Public ledger & trust
+
+- Global: http://localhost:3000/ledger  
+- Per user: http://localhost:3000/@handle/ledger  
+- Trust score = helpful ratings / delivered intros  
+- After a receiver Accepts, the intro email includes **Was this intro helpful?** Yes/No links (API console prints them when `RESEND_API_KEY` is unset)
+
+```bash
+curl http://localhost:4000/v1/ledger
+curl http://localhost:4000/v1/users/ada/ledger
+```
+
 ### Agent API
+
 
 ```bash
 # docs for agents

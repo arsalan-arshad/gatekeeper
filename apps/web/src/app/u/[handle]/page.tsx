@@ -52,6 +52,9 @@ export default async function PublicHandlePage({
             <span className="text-[var(--accent)]">Open to:</span> {user.wantsText}
           </p>
         ) : null}
+        <Link className="text-sm text-[var(--accent)] underline" href={`/@${user.handle}/ledger`}>
+          View public ledger
+        </Link>
       </header>
 
       <section className="flex flex-col gap-4">
