@@ -81,6 +81,20 @@ export const apiKeys = pgTable('api_keys', {
   rateLimit: integer('rate_limit').notNull().default(60),
 });
 
+/**
+ * Abuse / protection signals (rate limits, oversized payloads, spam judgments).
+ * Used for ops visibility — never exposed on public profiles.
+ */
+export const abuseEvents = pgTable('abuse_events', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  kind: text('kind').notNull(),
+  ip: text('ip'),
+  apiKeyId: uuid('api_key_id').references(() => apiKeys.id, { onDelete: 'set null' }),
+  targetUserId: uuid('target_user_id').references(() => users.id, { onDelete: 'set null' }),
+  detail: text('detail'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 export const requests = pgTable('requests', {
   id: uuid('id').defaultRandom().primaryKey(),
   senderType: senderTypeEnum('sender_type').notNull(),

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { IBM_Plex_Sans, Fraunces } from 'next/font/google';
+import { IBM_Plex_Sans, Syne } from 'next/font/google';
 
 import './globals.css';
 
@@ -9,15 +9,16 @@ const sans = IBM_Plex_Sans({
   variable: '--font-sans',
 });
 
-const display = Fraunces({
+const display = Syne({
   subsets: ['latin'],
-  weight: ['500', '600'],
+  weight: ['600', '700', '800'],
   variable: '--font-display',
 });
 
 export const metadata: Metadata = {
-  title: 'Gatekeeper',
-  description: 'An open-source AI principal — your front door for inbound requests.',
+  title: 'Gatekeeper — Your AI front door that says no for you',
+  description:
+    'Open-source AI principal. Requests meet your rules first. Only double-opt-in intros get through.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

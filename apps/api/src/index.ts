@@ -3,8 +3,10 @@ import { pathToFileURL } from 'node:url';
 import cors from '@fastify/cors';
 import Fastify from 'fastify';
 
+import { logAbuse } from './abuse-log.js';
 import { buildLlmsTxt } from './llms-txt.js';
 import { buildOpenApiDocument } from './openapi.js';
+import { FASTIFY_BODY_LIMIT } from './request-limits.js';
 import { registerAgentRoutes } from './routes/agent.js';
 import { registerKeyRoutes } from './routes/keys.js';
 import { registerLedgerRoutes } from './routes/ledger.js';
@@ -17,7 +19,10 @@ const port = Number(process.env.PORT ?? 4000);
 const host = process.env.HOST ?? '0.0.0.0';
 
 export async function buildServer() {
-  const app = Fastify({ logger: true });
+  const app = Fastify({
+    logger: true,
+    bodyLimit: FASTIFY_BODY_LIMIT,
+  });
 
   await app.register(cors, {
     origin: true,
@@ -33,6 +38,16 @@ export async function buildServer() {
 
   // Preserve raw JSON for Lemon Squeezy HMAC verification.
   app.addContentTypeParser('application/json', { parseAs: 'buffer' }, (request, body, done) => {
+    if (Buffer.isBuffer(body) && body.byteLength > FASTIFY_BODY_LIMIT) {
+      void logAbuse({
+        kind: 'oversized_body',
+        ip: request.ip,
+        detail: `bytes=${body.byteLength}`,
+        log: request.log,
+      });
+      done(Object.assign(new Error('Request body too large'), { statusCode: 413 }), undefined);
+      return;
+    }
     const raw = body.toString('utf8');
     (request as { rawBody?: string }).rawBody = raw;
     if (!raw) {
@@ -44,6 +59,25 @@ export async function buildServer() {
     } catch (error) {
       done(error as Error, undefined);
     }
+  });
+
+  app.setErrorHandler((error: Error & { statusCode?: number }, request, reply) => {
+    const statusCode = typeof error.statusCode === 'number' ? error.statusCode : 500;
+    if (statusCode === 413) {
+      void logAbuse({
+        kind: 'oversized_body',
+        ip: request.ip,
+        detail: error.message,
+        log: request.log,
+      });
+      return reply
+        .status(413)
+        .send({ error: 'Request body too large', max_bytes: FASTIFY_BODY_LIMIT });
+    }
+    request.log.error(error);
+    return reply.status(statusCode).send({
+      error: statusCode >= 500 ? 'Internal Server Error' : error.message,
+    });
   });
 
   app.get('/health', async () => ({

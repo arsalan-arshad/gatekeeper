@@ -3,15 +3,26 @@ import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
+import { logAbuse } from '../abuse-log.js';
 import { getDb } from '../db.js';
+import { checkIpRateLimit } from '../rate-limit.js';
+import { MESSAGE_MAX_CHARS } from '../request-limits.js';
 import { submitIntroRequest } from '../submit-request.js';
 
 const publicIntroSchema = z.object({
   senderType: z.enum(['human', 'agent']).default('human'),
   senderName: z.string().min(1).max(120),
   senderContact: z.string().min(1).max(320),
-  message: z.string().min(1).max(5000),
+  message: z.string().min(1).max(MESSAGE_MAX_CHARS),
 });
+
+function clientIp(request: { ip: string; headers: Record<string, unknown> }): string {
+  const forwarded = request.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.length > 0) {
+    return forwarded.split(',')[0]?.trim() || request.ip;
+  }
+  return request.ip;
+}
 
 export async function registerPublicRoutes(app: FastifyInstance): Promise<void> {
   app.get('/v1/users/:handle', async (request, reply) => {
@@ -38,6 +49,21 @@ export async function registerPublicRoutes(app: FastifyInstance): Promise<void> 
   });
 
   app.post('/v1/users/:handle/requests', async (request, reply) => {
+    const ip = clientIp(request);
+    const ipLimit = checkIpRateLimit(ip);
+    if (!ipLimit.ok) {
+      await logAbuse({
+        kind: 'rate_limit_ip',
+        ip,
+        detail: `public_intro reset_ms=${ipLimit.resetMs}`,
+        log: request.log,
+      });
+      reply.header('retry-after', Math.ceil(ipLimit.resetMs / 1000));
+      return reply
+        .status(429)
+        .send({ error: 'IP rate limit exceeded', retry_after_ms: ipLimit.resetMs });
+    }
+
     const { handle } = request.params as { handle: string };
     const parsed = publicIntroSchema.safeParse(request.body);
     if (!parsed.success) {
@@ -49,6 +75,7 @@ export async function registerPublicRoutes(app: FastifyInstance): Promise<void> 
     const outcome = await submitIntroRequest({
       handle,
       body: parsed.data,
+      clientIp: ip,
       log: request.log,
     });
 
