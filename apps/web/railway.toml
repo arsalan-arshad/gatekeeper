@@ -1,6 +1,6 @@
 [build]
 builder = "NIXPACKS"
-buildCommand = "pnpm --filter @gatekeeper/web build"
+buildCommand = "pnpm --filter @gatekeeper/db build && pnpm --filter @gatekeeper/web build"
 
 [deploy]
 startCommand = "pnpm --filter @gatekeeper/web start"
