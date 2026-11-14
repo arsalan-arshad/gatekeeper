@@ -63,7 +63,25 @@ Swappable providers via `LLM_PROVIDER` (`gemini` default, `groq`, `xai`). Embedd
 pnpm --filter @gatekeeper/api test
 ```
 
+### Agent API
+
+```bash
+# docs for agents
+curl http://localhost:4000/llms.txt
+curl http://localhost:4000/openapi.json
+
+# create a key at http://localhost:3000/dashboard/keys (sign in first)
+
+curl -X POST http://localhost:4000/v1/requests \
+  -H "Authorization: Bearer gk_…" \
+  -H "content-type: application/json" \
+  -d '{"targetHandle":"ada","senderName":"ResearchBot","senderContact":"ops@example.com","message":"…"}'
+```
+
+Per-key hourly limits + per-IP 30/min. Dashboard: `/dashboard/keys`.
+
 ### Double opt-in emails
+
 
 After judging:
 
