@@ -63,7 +63,25 @@ Swappable providers via `LLM_PROVIDER` (`gemini` default, `groq`, `xai`). Embedd
 pnpm --filter @gatekeeper/api test
 ```
 
+### Double opt-in emails
+
+After judging:
+
+- **accept** → status `delivered` → receiver gets Accept/Decline links (signed, 72h)
+- receiver **Accept** → status `accepted` → one intro email to both parties
+- receiver **Decline** → status `declined`
+- **reject/spam** → sender gets `reason_public` + `suggested_rewrite` (status stays `pending`)
+
+Without `RESEND_API_KEY`, the API prints full email bodies (including Accept/Decline URLs) to the **API console**.
+
+```bash
+pnpm --filter @gatekeeper/api test
+# focused:
+node --import tsx --test apps/api/src/opt-in.test.ts apps/api/src/email.test.ts apps/api/src/tokens.test.ts
+```
+
 ### Judging engine
+
 
 ```bash
 pnpm --filter @gatekeeper/api test

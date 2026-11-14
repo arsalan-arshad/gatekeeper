@@ -4,6 +4,7 @@ import cors from '@fastify/cors';
 import Fastify from 'fastify';
 
 import { registerOnboardingRoutes } from './routes/onboarding.js';
+import { registerOptInRoutes } from './routes/opt-in.js';
 import { registerPublicRoutes } from './routes/public.js';
 
 const port = Number(process.env.PORT ?? 4000);
@@ -24,6 +25,7 @@ export async function buildServer() {
 
   await registerOnboardingRoutes(app);
   await registerPublicRoutes(app);
+  await registerOptInRoutes(app);
 
   return app;
 }
