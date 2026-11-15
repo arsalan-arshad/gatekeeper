@@ -8,8 +8,17 @@ export function BillingClient({ initial }: { initial: BillingMe }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  const { config, user, creditsCents } = initial;
+  const checkoutAvailable = Boolean(
+    config.checkoutAvailable ?? (config.enabled && config.lemonConfigured),
+  );
+
   function checkout(kind: 'pro' | 'credits') {
     setError(null);
+    if (!checkoutAvailable) {
+      setError('Coming soon');
+      return;
+    }
     startTransition(async () => {
       const result = await startCheckout(kind);
       if (result.error) {
@@ -22,73 +31,70 @@ export function BillingClient({ initial }: { initial: BillingMe }) {
     });
   }
 
-  const { config, user, creditsCents, enabled } = initial;
-
   return (
     <div className="flex flex-col gap-8">
-      <div className="rounded-md border border-white/10 bg-black/20 p-4 text-sm">
-        <p>
-          Feature flag:{' '}
-          <strong className={enabled ? 'text-[var(--accent)]' : 'text-red-300'}>
-            PAYMENTS_ENABLED={enabled ? 'true' : 'false'}
-          </strong>
-        </p>
-        <p className="mt-2 text-[var(--muted)]">
-          When off, checkouts return 503 and stakes/credits are not enforced. Webhooks acknowledge
-          but do not mutate billing state.
-        </p>
-      </div>
-
       <section className="grid gap-4 sm:grid-cols-2">
-        <div className="border-b border-white/10 pb-3">
-          <p className="text-sm text-[var(--muted)]">Plan</p>
+        <div className="border border-white/10 bg-black/20 p-4">
+          <p className="text-sm text-[var(--muted)]">Free</p>
           <p
             className="mt-1 text-2xl"
             style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
           >
-            {user.plan}
+            $0
           </p>
+          <p className="mt-2 text-sm text-[var(--muted)]">
+            Receiver inbox, public page, ledger. Up to {config.freeInboxLimit} inbox.
+          </p>
+          {user.plan === 'free' ? (
+            <p className="mt-3 text-sm text-[var(--accent)]">Current plan</p>
+          ) : null}
         </div>
-        <div className="border-b border-white/10 pb-3">
-          <p className="text-sm text-[var(--muted)]">Sender credits</p>
+        <div className="border border-[var(--accent)]/35 bg-[var(--accent)]/5 p-4">
+          <p className="text-sm text-[var(--muted)]">Pro</p>
           <p
             className="mt-1 text-2xl"
             style={{ fontFamily: 'var(--font-display), Georgia, serif' }}
           >
-            ${(creditsCents / 100).toFixed(2)}
+            ${config.proPriceUsd}/mo
           </p>
+          <p className="mt-2 text-sm text-[var(--muted)]">
+            Custom rules + up to {config.proInboxLimit} inboxes. Checkout via Lemon Squeezy.
+          </p>
+          {user.plan === 'pro' ? (
+            <p className="mt-3 text-sm text-[var(--accent)]">Current plan</p>
+          ) : null}
         </div>
       </section>
 
-      <section className="flex flex-col gap-3 text-sm text-[var(--muted)]">
-        <p>
-          Pro ${config.proPriceUsd}/mo — custom rules + up to {config.proInboxLimit} inboxes (free:{' '}
-          {config.freeInboxLimit}).
-        </p>
-        <p>
-          Pay-per-accepted-intro: ${(config.introCreditCents / 100).toFixed(2)} from sender credits.
-          Optional ${(config.stakeCents / 100).toFixed(2)} stake — refunded on accept, forfeited to
-          the receiver on spam.
-        </p>
+      <section className="border-b border-white/10 pb-3 text-sm text-[var(--muted)]">
+        Sender credits: ${(creditsCents / 100).toFixed(2)}
       </section>
 
       <div className="flex flex-wrap gap-3">
-        <button
-          type="button"
-          disabled={!enabled || pending || user.plan === 'pro'}
-          onClick={() => checkout('pro')}
-          className="rounded-md bg-[var(--accent)] px-4 py-2 font-medium text-black disabled:opacity-50"
-        >
-          {user.plan === 'pro' ? 'Pro active' : 'Upgrade to Pro'}
-        </button>
-        <button
-          type="button"
-          disabled={!enabled || pending}
-          onClick={() => checkout('credits')}
-          className="rounded-md border border-white/20 px-4 py-2 font-medium disabled:opacity-50"
-        >
-          Buy intro credits
-        </button>
+        {checkoutAvailable ? (
+          <>
+            <button
+              type="button"
+              disabled={pending || user.plan === 'pro'}
+              onClick={() => checkout('pro')}
+              className="rounded-md bg-[var(--accent)] px-4 py-2 font-medium text-black disabled:opacity-50"
+            >
+              {user.plan === 'pro' ? 'Pro active' : 'Upgrade to Pro'}
+            </button>
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => checkout('credits')}
+              className="rounded-md border border-white/20 px-4 py-2 font-medium disabled:opacity-50"
+            >
+              Buy intro credits
+            </button>
+          </>
+        ) : (
+          <p className="rounded-md border border-white/15 px-4 py-2 text-sm text-[var(--muted)]">
+            Coming soon
+          </p>
+        )}
       </div>
 
       {error ? <p className="text-sm text-red-300">{error}</p> : null}

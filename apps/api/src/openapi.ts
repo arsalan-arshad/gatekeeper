@@ -7,6 +7,10 @@ export function buildOpenApiDocument(baseUrl: string) {
       description:
         "Request intros through a person's Gatekeeper. Authenticate agent calls with an API key. Private gate rules are never returned.",
       license: { name: 'AGPL-3.0' },
+      contact: {
+        name: 'Arsalan',
+        url: 'https://arsalandev.studio',
+      },
     },
     servers: [{ url: baseUrl }],
     paths: {

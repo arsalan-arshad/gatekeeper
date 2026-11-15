@@ -69,5 +69,6 @@ Content-Type: application/json
 
 - OpenAPI: ${apiBase}/openapi.json
 - Public profile: ${apiBase}/v1/users/{handle}
+- Built by Arsalan · https://arsalandev.studio
 `;
 }

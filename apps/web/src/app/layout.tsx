@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { IBM_Plex_Sans, Syne } from 'next/font/google';
 
+import { BRAND } from '@/lib/brand';
+
 import './globals.css';
 
 const sans = IBM_Plex_Sans({
@@ -15,10 +17,13 @@ const display = Syne({
   variable: '--font-display',
 });
 
+const ogTitle = 'Gatekeeper · by arsalandev.studio';
+
 export const metadata: Metadata = {
   title: 'Gatekeeper — Let anyone reach you. Only the right ones get through.',
-  description:
-    'Gatekeeper is an AI principal with its own reputation. It reads every request against your rules, says no to spam, and only makes intros you both accept.',
+  description: BRAND.summary,
+  authors: [{ name: 'Arsalan', url: BRAND.creator.studioUrl }],
+  creator: 'Arsalan',
   icons: {
     icon: [
       { url: '/favicon.ico', sizes: 'any' },
@@ -29,31 +34,60 @@ export const metadata: Metadata = {
     apple: [{ url: '/apple-touch-icon.png', sizes: '180x180' }],
   },
   openGraph: {
-    title: 'Gatekeeper — Let anyone reach you. Only the right ones get through.',
-    description:
-      'Gatekeeper is an AI principal with its own reputation. It reads every request against your rules, says no to spam, and only makes intros you both accept.',
+    title: ogTitle,
+    description: BRAND.summary,
     images: [
       {
         url: '/og.png',
         width: 1200,
         height: 630,
-        alt: 'Gatekeeper — Let anyone reach you. Only the right ones get through.',
+        alt: ogTitle,
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Gatekeeper — Let anyone reach you. Only the right ones get through.',
-    description:
-      'Gatekeeper is an AI principal with its own reputation. It reads every request against your rules, says no to spam, and only makes intros you both accept.',
+    title: ogTitle,
+    description: BRAND.summary,
     images: ['/og.png'],
   },
+};
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'SoftwareApplication',
+      name: 'Gatekeeper',
+      applicationCategory: 'BusinessApplication',
+      operatingSystem: 'Web',
+      license: 'https://www.gnu.org/licenses/agpl-3.0.html',
+      description: BRAND.summary,
+      url: 'https://arsalandev.studio',
+      creator: {
+        '@type': 'Person',
+        name: 'Arsalan',
+        url: BRAND.creator.studioUrl,
+      },
+    },
+    {
+      '@type': 'Person',
+      name: 'Arsalan',
+      url: BRAND.creator.studioUrl,
+    },
+  ],
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${sans.variable} ${display.variable}`}>
-      <body className="min-h-screen antialiased">{children}</body>
+      <body className="min-h-screen antialiased">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+        {children}
+      </body>
     </html>
   );
 }

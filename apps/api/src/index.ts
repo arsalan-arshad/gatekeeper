@@ -10,6 +10,7 @@ import { createLlm } from './llm.js';
 import { buildOpenApiDocument } from './openapi.js';
 import { FASTIFY_BODY_LIMIT } from './request-limits.js';
 import { registerAgentRoutes } from './routes/agent.js';
+import { registerDashboardRoutes } from './routes/dashboard.js';
 import { registerDemoRoutes } from './routes/demo.js';
 import { registerKeyRoutes } from './routes/keys.js';
 import { registerLedgerRoutes } from './routes/ledger.js';
@@ -121,6 +122,7 @@ export async function buildServer() {
   });
 
   await registerOnboardingRoutes(app);
+  await registerDashboardRoutes(app);
   await registerPublicRoutes(app);
   await registerDemoRoutes(app);
   await registerOptInRoutes(app);

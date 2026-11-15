@@ -21,11 +21,13 @@ export default async function GlobalLedgerPage() {
     <LedgerView
       data={data}
       title="Public ledger"
-      demoData={false}
+      demoData={unavailable || data.totals.requestCount === 0}
       notice={
         unavailable
-          ? 'Live totals are temporarily unavailable. This page stays public — try again shortly.'
-          : undefined
+          ? 'Live totals are temporarily unavailable. Showing Demo data placeholder until the API is back.'
+          : data.totals.requestCount === 0
+            ? 'No live traffic yet — Demo data badge marks empty public ledgers.'
+            : undefined
       }
     />
   );

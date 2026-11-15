@@ -26,6 +26,7 @@ export function HeroDemo() {
   const [limit, setLimit] = useState(20);
 
   const profile = DEMO_PROFILE_OPTIONS.find((p) => p.handle === handle) ?? DEMO_PROFILE_OPTIONS[0]!;
+  const canJudge = message.trim().length > 0;
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -54,23 +55,19 @@ export function HeroDemo() {
 
   const doorState: DoorState = !result ? 'idle' : result.decision === 'accept' ? 'open' : 'closed';
 
-  function applyChip(chipId: (typeof DEMO_CHIPS)[number]['id']) {
-    const chip = DEMO_CHIPS.find((c) => c.id === chipId);
-    if (!chip) return;
-    setMessage(chip.message);
-    setResult(null);
-    setError(null);
-  }
-
-  function onJudge() {
+  function judge(text: string, example: boolean) {
     setError(null);
     startTransition(async () => {
-      const text = message.trim() || DEMO_PLACEHOLDERS[placeholderIndex]!;
       try {
         const response = await fetch('/api/demo/judge', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ handle, message: text, senderName: 'Demo visitor' }),
+          body: JSON.stringify({
+            handle,
+            message: text,
+            senderName: 'Demo visitor',
+            example,
+          }),
         });
         const body = (await response.json().catch(() => ({}))) as DemoResult & {
           error?: string;
@@ -104,6 +101,25 @@ export function HeroDemo() {
         setError('AI busy, try again');
       }
     });
+  }
+
+  function applyChip(chipId: (typeof DEMO_CHIPS)[number]['id']) {
+    const chip = DEMO_CHIPS.find((c) => c.id === chipId);
+    if (!chip) return;
+    setMessage(chip.message);
+    setResult(null);
+    setError(null);
+    // Example chips never decrement the custom-request counter.
+    judge(chip.message, true);
+  }
+
+  function onJudge() {
+    const text = message.trim();
+    if (!text) {
+      setError('Enter a message to judge');
+      return;
+    }
+    judge(text, false);
   }
 
   return (
@@ -152,8 +168,8 @@ export function HeroDemo() {
 
         <p className="mt-2 text-sm text-[var(--muted)]">
           {remaining == null
-            ? `${limit} custom demo requests per IP per day · example chips from cache do not count`
-            : `${remaining} of ${limit} custom demo requests remaining today · cached examples free`}
+            ? `${limit} custom demo requests per IP per day · example chips do not count`
+            : `${remaining} of ${limit} custom demo requests remaining today · example chips free`}
         </p>
 
         <div className="mt-3 flex flex-wrap gap-2">
@@ -172,7 +188,7 @@ export function HeroDemo() {
         <button
           type="button"
           onClick={onJudge}
-          disabled={pending}
+          disabled={pending || !canJudge}
           className="mt-4 rounded-md bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-[#062015] transition hover:brightness-110 disabled:opacity-60"
         >
           {pending ? 'Judging…' : 'Judge request'}

@@ -27,6 +27,12 @@ export const requestStatusEnum = pgEnum('request_status', [
 
 export const planEnum = pgEnum('plan', ['free', 'pro']);
 
+export const notificationEmailModeEnum = pgEnum('notification_email_mode', [
+  'instant',
+  'daily_digest',
+  'off',
+]);
+
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
   handle: text('handle').notNull().unique(),
@@ -43,6 +49,10 @@ export const users = pgTable('users', {
   plan: planEnum('plan').notNull().default('free'),
   lemonCustomerId: text('lemon_customer_id'),
   lemonSubscriptionId: text('lemon_subscription_id'),
+  /** Owner inbox email cadence for new intro requests. */
+  notificationEmailMode: notificationEmailModeEnum('notification_email_mode')
+    .notNull()
+    .default('instant'),
 });
 
 /**
@@ -106,7 +116,10 @@ export const requests = pgTable('requests', {
     .references(() => users.id, { onDelete: 'cascade' }),
   message: text('message').notNull(),
   aiScore: integer('ai_score'),
+  /** Private judge rationale — never shown on public surfaces. */
   aiReason: text('ai_reason'),
+  /** Public judge reason safe for owner inbox + sender replies. */
+  aiReasonPublic: text('ai_reason_public'),
   decision: decisionEnum('decision'),
   status: requestStatusEnum('status').notNull().default('pending'),
   stakeCents: integer('stake_cents').notNull().default(0),

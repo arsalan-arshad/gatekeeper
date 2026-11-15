@@ -11,8 +11,11 @@ test('GET /openapi.json describes POST /v1/requests', async () => {
   assert.equal(response.statusCode, 200);
   const body = response.json() as {
     paths: Record<string, unknown>;
+    info: { contact?: { name?: string; url?: string } };
   };
   assert.ok(body.paths['/v1/requests']);
+  assert.equal(body.info.contact?.name, 'Arsalan');
+  assert.equal(body.info.contact?.url, 'https://arsalandev.studio');
 
   await app.close();
 });
@@ -27,6 +30,8 @@ test('GET /llms.txt explains agent auth and fields', async () => {
   assert.match(response.body, /X-API-Key/);
   assert.match(response.body, /targetHandle/);
   assert.match(response.body, /reason_public/);
+  assert.match(response.body, /Arsalan/);
+  assert.match(response.body, /arsalandev\.studio/);
 
   await app.close();
 });

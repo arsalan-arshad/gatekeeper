@@ -7,6 +7,8 @@ export type BillingMe = {
   enabled: boolean;
   config: {
     enabled: boolean;
+    lemonConfigured?: boolean;
+    checkoutAvailable?: boolean;
     proPriceUsd: number;
     stakeCents: number;
     introCreditCents: number;

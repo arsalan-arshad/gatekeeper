@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-import { BRAND } from '@/lib/brand';
+import { BRAND, studioLink } from '@/lib/brand';
 
 const EXAMPLE_RULES = [
   {
@@ -226,6 +226,30 @@ Content-Type: application/json
               </div>
             ))}
           </dl>
+
+          <aside className="mt-14 flex flex-col gap-4 border-t border-white/10 pt-10 sm:flex-row sm:items-center sm:gap-6">
+            <img
+              src={BRAND.creator.avatarUrl}
+              alt=""
+              width={56}
+              height={56}
+              className="h-14 w-14 rounded-full border border-white/10 object-cover"
+            />
+            <div className="max-w-xl">
+              <p className="text-sm tracking-wide text-[var(--muted)]">
+                Made by an indie developer
+              </p>
+              <p className="mt-2 leading-relaxed text-[var(--fg)]">{BRAND.creator.bio}</p>
+              <a
+                href={studioLink('landing')}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 inline-block text-sm text-[var(--accent)] underline underline-offset-4"
+              >
+                See my other work
+              </a>
+            </div>
+          </aside>
         </div>
       </section>
     </>

@@ -4,7 +4,7 @@ import type { FastifyInstance } from 'fastify';
 
 import { getDb } from '../db.js';
 import { createEmailSender } from '../email.js';
-import { sendIntroEmailToBoth } from '../opt-in.js';
+import { sendDeclineAutoReply, sendIntroEmailToBoth } from '../opt-in.js';
 import { refundStake, settleAcceptedIntro } from '../payments.js';
 import { verifyOptInToken, type OptInAction } from '../tokens.js';
 
@@ -49,13 +49,6 @@ export async function registerOptInRoutes(app: FastifyInstance): Promise<void> {
         .send(htmlPage('Not found', '<p>Request not found.</p>'));
     }
 
-    if (row.decision !== 'accept') {
-      return reply
-        .status(409)
-        .type('text/html')
-        .send(htmlPage('Unavailable', '<p>This request is not awaiting your decision.</p>'));
-    }
-
     if (row.status === 'accepted' || row.status === 'declined') {
       return reply
         .type('text/html')
@@ -67,13 +60,6 @@ export async function registerOptInRoutes(app: FastifyInstance): Promise<void> {
         );
     }
 
-    if (row.status !== 'delivered') {
-      return reply
-        .status(409)
-        .type('text/html')
-        .send(htmlPage('Unavailable', '<p>This request is not ready for Accept/Decline.</p>'));
-    }
-
     const [receiver] = await db.select().from(users).where(eq(users.id, row.targetUserId)).limit(1);
     if (!receiver) {
       return reply
@@ -82,6 +68,8 @@ export async function registerOptInRoutes(app: FastifyInstance): Promise<void> {
         .send(htmlPage('Not found', '<p>Receiver profile missing.</p>'));
     }
 
+    // Owner may Approve/Decline from notification links even when AI rejected —
+    // Approve overrides the verdict to accept and completes the intro.
     if (action === 'decline') {
       if (row.stakeCents > 0) {
         await refundStake(row.senderContact, row.stakeCents);
@@ -90,14 +78,38 @@ export async function registerOptInRoutes(app: FastifyInstance): Promise<void> {
         .update(requests)
         .set({ status: 'declined', stakeCents: 0 })
         .where(eq(requests.id, id));
+
+      const send = createEmailSender();
+      try {
+        await sendDeclineAutoReply(send, {
+          senderEmail: row.senderContact,
+          senderName: row.senderName,
+          receiverName: receiver.name,
+        });
+      } catch (error) {
+        request.log.error({ err: error }, 'decline auto-reply failed');
+      }
+
       return reply
         .type('text/html')
         .send(
           htmlPage(
             'Declined',
-            '<p>Declined. No intro email was sent. Thanks for keeping your Gatekeeper sharp.</p>',
+            '<p>Declined. A polite auto-reply was sent. Thanks for keeping your Gatekeeper sharp.</p>',
           ),
         );
+    }
+
+    if (row.decision !== 'accept') {
+      await db
+        .update(requests)
+        .set({ decision: 'accept', status: 'delivered' })
+        .where(eq(requests.id, id));
+    } else if (row.status !== 'delivered' && row.status !== 'pending') {
+      return reply
+        .status(409)
+        .type('text/html')
+        .send(htmlPage('Unavailable', '<p>This request is not ready for Accept/Decline.</p>'));
     }
 
     const settlement = await settleAcceptedIntro({

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 
+import { SiteFooter } from '@/components/site-footer';
 import { SiteNav } from '@/components/site-nav';
 
 export default function NotFound() {
@@ -43,7 +44,13 @@ export default function NotFound() {
               Visit @demo
             </Link>
           </div>
+          <p className="mt-10 text-sm text-[var(--muted)]">
+            <Link href="/" className="text-[var(--accent)] underline underline-offset-4">
+              Powered by Gatekeeper
+            </Link>
+          </p>
         </div>
+        <SiteFooter />
       </div>
     </main>
   );
