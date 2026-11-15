@@ -3,12 +3,15 @@ import { test } from 'node:test';
 
 import {
   DailyLimitExceededError,
+  DEFAULT_GROQ_MODEL,
   GEMINI_CHAT_MODEL,
   GEMINI_EMBEDDING_DIMENSIONS,
   GEMINI_EMBEDDING_MODEL,
+  LlmBusyError,
   LlmProviderError,
   LlmTimeoutError,
   createLlm,
+  isFailoverError,
   l2Normalize,
   type ChatMessage,
   type LlmProvider,
@@ -26,6 +29,7 @@ function mockProvider(overrides?: Partial<LlmProvider> & { failTimes?: number })
 
   const provider: LlmProvider & typeof state = {
     name: overrides?.name ?? 'mock',
+    model: overrides?.model,
     completeCalls: 0,
     embedCalls: 0,
     async complete(messages, options) {
@@ -104,7 +108,7 @@ test('retries retryable provider failures then succeeds', async () => {
   assert.equal(provider.completeCalls, 3);
 });
 
-test('exhausting retries surfaces the provider error', async () => {
+test('exhausting retries surfaces busy when failover cannot recover', async () => {
   const provider = mockProvider({
     async complete() {
       throw new LlmProviderError('down', { retryable: true, status: 503 });
@@ -115,8 +119,7 @@ test('exhausting retries surfaces the provider error', async () => {
   await assert.rejects(
     () => llm.complete(messages),
     (error: unknown) => {
-      assert.ok(error instanceof LlmProviderError);
-      assert.equal(error.message, 'down');
+      assert.ok(error instanceof LlmBusyError);
       return true;
     },
   );
@@ -161,7 +164,7 @@ test('calls without userId do not consume the daily budget', async () => {
   assert.equal(llm.getDailyUsage('anyone'), 0);
 });
 
-test('timeouts are wrapped as LlmTimeoutError and retried', async () => {
+test('timeouts are wrapped as LlmTimeoutError and fail over / busy', async () => {
   let attempts = 0;
   const fetchImpl: typeof fetch = async () => {
     attempts += 1;
@@ -172,7 +175,7 @@ test('timeouts are wrapped as LlmTimeoutError and retried', async () => {
 
   const llm = createLlm({
     provider: 'gemini',
-    env: { LLM_PROVIDER: 'gemini', GEMINI_API_KEY: 'test-key' },
+    env: { GEMINI_API_KEY: 'test-key' },
     fetch: fetchImpl,
     maxRetries: 1,
     timeoutMs: 5,
@@ -181,7 +184,7 @@ test('timeouts are wrapped as LlmTimeoutError and retried', async () => {
   await assert.rejects(
     () => llm.complete(messages),
     (error: unknown) => {
-      assert.ok(error instanceof LlmTimeoutError);
+      assert.ok(error instanceof LlmBusyError || error instanceof LlmTimeoutError);
       return true;
     },
   );
@@ -212,7 +215,7 @@ test('l2Normalize returns a unit vector', () => {
   assert.deepEqual(l2Normalize([0, 0]), [0, 0]);
 });
 
-test('gemini chat uses gemini-3.8-flash generateContent', async () => {
+test('gemini chat uses GEMINI_MODEL / gemini-3.8-flash generateContent', async () => {
   let seenUrl = '';
   let seenBody: Record<string, unknown> | undefined;
 
@@ -232,7 +235,7 @@ test('gemini chat uses gemini-3.8-flash generateContent', async () => {
 
   const llm = createLlm({
     provider: 'gemini',
-    env: { LLM_PROVIDER: 'gemini', GEMINI_API_KEY: 'test-key' },
+    env: { GEMINI_API_KEY: 'test-key' },
     fetch: fetchImpl,
     maxRetries: 0,
   });
@@ -261,7 +264,7 @@ test('gemini embed uses gemini-embedding-001 with 768 dims and normalizes', asyn
 
   const llm = createLlm({
     provider: 'gemini',
-    env: { LLM_PROVIDER: 'gemini', GEMINI_API_KEY: 'test-key' },
+    env: { GEMINI_API_KEY: 'test-key' },
     fetch: fetchImpl,
     maxRetries: 0,
   });
@@ -277,39 +280,175 @@ test('gemini embed uses gemini-embedding-001 with 768 dims and normalizes', asyn
   assert.equal(vector[2], 0);
 });
 
-test('groq chat provider remains available as fallback', async () => {
-  let seenUrl = '';
-  let seenBody: Record<string, unknown> | undefined;
+test('failover: gemini 503 then groq succeeds', async () => {
+  const seen: string[] = [];
+  const logs: Array<{ provider: string; status?: number }> = [];
 
   const fetchImpl: typeof fetch = async (input, init) => {
-    seenUrl = String(input);
+    const url = String(input);
+    seen.push(url);
+    if (url.includes('generativelanguage.googleapis.com')) {
+      return new Response(
+        JSON.stringify({ error: { status: 'UNAVAILABLE', message: 'high demand' } }),
+        {
+          status: 503,
+          headers: { 'content-type': 'application/json' },
+        },
+      );
+    }
+    const body = JSON.parse(String(init?.body ?? '{}')) as {
+      response_format?: { type?: string };
+      model?: string;
+    };
+    assert.equal(body.model, DEFAULT_GROQ_MODEL);
+    assert.equal(body.response_format?.type, 'json_object');
+    return new Response(JSON.stringify({ choices: [{ message: { content: '{"ok":true}' } }] }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+
+  const llm = createLlm({
+    env: {
+      GEMINI_API_KEY: 'test-gemini',
+      GROQ_API_KEY: 'test-groq',
+    },
+    fetch: fetchImpl,
+    maxRetries: 0,
+    log: (info) => logs.push({ provider: info.provider, status: info.status }),
+  });
+
+  const result = await llm.complete(messages, { json: true });
+  assert.equal(result, '{"ok":true}');
+  assert.equal(llm.providerName, 'groq');
+  assert.ok(seen.some((u) => u.includes('generativelanguage.googleapis.com')));
+  assert.ok(seen.some((u) => u.includes('api.groq.com/openai/v1/chat/completions')));
+  assert.ok(logs.some((l) => l.provider === 'gemini' && l.status === 503));
+});
+
+test('failover: both providers fail → LlmBusyError', async () => {
+  const fetchImpl: typeof fetch = async () =>
+    new Response('RESOURCE_EXHAUSTED', { status: 429, headers: { 'content-type': 'text/plain' } });
+
+  const llm = createLlm({
+    env: { GEMINI_API_KEY: 'g', GROQ_API_KEY: 'q' },
+    fetch: fetchImpl,
+    maxRetries: 0,
+    log: () => {},
+  });
+
+  await assert.rejects(
+    () => llm.complete(messages),
+    (error: unknown) => {
+      assert.ok(error instanceof LlmBusyError);
+      return true;
+    },
+  );
+});
+
+test('429 cooldown skips gemini on next call', async () => {
+  let geminiHits = 0;
+  let groqHits = 0;
+  let nowMs = Date.parse('2026-11-15T00:00:00.000Z');
+
+  const fetchImpl: typeof fetch = async (input) => {
+    const url = String(input);
+    if (url.includes('generativelanguage')) {
+      geminiHits += 1;
+      return new Response('rate limited', { status: 429 });
+    }
+    groqHits += 1;
+    return new Response(JSON.stringify({ choices: [{ message: { content: 'from-groq' } }] }), {
+      status: 200,
+    });
+  };
+
+  const llm = createLlm({
+    env: { GEMINI_API_KEY: 'g', GROQ_API_KEY: 'q' },
+    fetch: fetchImpl,
+    maxRetries: 0,
+    now: () => new Date(nowMs),
+    log: () => {},
+  });
+
+  assert.equal(await llm.complete(messages), 'from-groq');
+  assert.equal(geminiHits, 1);
+  assert.equal(groqHits, 1);
+
+  assert.equal(await llm.complete(messages), 'from-groq');
+  assert.equal(geminiHits, 1, 'gemini should stay in cooldown');
+  assert.equal(groqHits, 2);
+
+  nowMs += 11 * 60 * 1000;
+  assert.equal(await llm.complete(messages), 'from-groq');
+  assert.equal(geminiHits, 2, 'cooldown expired — gemini tried again');
+});
+
+test('isFailoverError covers 429 / 5xx / timeout / invalid JSON', () => {
+  assert.equal(isFailoverError(new LlmTimeoutError()), true);
+  assert.equal(isFailoverError(new LlmProviderError('x', { status: 429, retryable: true })), true);
+  assert.equal(isFailoverError(new LlmProviderError('x', { status: 503, retryable: true })), true);
+  assert.equal(
+    isFailoverError(new LlmProviderError('RESOURCE_EXHAUSTED', { status: 400, retryable: false })),
+    true,
+  );
+  assert.equal(
+    isFailoverError(new LlmProviderError('gemini returned invalid JSON', { retryable: true })),
+    true,
+  );
+  assert.equal(
+    isFailoverError(new LlmProviderError('auth', { status: 401, retryable: false })),
+    false,
+  );
+});
+
+test('groq defaults to llama-3.3-70b-versatile with json_object', async () => {
+  let seenBody: Record<string, unknown> | undefined;
+
+  const fetchImpl: typeof fetch = async (_input, init) => {
     seenBody = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
-    return new Response(
-      JSON.stringify({
-        choices: [{ message: { content: 'groq-ok' } }],
-      }),
-      {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      },
-    );
+    return new Response(JSON.stringify({ choices: [{ message: { content: '{"a":1}' } }] }), {
+      status: 200,
+    });
   };
 
   const llm = createLlm({
     provider: 'groq',
-    env: {
-      LLM_PROVIDER: 'groq',
-      GROQ_API_KEY: 'test-groq-key',
-      GEMINI_API_KEY: 'test-gemini-key',
-    },
+    env: { GROQ_API_KEY: 'test-groq-key', GEMINI_API_KEY: 'test-gemini-key' },
     fetch: fetchImpl,
     maxRetries: 0,
   });
 
-  const result = await llm.complete(messages);
+  const result = await llm.complete(messages, { json: true });
+  assert.equal(result, '{"a":1}');
+  assert.equal(seenBody?.model, DEFAULT_GROQ_MODEL);
+  assert.deepEqual(seenBody?.response_format, { type: 'json_object' });
+});
 
-  assert.equal(result, 'groq-ok');
-  assert.equal(llm.providerName, 'groq');
-  assert.match(seenUrl, /api\.groq\.com\/openai\/v1\/chat\/completions/);
-  assert.equal(seenBody?.model, 'llama-3.1-8b-instant');
+test('healthCheck reports configured providers', async () => {
+  const fetchImpl: typeof fetch = async (input) => {
+    const url = String(input);
+    if (url.includes('generativelanguage')) {
+      return new Response(
+        JSON.stringify({ candidates: [{ content: { parts: [{ text: '{"ok":true}' }] } }] }),
+        { status: 200 },
+      );
+    }
+    return new Response('down', { status: 500 });
+  };
+
+  const llm = createLlm({
+    env: { GEMINI_API_KEY: 'g', GROQ_API_KEY: 'q' },
+    fetch: fetchImpl,
+    maxRetries: 0,
+    log: () => {},
+  });
+
+  const health = await llm.healthCheck();
+  assert.equal(health.length, 2);
+  assert.equal(health[0]?.provider, 'gemini');
+  assert.equal(health[0]?.ok, true);
+  assert.equal(health[0]?.model, GEMINI_CHAT_MODEL);
+  assert.equal(health[1]?.provider, 'groq');
+  assert.equal(health[1]?.ok, false);
 });
