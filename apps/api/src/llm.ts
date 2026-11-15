@@ -560,7 +560,7 @@ function scrubSecrets(message: string, env: NodeJS.ProcessEnv): string {
   }
   // Also strip key= query fragments if somehow present.
   out = out.replace(/key=[^&\s"']+/gi, 'key=[redacted]');
-  out = out.replace(/Bearer\s+[A-Za-z0-9._\-]+/gi, 'Bearer [redacted]');
+  out = out.replace(/Bearer\s+[A-Za-z0-9._-]+/gi, 'Bearer [redacted]');
   return out;
 }
 
