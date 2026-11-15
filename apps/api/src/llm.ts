@@ -194,6 +194,23 @@ function toGeminiContents(messages: ChatMessage[]): {
   };
 }
 
+/** Current Google AI Studio embedding model (text-embedding-004 returns 404 on v1beta). */
+export const GEMINI_EMBEDDING_MODEL = 'gemini-embedding-001';
+
+/** Match packages/db DEFAULT_EMBEDDING_DIMENSIONS / vector(768). */
+export const GEMINI_EMBEDDING_DIMENSIONS = 768;
+
+/** L2-normalize truncated gemini-embedding-001 vectors (required for non-3072 dims). */
+export function l2Normalize(values: number[]): number[] {
+  let sumSquares = 0;
+  for (const value of values) {
+    sumSquares += value * value;
+  }
+  if (sumSquares === 0) return values;
+  const norm = Math.sqrt(sumSquares);
+  return values.map((value) => value / norm);
+}
+
 function createGeminiProvider(
   apiKey: string,
   fetchImpl: typeof fetch,
@@ -239,13 +256,14 @@ function createGeminiProvider(
     async embed(text) {
       const response = await fetchWithTimeout(
         fetchImpl,
-        `${base}/text-embedding-004:embedContent?key=${encodeURIComponent(apiKey)}`,
+        `${base}/${GEMINI_EMBEDDING_MODEL}:embedContent?key=${encodeURIComponent(apiKey)}`,
         {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
-            model: 'models/text-embedding-004',
+            model: `models/${GEMINI_EMBEDDING_MODEL}`,
             content: { parts: [{ text }] },
+            outputDimensionality: GEMINI_EMBEDDING_DIMENSIONS,
           }),
         },
         timeoutMs,
@@ -258,7 +276,7 @@ function createGeminiProvider(
       if (!values?.length) {
         throw new LlmProviderError('gemini returned an empty embedding', { retryable: true });
       }
-      return values;
+      return l2Normalize(values);
     },
   };
 }
@@ -352,7 +370,7 @@ function createProviderFromEnv(
   const geminiEmbedFallback = (): LlmProvider => {
     if (!geminiKey) {
       throw new LlmProviderError(
-        `${name} chat is configured, but embeddings require GEMINI_API_KEY (Gemini text-embedding-004).`,
+        `${name} chat is configured, but embeddings require GEMINI_API_KEY (Gemini ${GEMINI_EMBEDDING_MODEL}).`,
       );
     }
     return createGeminiProvider(geminiKey, fetchImpl, timeoutMs);

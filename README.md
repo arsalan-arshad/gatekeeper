@@ -77,7 +77,7 @@ API health check: `GET http://localhost:4000/health`
 
 ### LLM layer (`apps/api`)
 
-Swappable providers via `LLM_PROVIDER` (`gemini` default, `groq`, `xai`). Embeddings always use Gemini (`text-embedding-004`) — set `GEMINI_API_KEY` even when chatting through Groq/xAI.
+Swappable providers via `LLM_PROVIDER` (`gemini` default, `groq`, `xai`). Embeddings always use Gemini (`gemini-embedding-001` at 768 dims) — set `GEMINI_API_KEY` even when chatting through Groq/xAI.
 
 ```bash
 pnpm --filter @gatekeeper/api test

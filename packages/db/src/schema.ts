@@ -12,7 +12,7 @@ import {
   vector,
 } from 'drizzle-orm/pg-core';
 
-/** Keep in sync with DEFAULT_EMBEDDING_DIMENSIONS in pgvector.ts (Gemini text-embedding-004). */
+/** Keep in sync with DEFAULT_EMBEDDING_DIMENSIONS in pgvector.ts (Gemini gemini-embedding-001). */
 const PROFILE_EMBEDDING_DIMENSIONS = 768;
 
 export const senderTypeEnum = pgEnum('sender_type', ['human', 'agent']);

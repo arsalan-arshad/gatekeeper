@@ -3,9 +3,12 @@ import { test } from 'node:test';
 
 import {
   DailyLimitExceededError,
+  GEMINI_EMBEDDING_DIMENSIONS,
+  GEMINI_EMBEDDING_MODEL,
   LlmProviderError,
   LlmTimeoutError,
   createLlm,
+  l2Normalize,
   type ChatMessage,
   type LlmProvider,
 } from './llm.ts';
@@ -198,4 +201,43 @@ test('json option is forwarded to the provider', async () => {
 
   assert.equal(result, '{"ok":true}');
   assert.equal(sawJson, true);
+});
+
+test('l2Normalize returns a unit vector', () => {
+  const normalized = l2Normalize([3, 4]);
+  assert.equal(normalized.length, 2);
+  assert.ok(Math.abs((normalized[0] ?? 0) - 0.6) < 1e-9);
+  assert.ok(Math.abs((normalized[1] ?? 0) - 0.8) < 1e-9);
+  assert.deepEqual(l2Normalize([0, 0]), [0, 0]);
+});
+
+test('gemini embed uses gemini-embedding-001 with 768 dims and normalizes', async () => {
+  let seenUrl = '';
+  let seenBody: Record<string, unknown> | undefined;
+
+  const fetchImpl: typeof fetch = async (input, init) => {
+    seenUrl = String(input);
+    seenBody = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
+    return new Response(JSON.stringify({ embedding: { values: [3, 4, 0] } }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+
+  const llm = createLlm({
+    provider: 'gemini',
+    env: { LLM_PROVIDER: 'gemini', GEMINI_API_KEY: 'test-key' },
+    fetch: fetchImpl,
+    maxRetries: 0,
+  });
+
+  const vector = await llm.embed('hello embeddings');
+
+  assert.match(seenUrl, new RegExp(`/v1beta/models/${GEMINI_EMBEDDING_MODEL}:embedContent\\?`));
+  assert.equal(seenBody?.model, `models/${GEMINI_EMBEDDING_MODEL}`);
+  assert.equal(seenBody?.outputDimensionality, GEMINI_EMBEDDING_DIMENSIONS);
+  assert.deepEqual(seenBody?.content, { parts: [{ text: 'hello embeddings' }] });
+  assert.ok(Math.abs((vector[0] ?? 0) - 0.6) < 1e-9);
+  assert.ok(Math.abs((vector[1] ?? 0) - 0.8) < 1e-9);
+  assert.equal(vector[2], 0);
 });
