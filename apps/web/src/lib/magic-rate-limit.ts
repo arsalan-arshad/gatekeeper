@@ -35,7 +35,9 @@ async function consume(key: string, limit: number, windowMs: number): Promise<bo
   const db = getDb();
   const nowMs = Date.now();
   const windowStart = new Date(nowMs);
-  const expiredBefore = new Date(nowMs - windowMs);
+  // postgres.js sql`` params must be strings/numbers — never Date instances.
+  const windowStartIso = windowStart.toISOString();
+  const expiredBeforeMs = nowMs - windowMs;
   const [row] = await db
     .insert(rateLimitBuckets)
     .values({
@@ -48,11 +50,13 @@ async function consume(key: string, limit: number, windowMs: number): Promise<bo
       target: rateLimitBuckets.bucketKey,
       set: {
         count: sql`CASE
-          WHEN ${rateLimitBuckets.windowStart} <= ${expiredBefore} THEN 1
+          WHEN (EXTRACT(EPOCH FROM ${rateLimitBuckets.windowStart}) * 1000) <= ${expiredBeforeMs}
+          THEN 1
           ELSE ${rateLimitBuckets.count} + 1
         END`,
         windowStart: sql`CASE
-          WHEN ${rateLimitBuckets.windowStart} <= ${expiredBefore} THEN ${windowStart}
+          WHEN (EXTRACT(EPOCH FROM ${rateLimitBuckets.windowStart}) * 1000) <= ${expiredBeforeMs}
+          THEN ${windowStartIso}::timestamptz
           ELSE ${rateLimitBuckets.windowStart}
         END`,
         updatedAt: windowStart,

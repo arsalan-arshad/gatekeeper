@@ -126,7 +126,9 @@ export async function consumePostgresRateLimit(
 
   const db = getDb();
   const windowStart = new Date(nowMs);
-  const expiredBefore = new Date(nowMs - windowMs);
+  // postgres.js sql`` params must be strings/numbers — never Date instances.
+  const windowStartIso = windowStart.toISOString();
+  const expiredBeforeMs = nowMs - windowMs;
   // Single round-trip upsert + RETURNING (no SELECT then UPDATE).
   const [row] = await db
     .insert(rateLimitBuckets)
@@ -140,11 +142,13 @@ export async function consumePostgresRateLimit(
       target: rateLimitBuckets.bucketKey,
       set: {
         count: sql`CASE
-          WHEN ${rateLimitBuckets.windowStart} <= ${expiredBefore} THEN 1
+          WHEN (EXTRACT(EPOCH FROM ${rateLimitBuckets.windowStart}) * 1000) <= ${expiredBeforeMs}
+          THEN 1
           ELSE ${rateLimitBuckets.count} + 1
         END`,
         windowStart: sql`CASE
-          WHEN ${rateLimitBuckets.windowStart} <= ${expiredBefore} THEN ${windowStart}
+          WHEN (EXTRACT(EPOCH FROM ${rateLimitBuckets.windowStart}) * 1000) <= ${expiredBeforeMs}
+          THEN ${windowStartIso}::timestamptz
           ELSE ${rateLimitBuckets.windowStart}
         END`,
         updatedAt: windowStart,
