@@ -18,8 +18,10 @@ const display = Syne({
 });
 
 const ogTitle = 'Gatekeeper · by arsalandev.studio';
+const siteUrl = BRAND.siteUrl;
 
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: 'Gatekeeper — Let anyone reach you. Only the right ones get through.',
   description: BRAND.summary,
   authors: [{ name: 'Arsalan', url: BRAND.creator.studioUrl }],
@@ -36,6 +38,8 @@ export const metadata: Metadata = {
   openGraph: {
     title: ogTitle,
     description: BRAND.summary,
+    url: siteUrl,
+    siteName: BRAND.name,
     images: [
       {
         url: '/og.png',
@@ -63,17 +67,17 @@ const jsonLd = {
       operatingSystem: 'Web',
       license: 'https://www.gnu.org/licenses/agpl-3.0.html',
       description: BRAND.summary,
-      url: 'https://arsalandev.studio',
+      url: 'https://gatekeeper.arsalandev.studio',
       creator: {
         '@type': 'Person',
         name: 'Arsalan',
-        url: BRAND.creator.studioUrl,
+        url: 'https://arsalandev.studio',
       },
     },
     {
       '@type': 'Person',
       name: 'Arsalan',
-      url: BRAND.creator.studioUrl,
+      url: 'https://arsalandev.studio',
     },
   ],
 };

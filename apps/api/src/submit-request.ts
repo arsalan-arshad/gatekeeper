@@ -1,5 +1,5 @@
 import { gateRules, requests, users } from '@gatekeeper/db';
-import { eq } from 'drizzle-orm';
+import { and, eq, gte } from 'drizzle-orm';
 import type { FastifyBaseLogger } from 'fastify';
 import { z } from 'zod';
 
@@ -21,7 +21,8 @@ import {
   refundStake,
   stakeCentsFromEnv,
 } from './payments.js';
-import { MESSAGE_MAX_CHARS } from './request-limits.js';
+import { DEDUPE_WINDOW_MS, messageDedupeHash, normalizeSenderEmail } from './request-dedupe.js';
+import { MESSAGE_MAX_CHARS, NAME_MAX_CHARS } from './request-limits.js';
 
 export const introBodySchema = z.object({
   handle: z
@@ -37,7 +38,7 @@ export const introBodySchema = z.object({
     .regex(/^[a-z0-9-]+$/i)
     .optional(),
   senderType: z.enum(['human', 'agent']).default('human'),
-  senderName: z.string().min(1).max(120),
+  senderName: z.string().min(1).max(NAME_MAX_CHARS),
   senderContact: z.string().min(1).max(320),
   message: z.string().min(1).max(MESSAGE_MAX_CHARS),
   /** Optional anti-spam stake in cents when PAYMENTS_ENABLED (e.g. 100 = $1). */
@@ -85,6 +86,32 @@ export async function submitIntroRequest(options: {
   const [rules] = await db.select().from(gateRules).where(eq(gateRules.userId, user.id)).limit(1);
   if (!rules) {
     return { ok: false, status: 409, error: 'User has not finished onboarding' };
+  }
+
+  // 24h dedupe on (owner, sender email, normalized message hash) — no LLM.
+  const senderEmail = normalizeSenderEmail(options.body.senderContact);
+  const msgHash = messageDedupeHash(options.body.message);
+  const since = new Date(Date.now() - DEDUPE_WINDOW_MS);
+  const recent = await db
+    .select({
+      id: requests.id,
+      senderContact: requests.senderContact,
+      message: requests.message,
+    })
+    .from(requests)
+    .where(and(eq(requests.targetUserId, user.id), gte(requests.createdAt, since)))
+    .limit(500);
+  const duplicate = recent.find(
+    (row) =>
+      normalizeSenderEmail(row.senderContact) === senderEmail &&
+      messageDedupeHash(row.message) === msgHash,
+  );
+  if (duplicate) {
+    return {
+      ok: false,
+      status: 409,
+      error: 'Duplicate request within 24 hours',
+    };
   }
 
   const stakeCents = paymentsEnabled() ? (options.body.stakeCents ?? 0) : 0;

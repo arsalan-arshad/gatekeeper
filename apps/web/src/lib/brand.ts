@@ -4,8 +4,18 @@ export const BRAND = {
   summary:
     'Gatekeeper is an AI principal with its own reputation. It reads every request against your rules, says no to spam, and only makes intros you both accept.',
   githubUrl: process.env.NEXT_PUBLIC_GITHUB_URL || 'https://github.com/arsalan-arshad/gatekeeper',
-  xUrl: process.env.NEXT_PUBLIC_X_URL || 'https://x.com/arsalanadev',
-  linkedinUrl: process.env.NEXT_PUBLIC_LINKEDIN_URL || 'https://www.linkedin.com/in/arsalanadev',
+  /** Optional — footer hides X when unset (no hardcoded personal links). */
+  xUrl: process.env.NEXT_PUBLIC_X_URL?.trim() || null,
+  /** Optional — footer hides LinkedIn when unset. */
+  linkedinUrl: process.env.NEXT_PUBLIC_LINKEDIN_URL?.trim() || null,
+  // OG/sitemap base — NEXT_PUBLIC_SITE_URL only (reject empty/"null"; never APP_URL).
+  siteUrl: (() => {
+    const raw = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+    if (raw && raw !== 'null' && /^https?:\/\//i.test(raw)) {
+      return raw.replace(/\/$/, '');
+    }
+    return 'https://gatekeeper.arsalandev.studio';
+  })(),
   creator: {
     name: 'Arsalan',
     studioName: 'arsalandev.studio',

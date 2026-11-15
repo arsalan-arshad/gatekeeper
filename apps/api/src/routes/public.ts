@@ -5,13 +5,13 @@ import { z } from 'zod';
 
 import { logAbuse } from '../abuse-log.js';
 import { getDb } from '../db.js';
-import { checkIpRateLimit } from '../rate-limit.js';
-import { MESSAGE_MAX_CHARS } from '../request-limits.js';
+import { checkPublicFormIpRateLimit, checkPublicFormSenderOwnerRateLimit } from '../rate-limit.js';
+import { MESSAGE_MAX_CHARS, NAME_MAX_CHARS } from '../request-limits.js';
 import { submitIntroRequest } from '../submit-request.js';
 
 const publicIntroSchema = z.object({
   senderType: z.enum(['human', 'agent']).default('human'),
-  senderName: z.string().min(1).max(120),
+  senderName: z.string().min(1).max(NAME_MAX_CHARS),
   senderContact: z.string().min(1).max(320),
   message: z.string().min(1).max(MESSAGE_MAX_CHARS),
 });
@@ -50,12 +50,12 @@ export async function registerPublicRoutes(app: FastifyInstance): Promise<void> 
 
   app.post('/v1/users/:handle/requests', async (request, reply) => {
     const ip = clientIp(request);
-    const ipLimit = checkIpRateLimit(ip);
+    const ipLimit = checkPublicFormIpRateLimit(ip);
     if (!ipLimit.ok) {
       await logAbuse({
         kind: 'rate_limit_ip',
         ip,
-        detail: `public_intro reset_ms=${ipLimit.resetMs}`,
+        detail: `public_form_ip reset_ms=${ipLimit.resetMs}`,
         log: request.log,
       });
       reply.header('retry-after', Math.ceil(ipLimit.resetMs / 1000));
@@ -70,6 +70,29 @@ export async function registerPublicRoutes(app: FastifyInstance): Promise<void> 
       return reply
         .status(400)
         .send({ error: 'Invalid intro request', details: parsed.error.flatten() });
+    }
+
+    const db = getDb();
+    const [owner] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.handle, handle.toLowerCase()))
+      .limit(1);
+    if (owner) {
+      const senderLimit = checkPublicFormSenderOwnerRateLimit(parsed.data.senderContact, owner.id);
+      if (!senderLimit.ok) {
+        await logAbuse({
+          kind: 'rate_limit_ip',
+          ip,
+          detail: `public_form_sender reset_ms=${senderLimit.resetMs}`,
+          log: request.log,
+        });
+        reply.header('retry-after', Math.ceil(senderLimit.resetMs / 1000));
+        return reply.status(429).send({
+          error: 'Sender rate limit exceeded for this Gatekeeper',
+          retry_after_ms: senderLimit.resetMs,
+        });
+      }
     }
 
     const outcome = await submitIntroRequest({

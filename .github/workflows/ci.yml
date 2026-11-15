@@ -46,6 +46,37 @@ jobs:
       - name: Test
         run: pnpm test
 
+      - name: Prod OG must not use localhost
+        env:
+          NEXT_PUBLIC_SITE_URL: https://gatekeeper.arsalandev.studio
+          APP_URL: https://gatekeeper.arsalandev.studio
+          API_URL: https://api.gatekeeper.arsalandev.studio
+          NEXT_PUBLIC_API_URL: https://api.gatekeeper.arsalandev.studio
+          AUTH_SECRET: ci-auth-secret-for-og-grep-only
+        run: |
+          # next/font Google fetch can flake on runners — retry the build a few times.
+          for i in 1 2 3; do
+            if pnpm --filter @gatekeeper/web build; then
+              break
+            fi
+            if [ "$i" -eq 3 ]; then
+              echo "web build failed after 3 attempts" >&2
+              exit 1
+            fi
+            echo "web build failed (attempt $i); retrying…"
+            rm -rf apps/web/.next
+            sleep 5
+          done
+          # Grep prerendered HTML/body only (not server JS bundles that keep localhost API fallbacks).
+          if grep -RInE 'localhost|127\.0\.0\.1' apps/web/.next/server/app \
+            --include='*.html' --include='*.body' 2>/dev/null; then
+            echo "Found localhost in production HTML output" >&2
+            exit 1
+          fi
+          grep -q 'https://gatekeeper.arsalandev.studio' apps/web/.next/server/app/index.html
+          grep -q 'https://gatekeeper.arsalandev.studio/sitemap.xml' apps/web/.next/server/app/robots.txt.body
+          echo "No localhost in prod HTML; OG host is gatekeeper.arsalandev.studio."
+
       - name: Judge eval
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -85,6 +116,7 @@ jobs:
       AUTH_URL: http://127.0.0.1:3000
       API_URL: http://127.0.0.1:4000
       NEXT_PUBLIC_API_URL: http://127.0.0.1:4000
+      NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3000
 
     steps:
       - name: Checkout
