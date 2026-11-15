@@ -194,6 +194,14 @@ function toGeminiContents(messages: ChatMessage[]): {
   };
 }
 
+/**
+ * Current Google AI Studio Flash chat model.
+ * `gemini-2.0-flash` is shut down and 404s on v1beta generateContent;
+ * Google documents `gemini-3.8-flash` as the stable Flash replacement.
+ * @see https://aistudio.google.com/docs/models
+ */
+export const GEMINI_CHAT_MODEL = 'gemini-3.8-flash';
+
 /** Current Google AI Studio embedding model (text-embedding-004 returns 404 on v1beta). */
 export const GEMINI_EMBEDDING_MODEL = 'gemini-embedding-001';
 
@@ -232,7 +240,7 @@ function createGeminiProvider(
 
       const response = await fetchWithTimeout(
         fetchImpl,
-        `${base}/gemini-2.0-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
+        `${base}/${GEMINI_CHAT_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`,
         {
           method: 'POST',
           headers: { 'content-type': 'application/json' },

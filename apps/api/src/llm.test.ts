@@ -3,6 +3,7 @@ import { test } from 'node:test';
 
 import {
   DailyLimitExceededError,
+  GEMINI_CHAT_MODEL,
   GEMINI_EMBEDDING_DIMENSIONS,
   GEMINI_EMBEDDING_MODEL,
   LlmProviderError,
@@ -211,6 +212,40 @@ test('l2Normalize returns a unit vector', () => {
   assert.deepEqual(l2Normalize([0, 0]), [0, 0]);
 });
 
+test('gemini chat uses gemini-3.8-flash generateContent', async () => {
+  let seenUrl = '';
+  let seenBody: Record<string, unknown> | undefined;
+
+  const fetchImpl: typeof fetch = async (input, init) => {
+    seenUrl = String(input);
+    seenBody = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
+    return new Response(
+      JSON.stringify({
+        candidates: [{ content: { parts: [{ text: 'ok' }] } }],
+      }),
+      {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      },
+    );
+  };
+
+  const llm = createLlm({
+    provider: 'gemini',
+    env: { LLM_PROVIDER: 'gemini', GEMINI_API_KEY: 'test-key' },
+    fetch: fetchImpl,
+    maxRetries: 0,
+  });
+
+  const result = await llm.complete([{ role: 'user', content: 'ping' }]);
+
+  assert.equal(result, 'ok');
+  assert.equal(GEMINI_CHAT_MODEL, 'gemini-3.8-flash');
+  assert.match(seenUrl, new RegExp(`/v1beta/models/${GEMINI_CHAT_MODEL}:generateContent\\?`));
+  assert.ok(!seenUrl.includes('gemini-2.0-flash'));
+  assert.deepEqual(seenBody?.contents, [{ role: 'user', parts: [{ text: 'ping' }] }]);
+});
+
 test('gemini embed uses gemini-embedding-001 with 768 dims and normalizes', async () => {
   let seenUrl = '';
   let seenBody: Record<string, unknown> | undefined;
@@ -240,4 +275,41 @@ test('gemini embed uses gemini-embedding-001 with 768 dims and normalizes', asyn
   assert.ok(Math.abs((vector[0] ?? 0) - 0.6) < 1e-9);
   assert.ok(Math.abs((vector[1] ?? 0) - 0.8) < 1e-9);
   assert.equal(vector[2], 0);
+});
+
+test('groq chat provider remains available as fallback', async () => {
+  let seenUrl = '';
+  let seenBody: Record<string, unknown> | undefined;
+
+  const fetchImpl: typeof fetch = async (input, init) => {
+    seenUrl = String(input);
+    seenBody = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
+    return new Response(
+      JSON.stringify({
+        choices: [{ message: { content: 'groq-ok' } }],
+      }),
+      {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      },
+    );
+  };
+
+  const llm = createLlm({
+    provider: 'groq',
+    env: {
+      LLM_PROVIDER: 'groq',
+      GROQ_API_KEY: 'test-groq-key',
+      GEMINI_API_KEY: 'test-gemini-key',
+    },
+    fetch: fetchImpl,
+    maxRetries: 0,
+  });
+
+  const result = await llm.complete(messages);
+
+  assert.equal(result, 'groq-ok');
+  assert.equal(llm.providerName, 'groq');
+  assert.match(seenUrl, /api\.groq\.com\/openai\/v1\/chat\/completions/);
+  assert.equal(seenBody?.model, 'llama-3.1-8b-instant');
 });
