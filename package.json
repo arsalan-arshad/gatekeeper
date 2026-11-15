@@ -16,7 +16,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "pnpm -r --if-present test",
-    "typecheck": "pnpm -r --if-present typecheck"
+    "typecheck": "pnpm -r --if-present typecheck",
+    "eval:judge": "pnpm --filter @gatekeeper/api eval:judge"
   },
   "devDependencies": {
     "@gatekeeper/eslint-config": "workspace:*",

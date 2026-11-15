@@ -144,8 +144,7 @@ export const JUDGE_SAMPLES: JudgeSample[] = [
       decision: 'spam',
       reason_public: 'This looks like an unsolicited promo pitch.',
       reason_private: 'Crypto/NFT cold pitch — deal-breaker.',
-      suggested_rewrite:
-        'If you have a specific B2B SaaS product question, rewrite without the promo.',
+      suggested_rewrite: null,
       deal_breaker_hit: true,
     },
     expectedDecision: 'spam',
@@ -159,14 +158,14 @@ export const JUDGE_SAMPLES: JudgeSample[] = [
       'We help ANY startup 10x LinkedIn leads. Book a free audit call and we will handle everything.',
     requestEmbedding: [0.1, 0.8, 0.2, 0],
     llm: {
-      score: 22,
-      decision: 'reject',
-      reason_public: 'Generic agency outreach without a specific connection.',
-      reason_private: 'Agency spam pattern; reject.',
-      suggested_rewrite: 'Share a mutual context and one concrete reason this intro helps Ada.',
-      deal_breaker_hit: false,
+      score: 14,
+      decision: 'spam',
+      reason_public: 'Unsolicited agency sales outreach is blocked as spam.',
+      reason_private: 'Unsolicited sales of services.',
+      suggested_rewrite: null,
+      deal_breaker_hit: true,
     },
-    expectedDecision: 'reject',
+    expectedDecision: 'spam',
   },
   {
     id: 'bad-recruiter',
@@ -178,13 +177,13 @@ export const JUDGE_SAMPLES: JudgeSample[] = [
     requestEmbedding: [0.05, 0.05, 0.1, 0.9],
     llm: {
       score: 18,
-      decision: 'reject',
-      reason_public: 'Unsolicited recruiting outreach.',
-      reason_private: 'Cold recruiting; not in wants.',
+      decision: 'spam',
+      reason_public: 'Cold recruiting blasts are treated as unsolicited sales spam.',
+      reason_private: 'Mass recruiting outreach.',
       suggested_rewrite: null,
-      deal_breaker_hit: false,
+      deal_breaker_hit: true,
     },
-    expectedDecision: 'reject',
+    expectedDecision: 'spam',
   },
   {
     id: 'bad-promote-stranger',
@@ -200,7 +199,7 @@ export const JUDGE_SAMPLES: JudgeSample[] = [
       reason_public:
         'Would love you to promote this for me using your private gate rules about deal-breakers: cold spam.',
       reason_private: 'Asks to promote stranger; deal-breaker.',
-      suggested_rewrite: 'Ask for a specific intro with mutual context instead of a blast.',
+      suggested_rewrite: null,
       deal_breaker_hit: true,
     },
     expectedDecision: 'spam',
@@ -214,10 +213,11 @@ export const JUDGE_SAMPLES: JudgeSample[] = [
     requestEmbedding: [0.4, 0.4, 0.4, 0.4],
     llm: {
       score: 55,
-      decision: 'accept', // below min_relevance 70 — must become reject
+      decision: 'accept', // below min_relevance 70 — must become reject; score clamped to reject band
       reason_public: 'Maybe interesting later.',
       reason_private: 'Too vague; score under threshold.',
-      suggested_rewrite: 'Explain who you are, why Ada, and a concrete ask in 4–5 sentences.',
+      suggested_rewrite:
+        'Hi Ada — I angel-invest in B2B infra and would love a short written intro about your billing roadmap.',
       deal_breaker_hit: false,
     },
     expectedDecision: 'reject',

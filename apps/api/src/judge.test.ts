@@ -1,18 +1,32 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { cosineSimilarity, enforceDecision, judgeRequest, sanitizePublicReason } from './judge.ts';
+import {
+  clampScoreToDecision,
+  cosineSimilarity,
+  decisionMatchesScore,
+  enforceDecision,
+  hasRewritePlaceholders,
+  judgeRequest,
+  llmJudgePayloadSchema,
+  sanitizePublicReason,
+} from './judge.ts';
 import { JUDGE_SAMPLES, SAMPLE_TARGET } from './judge.samples.ts';
 import type { Llm, LlmProvider } from './llm.ts';
 
 function mockLlm(options: {
   embedding: number[];
-  completion: string;
-}): Llm & { provider: LlmProvider } {
+  completion: string | string[];
+}): Llm & { provider: LlmProvider; calls: number } {
+  let calls = 0;
+  const completions = Array.isArray(options.completion) ? options.completion : [options.completion];
+
   const provider: LlmProvider = {
     name: 'mock',
     async complete() {
-      return options.completion;
+      const idx = Math.min(calls, completions.length - 1);
+      calls += 1;
+      return completions[idx]!;
     },
     async embed() {
       return options.embedding;
@@ -22,11 +36,17 @@ function mockLlm(options: {
   return {
     providerName: 'mock',
     provider,
+    get calls() {
+      return calls;
+    },
     complete: (messages, completeOptions) => provider.complete(messages, completeOptions),
     embed: (text) => provider.embed(text),
     clearEmbeddingCache() {},
     getDailyUsage() {
       return 0;
+    },
+    async healthCheck() {
+      return [{ provider: 'gemini', ok: true, model: 'mock', error: null }];
     },
   };
 }
@@ -50,6 +70,97 @@ test('enforceDecision blocks accept below min_relevance or with deal-breakers', 
     enforceDecision({ score: 95, decision: 'accept', dealBreakerHit: true, minRelevance: 70 }),
     'spam',
   );
+});
+
+test('score bands match verdicts and placeholders are detected', () => {
+  assert.equal(decisionMatchesScore('spam', 12), true);
+  assert.equal(decisionMatchesScore('spam', 40), false);
+  assert.equal(decisionMatchesScore('reject', 40), true);
+  assert.equal(decisionMatchesScore('accept', 60), true);
+  assert.equal(clampScoreToDecision('reject', 88), 59);
+  assert.equal(hasRewritePlaceholders('Hi from <YourCompany>'), true);
+  assert.equal(hasRewritePlaceholders('Looking for a [role] intro'), true);
+  assert.equal(hasRewritePlaceholders('Hi — I ship billing tools for indie SaaS.'), false);
+
+  const bad = llmJudgePayloadSchema.safeParse({
+    score: 80,
+    decision: 'spam',
+    reason_public: 'Nope.',
+    reason_private: 'x',
+    suggested_rewrite: 'Hi from <YourCompany>',
+    deal_breaker_hit: true,
+  });
+  assert.equal(bad.success, false);
+});
+
+test('judgeRequest retries once when score/verdict disagree then accepts correction', async () => {
+  const llm = mockLlm({
+    embedding: [1, 0, 0, 0],
+    completion: [
+      JSON.stringify({
+        score: 80,
+        decision: 'spam',
+        reason_public: 'Wrong band.',
+        reason_private: 'bad',
+        suggested_rewrite: 'Use <YourCompany>',
+        deal_breaker_hit: false,
+      }),
+      JSON.stringify({
+        score: 34,
+        decision: 'reject',
+        reason_public: 'A vague ask is not a strong fit right now.',
+        reason_private: 'corrected',
+        suggested_rewrite:
+          'Hi Ada — I run a B2B invoicing SaaS and wanted a short intro about billing edge cases.',
+        deal_breaker_hit: false,
+      }),
+    ],
+  });
+
+  const result = await judgeRequest(
+    {
+      message: 'We should sync sometime?',
+      senderName: 'Vague',
+      senderType: 'human',
+      target: SAMPLE_TARGET,
+    },
+    llm,
+  );
+
+  assert.equal(llm.calls, 2);
+  assert.equal(result.decision, 'reject');
+  assert.ok(result.score >= 26 && result.score <= 59);
+  assert.ok(result.suggested_rewrite);
+  assert.equal(hasRewritePlaceholders(result.suggested_rewrite!), false);
+});
+
+test('judgeRequest drops rewrite for spam even if the model invents one', async () => {
+  const llm = mockLlm({
+    embedding: [0, 0, 1, 0],
+    completion: JSON.stringify({
+      score: 9,
+      decision: 'spam',
+      reason_public: 'Unsolicited crypto promotion is blocked.',
+      reason_private: 'crypto',
+      suggested_rewrite: 'Rewrite without hype',
+      deal_breaker_hit: true,
+    }),
+  });
+
+  const result = await judgeRequest(
+    {
+      message: 'Hot NFT token launch for guaranteed leads!!!',
+      senderName: 'Moon',
+      senderType: 'human',
+      target: SAMPLE_TARGET,
+    },
+    llm,
+  );
+
+  // First response fails zod (spam + rewrite); retry gets same mock → coerce path.
+  assert.equal(result.decision, 'spam');
+  assert.equal(result.suggested_rewrite, null);
+  assert.ok(result.score <= 25);
 });
 
 test('sanitizePublicReason never echoes private gate rules', () => {

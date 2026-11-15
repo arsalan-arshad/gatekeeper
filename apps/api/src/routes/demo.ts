@@ -10,23 +10,28 @@ import { createLlm, type Llm } from '../llm.js';
 import { FixedWindowRateLimiter } from '../rate-limit.js';
 import { MESSAGE_MAX_CHARS } from '../request-limits.js';
 
-/** Landing demo: 5 requests / IP / UTC day. */
-const DEMO_IP_DAILY_LIMIT = 5;
+/** Custom (uncached) demo requests: 20 / IP / UTC day. Cached chip responses do not count. */
+export const DEMO_IP_DAILY_LIMIT = 20;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const VERDICT_CACHE_TTL_MS = DAY_MS;
 
 const demoIpLimiter = new FixedWindowRateLimiter(DEMO_IP_DAILY_LIMIT, DAY_MS);
 
+type DemoJudgeBody = {
+  handle: string;
+  score: number;
+  decision: string;
+  reason_public: string;
+  suggested_rewrite: string | null;
+  similarity: number;
+  remaining: number;
+  limit: number;
+  cached: boolean;
+};
+
 type CachedVerdict = {
   expiresAt: number;
-  body: {
-    handle: string;
-    score: number;
-    decision: string;
-    reason_public: string;
-    suggested_rewrite: string | null;
-    similarity: number;
-  };
+  body: Omit<DemoJudgeBody, 'remaining' | 'limit' | 'cached'>;
 };
 
 const verdictCache = new Map<string, CachedVerdict>();
@@ -77,13 +82,28 @@ function getCachedVerdict(key: string): CachedVerdict['body'] | null {
   return hit.body;
 }
 
+function demoLimitKey(ip: string): string {
+  return `demo:${ip || 'unknown'}`;
+}
+
 export async function registerDemoRoutes(app: FastifyInstance): Promise<void> {
   app.get('/v1/demo/profiles', async () => ({
     profiles: listDemoProfilesPublic(),
   }));
 
+  app.get('/v1/demo/quota', async (request) => {
+    const ip = clientIp(request);
+    const peek = demoIpLimiter.peek(demoLimitKey(ip));
+    return {
+      remaining: peek.remaining,
+      limit: DEMO_IP_DAILY_LIMIT,
+      reset_ms: peek.resetMs,
+    };
+  });
+
   app.post('/v1/demo/judge', async (request, reply) => {
     const ip = clientIp(request);
+    const limitKey = demoLimitKey(ip);
 
     const parsed = demoJudgeSchema.safeParse(request.body);
     if (!parsed.success) {
@@ -95,10 +115,17 @@ export async function registerDemoRoutes(app: FastifyInstance): Promise<void> {
     const cacheKey = verdictCacheKey(parsed.data.handle, parsed.data.message.trim());
     const cached = getCachedVerdict(cacheKey);
     if (cached) {
-      return cached;
+      // Example chips / repeat messages served from cache do not consume quota.
+      const peek = demoIpLimiter.peek(limitKey);
+      return {
+        ...cached,
+        remaining: peek.remaining,
+        limit: DEMO_IP_DAILY_LIMIT,
+        cached: true,
+      } satisfies DemoJudgeBody;
     }
 
-    const limit = demoIpLimiter.check(`demo:${ip || 'unknown'}`);
+    const limit = demoIpLimiter.check(limitKey);
     if (!limit.ok) {
       await logAbuse({
         kind: 'rate_limit_ip',
@@ -110,6 +137,8 @@ export async function registerDemoRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(429).send({
         error: 'Demo rate limit exceeded — try again tomorrow',
         retry_after_ms: limit.resetMs,
+        remaining: 0,
+        limit: DEMO_IP_DAILY_LIMIT,
       });
     }
 
@@ -118,19 +147,19 @@ export async function registerDemoRoutes(app: FastifyInstance): Promise<void> {
       llm = resolveDemoLlm();
     } catch (error) {
       request.log.error({ err: error }, 'demo judge LLM init failed');
-      return reply.status(503).send({ error: DEMO_BUSY_ERROR });
+      return reply.status(503).send({ error: DEMO_BUSY_ERROR, remaining: limit.remaining });
     }
 
     const result = await demoJudgeRequest(parsed.data, llm, request.log);
     if ('error' in result) {
       if (isBusyFailure(result)) {
-        return reply.status(503).send({ error: result.error });
+        return reply.status(503).send({ error: result.error, remaining: limit.remaining });
       }
-      return reply.status(400).send({ error: result.error });
+      return reply.status(400).send({ error: result.error, remaining: limit.remaining });
     }
 
     // Never leak reason_private on the public demo endpoint.
-    const body = {
+    const cachedBody = {
       handle: result.handle,
       score: result.score,
       decision: result.decision,
@@ -139,7 +168,13 @@ export async function registerDemoRoutes(app: FastifyInstance): Promise<void> {
       similarity: result.similarity,
     };
 
-    verdictCache.set(cacheKey, { expiresAt: Date.now() + VERDICT_CACHE_TTL_MS, body });
-    return body;
+    verdictCache.set(cacheKey, { expiresAt: Date.now() + VERDICT_CACHE_TTL_MS, body: cachedBody });
+
+    return {
+      ...cachedBody,
+      remaining: limit.remaining,
+      limit: DEMO_IP_DAILY_LIMIT,
+      cached: false,
+    } satisfies DemoJudgeBody;
   });
 }

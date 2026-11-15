@@ -14,7 +14,9 @@ export function DoorGraphic({ state = 'idle' }: { state?: DoorState }) {
 
   return (
     <div
-      className="relative mx-auto aspect-[3/5] w-full max-w-[14rem] sm:max-w-[16rem]"
+      className={`relative mx-auto aspect-[3/5] w-full max-w-[14rem] sm:max-w-[16rem] ${
+        state === 'closed' ? 'door-frame-slam' : ''
+      }`}
       aria-hidden
     >
       <div

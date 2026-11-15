@@ -10,6 +10,8 @@ type DemoResult = {
   decision: 'accept' | 'reject' | 'spam';
   reason_public: string;
   suggested_rewrite: string | null;
+  remaining?: number;
+  limit?: number;
 };
 
 export function HeroDemo() {
@@ -20,6 +22,8 @@ export function HeroDemo() {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [slamKey, setSlamKey] = useState(0);
+  const [remaining, setRemaining] = useState<number | null>(null);
+  const [limit, setLimit] = useState(20);
 
   const profile = DEMO_PROFILE_OPTIONS.find((p) => p.handle === handle) ?? DEMO_PROFILE_OPTIONS[0]!;
 
@@ -28,6 +32,24 @@ export function HeroDemo() {
       setPlaceholderIndex((i) => (i + 1) % DEMO_PLACEHOLDERS.length);
     }, 4200);
     return () => window.clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/demo/quota', { cache: 'no-store' })
+      .then(async (response) => {
+        if (!response.ok) return;
+        const body = (await response.json()) as { remaining?: number; limit?: number };
+        if (cancelled) return;
+        if (typeof body.remaining === 'number') setRemaining(body.remaining);
+        if (typeof body.limit === 'number') setLimit(body.limit);
+      })
+      .catch(() => {
+        /* quota is best-effort for UI */
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const doorState: DoorState = !result ? 'idle' : result.decision === 'accept' ? 'open' : 'closed';
@@ -50,7 +72,13 @@ export function HeroDemo() {
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ handle, message: text, senderName: 'Demo visitor' }),
         });
-        const body = (await response.json().catch(() => ({}))) as DemoResult & { error?: string };
+        const body = (await response.json().catch(() => ({}))) as DemoResult & {
+          error?: string;
+          remaining?: number;
+          limit?: number;
+        };
+        if (typeof body.remaining === 'number') setRemaining(body.remaining);
+        if (typeof body.limit === 'number') setLimit(body.limit);
         if (!response.ok) {
           setResult(null);
           if (response.status === 503 || /AI busy/i.test(body.error ?? '')) {
@@ -65,6 +93,8 @@ export function HeroDemo() {
           decision: body.decision,
           reason_public: body.reason_public,
           suggested_rewrite: body.suggested_rewrite,
+          remaining: body.remaining,
+          limit: body.limit,
         });
         if (body.decision !== 'accept') {
           setSlamKey((k) => k + 1);
@@ -119,6 +149,12 @@ export function HeroDemo() {
             className="mt-2 w-full resize-y rounded-md border border-white/15 bg-[#0a110e] px-3 py-2.5 text-[var(--fg)] placeholder:text-[var(--muted)]/70"
           />
         </label>
+
+        <p className="mt-2 text-sm text-[var(--muted)]">
+          {remaining == null
+            ? `${limit} custom demo requests per IP per day · example chips from cache do not count`
+            : `${remaining} of ${limit} custom demo requests remaining today · cached examples free`}
+        </p>
 
         <div className="mt-3 flex flex-wrap gap-2">
           {DEMO_CHIPS.map((chip) => (

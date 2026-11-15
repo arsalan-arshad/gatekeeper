@@ -160,9 +160,11 @@ node --import tsx --test apps/api/src/opt-in.test.ts apps/api/src/email.test.ts 
 pnpm --filter @gatekeeper/api test
 # focused:
 node --import tsx --test apps/api/src/judge.test.ts
+# live quality gate (~12 labeled @demo cases; needs GEMINI_API_KEY and/or GROQ_API_KEY):
+pnpm eval:judge
 ```
 
-`judgeRequest` embeds the inbound message, scores cosine similarity vs the profile embedding, asks the LLM for strict JSON, then accepts only when `score >= min_relevance` and no deal-breaker was hit. `reason_public` is sanitized so private gate rules never leak.
+`judgeRequest` embeds the inbound message, scores cosine similarity vs the profile embedding, asks the LLM for strict JSON (zod-validated; one correction retry if score/verdict bands disagree or placeholders appear), then accepts only when `score >= min_relevance` and no deal-breaker was hit. Verdict bands: spam 0–25, reject 26–59, accept 60–100. `reason_public` is sanitized so private gate rules never leak.
 
 ### Onboarding (`/start`)
 

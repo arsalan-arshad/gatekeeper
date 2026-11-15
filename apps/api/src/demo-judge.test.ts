@@ -7,9 +7,11 @@ import type { Llm, LlmProvider } from './llm.js';
 import { resetDemoRateLimiterForTests, setDemoLlmForTests } from './routes/demo.js';
 
 const STRONG_MESSAGE =
-  'Hey Sam — I’m a founder shipping a usage-based billing SaaS for indie tools. Would love a short peer intro to compare Stripe edge cases and founder-led sales.';
+  'Hey Sam — I’m Maya, founder of a usage-based billing SaaS for indie B2B tools (invoicing + metered overages). I’d love a short peer intro to compare Stripe Billing edge cases and founder-led sales — happy to share what we learned on dunning too.';
 
 const SPAM_MESSAGE = 'Hot crypto NFT token launch — guaranteed leads for your SaaS!!';
+const WEAK_MESSAGE =
+  'Hey — would love to pick your brain over coffee sometime and hear your founder journey. No specific ask yet, just a quick sync!';
 
 function mockLlm(options: {
   embedding?: number[];
@@ -80,8 +82,7 @@ test('demoJudgeRequest marks crypto pitches as spam with request-specific reason
       decision: 'spam',
       reason_public: 'Crypto/NFT cold pitch hits a deal-breaker — blocked as spam.',
       reason_private: 'deal breaker crypto',
-      suggested_rewrite:
-        'Hi Sam — I’m a peer founder with a specific billing question, not a token pitch…',
+      suggested_rewrite: null,
       deal_breaker_hit: true,
     }),
   });
@@ -90,8 +91,32 @@ test('demoJudgeRequest marks crypto pitches as spam with request-specific reason
   assert.ok(!('error' in result));
   if ('error' in result) return;
   assert.equal(result.decision, 'spam');
+  assert.equal(result.suggested_rewrite, null);
+  assert.match(result.reason_public, /crypto|nft|spam|deal-breaker|promo/i);
+});
+
+test('demoJudgeRequest rejects vague coffee chats for @demo', async () => {
+  const llm = mockLlm({
+    completion: JSON.stringify({
+      score: 34,
+      decision: 'reject',
+      reason_public: 'A vague coffee chat without a written ask is not a strong fit right now.',
+      reason_private: 'vague',
+      suggested_rewrite:
+        'Hi Sam — I’m Alex, a founder shipping usage-based invoicing. I’d love a short written intro about Stripe metered billing.',
+      deal_breaker_hit: false,
+    }),
+  });
+
+  const result = await demoJudgeRequest(
+    { handle: 'demo', message: WEAK_MESSAGE, senderName: 'Alex' },
+    llm,
+  );
+  assert.ok(!('error' in result));
+  if ('error' in result) return;
+  assert.equal(result.decision, 'reject');
+  assert.ok(result.score >= 26 && result.score <= 59);
   assert.ok(result.suggested_rewrite);
-  assert.match(result.reason_public, /crypto|nft|spam|deal-breaker/i);
 });
 
 test('strong request scores higher than spam', async () => {
@@ -111,7 +136,7 @@ test('strong request scores higher than spam', async () => {
       decision: 'spam',
       reason_public: 'Token/NFT blast — spam.',
       reason_private: 'spam',
-      suggested_rewrite: 'Rewrite without crypto hype…',
+      suggested_rewrite: null,
       deal_breaker_hit: true,
     }),
   });
@@ -136,7 +161,7 @@ test('demoJudgeRequest returns busy error on LLM failure — no fake verdict', a
   assert.equal('score' in result, false);
 });
 
-test('POST /v1/demo/judge is IP rate limited (5/day) and omits private reasons', async () => {
+test('POST /v1/demo/judge is IP rate limited (20/day), exposes remaining, cache exempt', async () => {
   resetDemoRateLimiterForTests();
   setDemoLlmForTests(
     mockLlm({
@@ -168,6 +193,9 @@ test('POST /v1/demo/judge is IP rate limited (5/day) and omits private reasons',
     assert.equal(typeof body.score, 'number');
     assert.ok(['accept', 'reject', 'spam'].includes(String(body.decision)));
     assert.equal(body.reason_private, undefined);
+    assert.equal(body.limit, 20);
+    assert.equal(body.remaining, 19);
+    assert.equal(body.cached, false);
 
     // Cached replay does not consume more of the daily budget.
     const cached = await app.inject({
@@ -177,16 +205,19 @@ test('POST /v1/demo/judge is IP rate limited (5/day) and omits private reasons',
       payload: { handle: 'demo', message: STRONG_MESSAGE },
     });
     assert.equal(cached.statusCode, 200);
+    const cachedBody = cached.json() as Record<string, unknown>;
+    assert.equal(cachedBody.cached, true);
+    assert.equal(cachedBody.remaining, 19);
 
-    // 4 more unique messages → daily cap of 5.
-    for (let i = 0; i < 4; i += 1) {
+    // 19 more unique messages → daily cap of 20.
+    for (let i = 0; i < 19; i += 1) {
       const res = await app.inject({
         method: 'POST',
         url: '/v1/demo/judge',
         headers: { 'x-forwarded-for': '203.0.113.50' },
         payload: { handle: 'demo', message: `probe ${i} founder saas billing typescript peer` },
       });
-      assert.equal(res.statusCode, 200);
+      assert.equal(res.statusCode, 200, `probe ${i}`);
     }
 
     const limited = await app.inject({
@@ -196,6 +227,18 @@ test('POST /v1/demo/judge is IP rate limited (5/day) and omits private reasons',
       payload: { handle: 'demo', message: 'another founder saas billing note' },
     });
     assert.equal(limited.statusCode, 429);
+    const limitedBody = limited.json() as Record<string, unknown>;
+    assert.equal(limitedBody.remaining, 0);
+
+    // Cached chip still works after limit.
+    const cachedAfter = await app.inject({
+      method: 'POST',
+      url: '/v1/demo/judge',
+      headers: { 'x-forwarded-for': '203.0.113.50' },
+      payload: { handle: 'demo', message: STRONG_MESSAGE },
+    });
+    assert.equal(cachedAfter.statusCode, 200);
+    assert.equal((cachedAfter.json() as { cached?: boolean }).cached, true);
 
     await app.close();
   } finally {
