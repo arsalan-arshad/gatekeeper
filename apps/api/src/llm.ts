@@ -129,7 +129,13 @@ export const GEMINI_EMBEDDING_MODEL = 'gemini-embedding-001';
 /** Match packages/db DEFAULT_EMBEDDING_DIMENSIONS / vector(768). */
 export const GEMINI_EMBEDDING_DIMENSIONS = 768;
 
-export const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile';
+/**
+ * Groq free/developer default.
+ * `llama-3.3-70b-versatile` was retired for free/dev tiers (2026-08-16);
+ * Groq docs recommend `openai/gpt-oss-120b` as the replacement.
+ * @see https://console.groq.com/docs/deprecations
+ */
+export const DEFAULT_GROQ_MODEL = 'openai/gpt-oss-120b';
 
 type UsageStore = Map<string, number>;
 
@@ -210,9 +216,10 @@ async function withRetries<T>(run: () => Promise<T>, maxRetries: number): Promis
 function assertOk(response: Response, body: string, provider: string): void {
   if (response.ok) return;
   const retryable =
+    response.status === 404 ||
     response.status === 429 ||
     response.status >= 500 ||
-    /RESOURCE_EXHAUSTED|UNAVAILABLE|high demand/i.test(body);
+    /RESOURCE_EXHAUSTED|UNAVAILABLE|high demand|model_not_found/i.test(body);
   throw new LlmProviderError(
     `${provider} request failed (${response.status}): ${body || response.statusText}`,
     { status: response.status, retryable, provider },
@@ -538,8 +545,17 @@ function looksLikeJsonObject(text: string): boolean {
 export function isFailoverError(error: unknown): boolean {
   if (error instanceof LlmTimeoutError) return true;
   if (!(error instanceof LlmProviderError)) return false;
-  if (error.status === 429 || (error.status !== undefined && error.status >= 500)) return true;
-  if (/RESOURCE_EXHAUSTED|invalid JSON|empty completion/i.test(error.message)) return true;
+  // 404 covers retired/unknown model ids (e.g. Groq model_not_found).
+  if (
+    error.status === 404 ||
+    error.status === 429 ||
+    (error.status !== undefined && error.status >= 500)
+  ) {
+    return true;
+  }
+  if (/RESOURCE_EXHAUSTED|invalid JSON|empty completion|model_not_found/i.test(error.message)) {
+    return true;
+  }
   return error.retryable;
 }
 
