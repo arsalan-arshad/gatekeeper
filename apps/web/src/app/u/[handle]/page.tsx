@@ -5,6 +5,7 @@ import { SiteNav } from '@/components/site-nav';
 import { API_URL } from '@/lib/api';
 import { DEMO_USER_FALLBACK } from '@/lib/demo';
 
+import { DemoIntroForm } from './demo-intro-form';
 import { IntroRequestForm } from './intro-form';
 
 type PublicUser = {
@@ -50,6 +51,7 @@ export default async function PublicHandlePage({
   if (!data) notFound();
 
   const { user, demoFallback } = data;
+  const isDemo = user.handle === 'demo' || demoFallback;
 
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-8 px-6 py-16">
@@ -58,8 +60,8 @@ export default async function PublicHandlePage({
       <header className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-3">
           <p className="text-sm text-[var(--muted)]">@{user.handle}</p>
-          {demoFallback || user.handle === 'demo' ? (
-            <span className="rounded-md border border-[var(--accent)]/35 bg-[var(--accent)]/10 px-2.5 py-1 text-xs font-semibold tracking-wide text-[var(--accent)] uppercase">
+          {isDemo ? (
+            <span className="rounded-md border border-[var(--accent)]/35 bg-[var(--accent)]/10 px-2.5 py-1 text-sm font-semibold tracking-wide text-[var(--accent)] uppercase">
               Demo data
             </span>
           ) : null}
@@ -89,19 +91,15 @@ export default async function PublicHandlePage({
         </h2>
         <p className="text-sm text-[var(--muted)]">
           Your note goes to {user.name}&apos;s Gatekeeper first. Private rules stay private.
-          {demoFallback
-            ? ' Live submission needs the API and seeded @demo user — try the landing demo meanwhile.'
+          {isDemo
+            ? ' Demo judgments use the same rate-limited AI judge as the landing page — no email delivery.'
             : null}
         </p>
-        {!demoFallback ? <IntroRequestForm handle={user.handle} /> : null}
-        {demoFallback ? (
-          <Link
-            href="/#try"
-            className="w-fit rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-[#062015]"
-          >
-            Try the interactive demo
-          </Link>
-        ) : null}
+        {isDemo ? (
+          <DemoIntroForm handle={user.handle} />
+        ) : (
+          <IntroRequestForm handle={user.handle} />
+        )}
       </section>
     </main>
   );

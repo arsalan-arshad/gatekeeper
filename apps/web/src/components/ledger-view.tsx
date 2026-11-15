@@ -28,7 +28,7 @@ export function LedgerView({
             {title}
           </h1>
           {demoData ? (
-            <span className="rounded-md border border-[var(--accent)]/35 bg-[var(--accent)]/10 px-2.5 py-1 text-xs font-semibold tracking-wide text-[var(--accent)] uppercase">
+            <span className="rounded-md border border-[var(--accent)]/35 bg-[var(--accent)]/10 px-2.5 py-1 text-sm font-semibold tracking-wide text-[var(--accent)] uppercase">
               Demo data
             </span>
           ) : null}
@@ -68,7 +68,7 @@ export function LedgerView({
             Monthly chart
           </h2>
           {demoData ? (
-            <span className="text-xs tracking-wide text-[var(--accent)] uppercase">Demo data</span>
+            <span className="text-sm tracking-wide text-[var(--accent)] uppercase">Demo data</span>
           ) : null}
         </div>
         {months.length === 0 ? (
@@ -88,7 +88,7 @@ export function LedgerView({
                 <span className="text-sm tabular-nums text-[var(--fg)]">{row.requestCount}</span>
               </div>
             ))}
-            <div className="flex flex-wrap gap-4 pt-2 text-xs text-[var(--muted)]">
+            <div className="flex flex-wrap gap-4 pt-2 text-sm text-[var(--muted)]">
               <span>
                 <span className="mr-1 inline-block h-2 w-2 rounded-sm bg-[var(--accent)]/70" />
                 Requests / month

@@ -246,7 +246,7 @@ function MockThread({
       <div className="mb-4 flex items-center justify-between gap-3">
         <p className="text-sm tracking-wide text-[var(--muted)] uppercase">Chat / phone mockup</p>
         <span
-          className={`rounded-md px-2 py-1 text-xs font-semibold uppercase ${
+          className={`rounded-md px-2 py-1 text-sm font-semibold uppercase ${
             tone === 'accept'
               ? 'bg-[var(--accent)]/20 text-[var(--accent)]'
               : 'bg-red-500/20 text-red-200'
@@ -269,7 +269,7 @@ function MockThread({
                   : 'bg-white/5 text-[var(--muted)]'
               }`}
             >
-              <span className="text-xs tracking-wide text-[var(--accent)] uppercase">
+              <span className="text-sm tracking-wide text-[var(--accent)] uppercase">
                 {line.who}
               </span>
               <p className="mt-1">{line.text}</p>

@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from 'react';
 
 import { DoorGraphic, type DoorState } from '@/components/door-graphic';
-import { DEMO_PLACEHOLDERS, DEMO_PROFILE_OPTIONS } from '@/lib/demo';
+import { DEMO_CHIPS, DEMO_PLACEHOLDERS, DEMO_PROFILE_OPTIONS } from '@/lib/demo';
 
 type DemoResult = {
   score: number;
@@ -19,6 +19,7 @@ export function HeroDemo() {
   const [result, setResult] = useState<DemoResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [slamKey, setSlamKey] = useState(0);
 
   const profile = DEMO_PROFILE_OPTIONS.find((p) => p.handle === handle) ?? DEMO_PROFILE_OPTIONS[0]!;
 
@@ -30,6 +31,14 @@ export function HeroDemo() {
   }, []);
 
   const doorState: DoorState = !result ? 'idle' : result.decision === 'accept' ? 'open' : 'closed';
+
+  function applyChip(chipId: (typeof DEMO_CHIPS)[number]['id']) {
+    const chip = DEMO_CHIPS.find((c) => c.id === chipId);
+    if (!chip) return;
+    setMessage(chip.message);
+    setResult(null);
+    setError(null);
+  }
 
   function onJudge() {
     setError(null);
@@ -44,7 +53,11 @@ export function HeroDemo() {
         const body = (await response.json().catch(() => ({}))) as DemoResult & { error?: string };
         if (!response.ok) {
           setResult(null);
-          setError(body.error || 'Could not judge request');
+          if (response.status === 503 || /AI busy/i.test(body.error ?? '')) {
+            setError('AI busy, try again');
+          } else {
+            setError(body.error || 'Could not judge request');
+          }
           return;
         }
         setResult({
@@ -53,15 +66,18 @@ export function HeroDemo() {
           reason_public: body.reason_public,
           suggested_rewrite: body.suggested_rewrite,
         });
+        if (body.decision !== 'accept') {
+          setSlamKey((k) => k + 1);
+        }
       } catch {
         setResult(null);
-        setError('Demo API unreachable — start the API or try again.');
+        setError('AI busy, try again');
       }
     });
   }
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:items-start">
+    <div className="grid gap-8 md:grid-cols-1 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:items-start">
       <div className="rounded-xl border border-white/10 bg-black/25 p-5 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm font-medium tracking-wide text-[var(--accent)] uppercase">
@@ -104,6 +120,19 @@ export function HeroDemo() {
           />
         </label>
 
+        <div className="mt-3 flex flex-wrap gap-2">
+          {DEMO_CHIPS.map((chip) => (
+            <button
+              key={chip.id}
+              type="button"
+              onClick={() => applyChip(chip.id)}
+              className="rounded-md border border-white/15 px-3 py-1.5 text-sm text-[var(--muted)] transition hover:border-[var(--accent)]/40 hover:text-[var(--fg)]"
+            >
+              {chip.label}
+            </button>
+          ))}
+        </div>
+
         <button
           type="button"
           onClick={onJudge}
@@ -126,7 +155,7 @@ export function HeroDemo() {
             <p className="leading-relaxed text-[var(--fg)]">{result.reason_public}</p>
             {result.suggested_rewrite ? (
               <div className="rounded-md border border-white/10 bg-black/20 p-3">
-                <p className="text-xs tracking-wide text-[var(--muted)] uppercase">
+                <p className="text-sm tracking-wide text-[var(--muted)] uppercase">
                   Suggested rewrite
                 </p>
                 <p className="mt-2 text-sm leading-relaxed text-[var(--fg)]">
@@ -138,13 +167,13 @@ export function HeroDemo() {
         ) : null}
       </div>
 
-      <div className="flex flex-col items-center justify-center gap-4 py-2">
+      <div className="flex flex-col items-center justify-center gap-4 py-2" key={slamKey}>
         <DoorGraphic state={doorState} />
         <p className="text-center text-sm text-[var(--muted)]">
           {doorState === 'open'
             ? 'Door open — forward for double opt-in'
             : doorState === 'closed'
-              ? 'Door closed — spam and weak fits stay out'
+              ? 'Door slammed — spam and weak fits stay out'
               : 'Your AI front door waits for a judgment'}
         </p>
       </div>
@@ -161,7 +190,7 @@ function DecisionBadge({ decision }: { decision: DemoResult['decision'] }) {
         : 'bg-amber-500/15 text-amber-100';
   return (
     <span
-      className={`rounded-md px-2.5 py-1 text-xs font-semibold tracking-wide uppercase ${styles}`}
+      className={`rounded-md px-2.5 py-1 text-sm font-semibold tracking-wide uppercase ${styles}`}
     >
       {decision}
     </span>

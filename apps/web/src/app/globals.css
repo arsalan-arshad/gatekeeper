@@ -63,19 +63,37 @@ body {
 
 @keyframes door-open {
   from {
-    transform: perspective(800px) rotateY(0deg);
+    transform: perspective(900px) rotateY(0deg);
   }
   to {
-    transform: perspective(800px) rotateY(-62deg);
+    transform: perspective(900px) rotateY(-68deg);
   }
 }
 
-@keyframes door-close {
-  from {
-    transform: perspective(800px) rotateY(-20deg);
+@keyframes door-slam {
+  0% {
+    transform: perspective(900px) rotateY(-48deg);
   }
-  to {
-    transform: perspective(800px) rotateY(0deg) scaleX(1.02);
+  55% {
+    transform: perspective(900px) rotateY(6deg) scaleX(1.04);
+  }
+  75% {
+    transform: perspective(900px) rotateY(-3deg);
+  }
+  100% {
+    transform: perspective(900px) rotateY(0deg) scaleX(1);
+  }
+}
+
+@keyframes glow-accept-pulse {
+  0%,
+  100% {
+    opacity: 0.75;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
   }
 }
 
@@ -95,23 +113,39 @@ body {
   animation: door-breathe 5.5s ease-in-out infinite;
 }
 
+.door-glow-accept {
+  animation: glow-accept-pulse 1.8s ease-in-out infinite;
+  filter: drop-shadow(0 0 28px rgba(95, 212, 164, 0.55));
+}
+
+.door-glow-reject {
+  opacity: 0.45;
+}
+
 .light-sweep {
   animation: sweep 7s ease-in-out infinite;
 }
 
+.door-leaf-idle,
+.door-leaf-open,
+.door-leaf-closed {
+  transform-box: fill-box;
+  transform-origin: left center;
+}
+
 .door-leaf-idle {
-  transform: perspective(800px) rotateY(-8deg);
+  transform: perspective(900px) rotateY(-8deg);
   transition: transform 0.7s ease;
 }
 
 .door-leaf-open {
-  animation: door-open 0.85s ease forwards;
-  box-shadow: 12px 0 40px rgba(95, 212, 164, 0.18);
+  animation: door-open 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  filter: drop-shadow(10px 0 28px rgba(95, 212, 164, 0.35));
 }
 
 .door-leaf-closed {
-  animation: door-close 0.55s ease forwards;
-  filter: brightness(0.72);
+  animation: door-slam 0.48s cubic-bezier(0.55, 0.05, 0.3, 1) forwards;
+  filter: brightness(0.68);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -119,6 +153,7 @@ body {
   .animate-rise-delay,
   .animate-rise-delay-2,
   .door-glow,
+  .door-glow-accept,
   .light-sweep,
   .door-leaf-open,
   .door-leaf-closed {
@@ -126,11 +161,11 @@ body {
   }
 
   .door-leaf-open {
-    transform: perspective(800px) rotateY(-55deg);
+    transform: perspective(900px) rotateY(-55deg);
   }
 
   .door-leaf-closed {
     transform: none;
-    filter: brightness(0.72);
+    filter: brightness(0.68);
   }
 }
