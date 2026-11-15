@@ -15,6 +15,12 @@ import {
   statusAfterJudgment,
 } from './opt-in.js';
 import {
+  canEmailSenderContact,
+  consumeSenderOutboundSlot,
+  isSenderContactVerified,
+  maybeSendSenderVerificationEmail,
+} from './sender-verify.js';
+import {
   forfeitStakeToReceiver,
   holdSenderStake,
   paymentsEnabled,
@@ -63,6 +69,12 @@ export type SubmitRequestResult = {
     suggested_rewrite: string | null;
   } | null;
   email: { kind: string; id: string; mode: string } | null;
+  /** Sender-facing delivery: on-screen until contact verified. */
+  senderContact?: {
+    verified: boolean;
+    verifyEmailSent: boolean;
+    onScreenOnly: boolean;
+  };
   error?: string;
 };
 
@@ -236,6 +248,7 @@ export async function submitIntroRequest(options: {
 
   const send = createEmailSender();
   let email: { kind: string; id: string; mode: string } | null = null;
+  let verifyEmailSent = false;
 
   try {
     if (shouldSendInstantOwnerEmail(user.notificationEmailMode)) {
@@ -253,24 +266,40 @@ export async function submitIntroRequest(options: {
       email = { kind: 'owner_notification', id: ownerMail.id, mode: ownerMail.mode };
     }
 
-    if (judgment.decision !== 'accept') {
-      const result = await sendRejectEmailToSender(send, {
+    // Never email unverified senderContact (reject/etc). On-screen only until verify.
+    const senderGate = await canEmailSenderContact(options.body.senderContact);
+    if (judgment.decision !== 'accept' && senderGate.ok) {
+      const slot = consumeSenderOutboundSlot(options.body.senderContact);
+      if (slot.ok) {
+        const result = await sendRejectEmailToSender(send, {
+          senderEmail: options.body.senderContact,
+          senderName: options.body.senderName,
+          receiverName: user.name,
+          judgment: {
+            decision: judgment.decision,
+            reason_public: judgment.reason_public,
+            suggested_rewrite: judgment.suggested_rewrite,
+          },
+        });
+        if (!email) {
+          email = { kind: 'sender_reject', id: result.id, mode: result.mode };
+        }
+      }
+    } else if (!senderGate.ok && senderGate.reason === 'unverified') {
+      const verify = await maybeSendSenderVerificationEmail(send, {
         senderEmail: options.body.senderContact,
         senderName: options.body.senderName,
-        receiverName: user.name,
-        judgment: {
-          decision: judgment.decision,
-          reason_public: judgment.reason_public,
-          suggested_rewrite: judgment.suggested_rewrite,
-        },
       });
-      if (!email) {
-        email = { kind: 'sender_reject', id: result.id, mode: result.mode };
+      verifyEmailSent = verify.sent;
+      if (verify.sent && !email) {
+        email = { kind: 'sender_verify', id: verify.id!, mode: verify.mode! };
       }
     }
   } catch (error) {
     options.log?.error({ err: error }, 'request notification email failed');
   }
+
+  const verified = await isSenderContactVerified(options.body.senderContact);
 
   return {
     ok: true,
@@ -283,6 +312,11 @@ export async function submitIntroRequest(options: {
         suggested_rewrite: judgment.suggested_rewrite,
       },
       email,
+      senderContact: {
+        verified,
+        verifyEmailSent,
+        onScreenOnly: !verified,
+      },
     },
   };
 }

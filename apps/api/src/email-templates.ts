@@ -233,6 +233,37 @@ export function buildRejectEmail(input: {
   return { subject, html, text };
 }
 
+export function buildSenderVerifyEmail(input: {
+  senderName: string;
+  verifyUrl: string;
+  env?: NodeJS.ProcessEnv;
+}): { subject: string; html: string; text: string } {
+  const links = getEmailBrandLinks(input.env);
+  const subject = sanitizeEmailSubject('Verify your email for Gatekeeper');
+  const text = [
+    `Hi ${input.senderName},`,
+    '',
+    'Confirm this email to receive Gatekeeper updates about your intro request.',
+    'Judgment details stay on-screen until you verify.',
+    '',
+    `Verify (valid 24h): ${input.verifyUrl}`,
+    footerText(links),
+  ].join('\n');
+  const html = layoutHtml({
+    title: 'Verify your email',
+    links,
+    bodyHtml: `
+      <p style="margin:0 0 12px;line-height:1.55;color:#c9d6cf;">Hi ${escapeHtml(input.senderName)},</p>
+      <p style="margin:0 0 16px;line-height:1.55;color:#c9d6cf;">
+        Confirm this address to receive Gatekeeper updates. Until then, results stay on-screen only.
+      </p>
+      <p style="margin:0 0 12px;">${buttonHtml(input.verifyUrl, 'Verify email')}</p>
+      <p style="margin:16px 0 0;font-size:13px;color:#8fa399;word-break:break-all;">${escapeHtml(input.verifyUrl)}</p>
+    `,
+  });
+  return { subject, html, text };
+}
+
 export function buildDeclineAutoReplyEmail(input: {
   senderName: string;
   receiverName: string;
