@@ -45,3 +45,14 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+      - name: Judge eval
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          if [ -z "${GEMINI_API_KEY}" ] && [ -z "${GROQ_API_KEY}" ]; then
+            echo "No LLM API secrets configured — skipping live judge eval (accuracy gate inactive)."
+            exit 0
+          fi
+          pnpm eval:judge

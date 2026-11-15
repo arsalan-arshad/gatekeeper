@@ -47,7 +47,10 @@ export const DEMO_PLACEHOLDERS = [
   'Hot crypto NFT token launch — promote to your audience for guaranteed leads!!',
 ];
 
-/** One-click sample requests for the landing Try-it-now demo. */
+/**
+ * One-click sample requests for the landing Try-it-now demo.
+ * Strong/weak are tuned for the default @demo profile (Sam Rivera — peer B2B SaaS/billing).
+ */
 export const DEMO_CHIPS = [
   {
     id: 'spam' as const,
@@ -58,13 +61,14 @@ export const DEMO_CHIPS = [
   {
     id: 'weak' as const,
     label: 'Weak example',
-    message: 'Quick sync sometime? Would love to pick your brain over coffee — no agenda yet.',
+    message:
+      'Hey — would love to pick your brain over coffee sometime and hear your founder journey. No specific ask yet, just a quick sync!',
   },
   {
     id: 'strong' as const,
     label: 'Strong example',
     message:
-      'Hey Sam — I’m a founder shipping usage-based billing SaaS for indie tools. Would love a short peer intro to compare Stripe edge cases and founder-led sales.',
+      'Hey Sam — I’m Maya, founder of a usage-based billing SaaS for indie B2B tools (invoicing + metered overages). I’d love a short peer intro to compare Stripe Billing edge cases and founder-led sales — happy to share what we learned on dunning too.',
   },
 ] as const;
 

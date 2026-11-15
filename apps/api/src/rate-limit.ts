@@ -19,6 +19,27 @@ export class FixedWindowRateLimiter {
     private readonly now: () => number = () => Date.now(),
   ) {}
 
+  /** Read remaining quota without consuming a unit. */
+  peek(key: string): RateLimitResult {
+    const now = this.now();
+    const existing = this.buckets.get(key);
+
+    if (!existing || now - existing.windowStart >= this.windowMs) {
+      return { ok: true, remaining: this.limit, resetMs: this.windowMs };
+    }
+
+    const resetMs = this.windowMs - (now - existing.windowStart);
+    if (existing.count >= this.limit) {
+      return { ok: false, remaining: 0, resetMs };
+    }
+
+    return {
+      ok: true,
+      remaining: Math.max(0, this.limit - existing.count),
+      resetMs,
+    };
+  }
+
   check(key: string): RateLimitResult {
     const now = this.now();
     const existing = this.buckets.get(key);

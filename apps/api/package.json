@@ -10,7 +10,8 @@
     "start": "node dist/index.js",
     "lint": "eslint src --max-warnings 0",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --import tsx --test src/**/*.test.ts"
+    "test": "node --import tsx --test src/**/*.test.ts",
+    "eval:judge": "tsx src/eval-judge.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.4.3",

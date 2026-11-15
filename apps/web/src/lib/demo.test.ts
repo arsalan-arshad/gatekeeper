@@ -20,7 +20,7 @@ test('demo placeholders rotate through accept and spam examples', () => {
   assert.ok(DEMO_PLACEHOLDERS.some((p) => /founder|saas|billing/i.test(p)));
 });
 
-test('demo chips include spam, weak, and strong one-clicks', () => {
+test('demo chips include spam, weak, and strong one-clicks tuned for @demo', () => {
   assert.equal(DEMO_CHIPS.length, 3);
   assert.deepEqual(
     DEMO_CHIPS.map((c) => c.id),
@@ -28,7 +28,10 @@ test('demo chips include spam, weak, and strong one-clicks', () => {
   );
   assert.match(DEMO_CHIPS[0]!.message, /crypto|nft/i);
   assert.match(DEMO_CHIPS[1]!.message, /coffee|pick your brain|quick sync/i);
-  assert.match(DEMO_CHIPS[2]!.message, /billing|founder|saas/i);
+  assert.match(DEMO_CHIPS[2]!.message, /Sam|usage-based billing|Stripe|peer/i);
+  const demo = DEMO_PROFILE_OPTIONS.find((p) => p.handle === 'demo');
+  assert.ok(demo);
+  assert.match(demo!.wantsText, /Peer founders|billing|TypeScript/i);
 });
 
 test('demo ledger fallback is labeled user scope for @demo', () => {
