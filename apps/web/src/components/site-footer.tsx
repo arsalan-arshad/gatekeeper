@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-import { BRAND } from '@/lib/brand';
+import { BRAND, studioLink } from '@/lib/brand';
 
 export function SiteFooter() {
   return (
@@ -26,6 +26,9 @@ export function SiteFooter() {
           <Link href="/privacy" className="hover:text-[var(--fg)]">
             Privacy
           </Link>
+          <Link href="/terms" className="hover:text-[var(--fg)]">
+            Terms
+          </Link>
           <Link href="/llms.txt" className="hover:text-[var(--fg)]">
             /llms.txt
           </Link>
@@ -35,16 +38,43 @@ export function SiteFooter() {
           <a
             href={BRAND.githubUrl}
             className="hover:text-[var(--fg)]"
-            rel="noreferrer"
+            rel="noopener noreferrer"
             target="_blank"
           >
             GitHub
           </a>
+          <a
+            href={BRAND.xUrl}
+            className="hover:text-[var(--fg)]"
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            X
+          </a>
+          <a
+            href={BRAND.linkedinUrl}
+            className="hover:text-[var(--fg)]"
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            LinkedIn
+          </a>
         </div>
       </div>
-      <p className="mx-auto mt-10 max-w-6xl px-6 text-sm sm:px-10">
-        AGPL-3.0 · Agents are untrusted · Principals have reputation
-      </p>
+      <div className="mx-auto mt-10 flex max-w-6xl flex-col gap-2 px-6 text-sm sm:px-10">
+        <p>
+          Built by {BRAND.creator.name} ·{' '}
+          <a
+            href={studioLink('footer')}
+            className="text-[var(--accent)] underline underline-offset-4 hover:brightness-110"
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            {BRAND.creator.studioName}
+          </a>
+        </p>
+        <p>AGPL-3.0 · Agents are untrusted · Principals have reputation</p>
+      </div>
     </footer>
   );
 }

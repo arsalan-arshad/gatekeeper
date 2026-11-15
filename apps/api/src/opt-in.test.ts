@@ -47,6 +47,8 @@ test('receiver opt-in email contains Accept/Decline links and summary', async ()
   assert.match(email.text, /Decline:/);
   assert.match(email.text, /88\/100/);
   assert.match(email.text, /billing notes/);
+  assert.match(email.text, /Gatekeeper by Arsalan/);
+  assert.match(email.html, /Sign in|Accept intro|button|5fd4a4/i);
 });
 
 test('reject email includes reason_public and suggested_rewrite only', async () => {

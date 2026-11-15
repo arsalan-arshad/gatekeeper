@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { SiteFooter } from '@/components/site-footer';
 import { SiteNav } from '@/components/site-nav';
 import { API_URL } from '@/lib/api';
 import { DEMO_USER_FALLBACK } from '@/lib/demo';
@@ -101,6 +102,13 @@ export default async function PublicHandlePage({
           <IntroRequestForm handle={user.handle} />
         )}
       </section>
+
+      <p className="text-sm text-[var(--muted)]">
+        <Link href="/" className="text-[var(--accent)] underline underline-offset-4">
+          Powered by Gatekeeper
+        </Link>
+      </p>
+      <SiteFooter />
     </main>
   );
 }

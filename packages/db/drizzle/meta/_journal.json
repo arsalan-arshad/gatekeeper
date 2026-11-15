@@ -36,6 +36,13 @@
       "when": 1794682594496,
       "tag": "0004_superb_maverick",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794750000000,
+      "tag": "0005_owner_dashboard",
+      "breakpoints": true
     }
   ]
 }

@@ -27,6 +27,14 @@ const QUESTIONS = [
   },
 ] as const;
 
+const DRAFT_STEPS = [
+  'Reading your answers',
+  'Drafting plain-English rules',
+  'Polishing profile copy',
+] as const;
+
+const DRAFT_TIMEOUT_MS = 15_000;
+
 type Answers = Record<(typeof QUESTIONS)[number]['id'], string>;
 
 type ProfileDraft = {
@@ -51,10 +59,51 @@ export function InterviewClient({ email }: { email: string }) {
   const [draft, setDraft] = useState<ProfileDraft | null>(null);
   const [handle, setHandle] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [draftStep, setDraftStep] = useState(0);
+  const [drafting, setDrafting] = useState(false);
   const [pending, startTransition] = useTransition();
 
   const current = QUESTIONS[step];
   const progress = useMemo(() => `${Math.min(step + 1, 5)} / 5`, [step]);
+
+  async function runDraft(withRetry = false) {
+    setError(null);
+    setDrafting(true);
+    setDraftStep(0);
+
+    const stepTimers = [
+      window.setTimeout(() => setDraftStep(1), 400),
+      window.setTimeout(() => setDraftStep(2), 1200),
+    ];
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), DRAFT_TIMEOUT_MS);
+
+    try {
+      const result = await Promise.race([
+        synthesizeRules(answers),
+        new Promise<never>((_, reject) => {
+          controller.signal.addEventListener('abort', () =>
+            reject(new Error('Draft timed out after 15s')),
+          );
+        }),
+      ]);
+      setDraft(result.profile);
+      setHandle(result.profile.handleSuggestion);
+      setDraftStep(DRAFT_STEPS.length - 1);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not synthesize rules';
+      if (withRetry) {
+        setError(`${message}. Try again.`);
+      } else {
+        setError(message);
+      }
+    } finally {
+      window.clearTimeout(timeout);
+      for (const id of stepTimers) window.clearTimeout(id);
+      setDrafting(false);
+    }
+  }
 
   function submitAnswer() {
     if (!current) return;
@@ -70,15 +119,7 @@ export function InterviewClient({ email }: { email: string }) {
       return;
     }
 
-    startTransition(async () => {
-      try {
-        const { profile } = await synthesizeRules(answers);
-        setDraft(profile);
-        setHandle(profile.handleSuggestion);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Could not synthesize rules');
-      }
-    });
+    void runDraft(false);
   }
 
   function saveProfile() {
@@ -97,6 +138,29 @@ export function InterviewClient({ email }: { email: string }) {
         setError(result.error);
       }
     });
+  }
+
+  if (drafting) {
+    return (
+      <div className="flex flex-col gap-5">
+        <h2 className="text-2xl" style={{ fontFamily: 'var(--font-display), Georgia, serif' }}>
+          Drafting your rules
+        </h2>
+        <p className="text-sm text-[var(--muted)]">Usually under 15 seconds.</p>
+        <ol className="flex flex-col gap-2">
+          {DRAFT_STEPS.map((label, index) => (
+            <li
+              key={label}
+              className={`text-sm ${
+                index <= draftStep ? 'text-[var(--accent)]' : 'text-[var(--muted)]'
+              }`}
+            >
+              {index < draftStep ? '✓' : index === draftStep ? '…' : '·'} {label}
+            </li>
+          ))}
+        </ol>
+      </div>
+    );
   }
 
   if (draft) {
@@ -179,14 +243,27 @@ export function InterviewClient({ email }: { email: string }) {
           setAnswers((prev) => ({ ...prev, [current.id]: e.target.value }));
         }}
       />
-      {error ? <p className="text-sm text-red-300">{error}</p> : null}
+      {error ? (
+        <div className="flex flex-col gap-2">
+          <p className="text-sm text-red-300">{error}</p>
+          {step >= QUESTIONS.length - 1 ? (
+            <button
+              type="button"
+              onClick={() => void runDraft(true)}
+              className="w-fit rounded-md border border-white/15 px-4 py-2 text-sm"
+            >
+              Retry draft
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       <button
         type="button"
-        disabled={pending}
+        disabled={pending || drafting}
         onClick={submitAnswer}
         className="w-fit rounded-md bg-[var(--accent)] px-4 py-2 font-medium text-black disabled:opacity-60"
       >
-        {pending ? 'Thinking…' : step < QUESTIONS.length - 1 ? 'Continue' : 'Draft my rules'}
+        {step < QUESTIONS.length - 1 ? 'Continue' : 'Draft my rules'}
       </button>
     </div>
   );

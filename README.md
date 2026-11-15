@@ -20,9 +20,9 @@ Brand & product art (principal seal): [docs/media/](./docs/media/) · App icons 
 
 Inspired by Andrew D'Souza's essay ["Principals"](https://www.andrewdsouza.com/): agents are untrusted; principals have their own reputation and can say no.
 
-![Gatekeeper demo](./docs/media/demo.gif)
+![Gatekeeper product screenshot](./docs/media/product-screenshot.png)
 
-> Placeholder GIF — replace with a real recording. See [docs/LAUNCH.md](./docs/LAUNCH.md) and `./scripts/generate-demo-gif-placeholder.sh`.
+> Product screenshot (Open Graph art). For a motion demo, see [docs/LAUNCH.md](./docs/LAUNCH.md).
 
 ## What it does
 
@@ -218,6 +218,12 @@ Each app has a `railway.toml`:
 - `apps/web` — build and start Next.js; health at `/`
 
 Set env vars from `.env.example` in Railway for both services (and attach a Postgres + pgvector plugin for `DATABASE_URL`). Full checklist: [docs/LAUNCH.md](./docs/LAUNCH.md).
+
+## Built by
+
+**Built by Arsalan** · [arsalandev.studio](https://arsalandev.studio?utm_source=gatekeeper&utm_medium=readme)
+
+**Hire me** for indie SaaS / AI product engineering: [arsalandev.studio](https://arsalandev.studio?utm_source=gatekeeper&utm_medium=readme)
 
 ## License
 

@@ -41,9 +41,11 @@ const verdictCache = new Map<string, CachedVerdict>();
 
 const demoJudgeSchema = z.object({
   handle: z.string().min(1).max(64),
-  message: z.string().min(1).max(MESSAGE_MAX_CHARS),
+  message: z.string().max(MESSAGE_MAX_CHARS),
   senderName: z.string().min(1).max(120).optional(),
   senderContact: z.string().min(1).max(320).optional(),
+  /** Landing example chips — judged without consuming the daily IP quota. */
+  example: z.boolean().optional(),
 });
 
 /** Optional LLM override for unit tests — never used in production. */
@@ -162,6 +164,17 @@ export async function registerDemoRoutes(app: FastifyInstance): Promise<void> {
         .send({ error: 'Invalid demo request', details: parsed.error.flatten() });
     }
 
+    const message = parsed.data.message?.trim() ?? '';
+    if (!message) {
+      // Empty / whitespace: 400 and do not consume quota.
+      const peek = demoIpLimiter.peek(limitKey);
+      return reply.status(400).send({
+        error: 'Message is required',
+        remaining: peek.remaining,
+        limit: DEMO_IP_DAILY_LIMIT,
+      });
+    }
+
     const profile = getDemoProfile(parsed.data.handle);
     if (!profile) {
       return reply.status(400).send({ error: 'Unknown demo profile' });
@@ -179,7 +192,7 @@ export async function registerDemoRoutes(app: FastifyInstance): Promise<void> {
       promptVersion: PROMPT_VERSION,
       model: llm.chatModel,
       ruleText: profile.ruleText,
-      message: parsed.data.message,
+      message,
     });
     const cached = getCachedVerdict(cacheKey);
     if (cached) {
@@ -193,29 +206,34 @@ export async function registerDemoRoutes(app: FastifyInstance): Promise<void> {
       } satisfies DemoJudgeBody;
     }
 
-    const limit = demoIpLimiter.check(limitKey);
-    if (!limit.ok) {
-      await logAbuse({
-        kind: 'rate_limit_ip',
-        ip,
-        detail: `demo_judge reset_ms=${limit.resetMs}`,
-        log: request.log,
-      });
-      reply.header('retry-after', Math.ceil(limit.resetMs / 1000));
-      return reply.status(429).send({
-        error: 'Demo rate limit exceeded — try again tomorrow',
-        retry_after_ms: limit.resetMs,
-        remaining: 0,
-        limit: DEMO_IP_DAILY_LIMIT,
-      });
+    const isExample = parsed.data.example === true;
+    let remaining = demoIpLimiter.peek(limitKey).remaining;
+    if (!isExample) {
+      const limit = demoIpLimiter.check(limitKey);
+      if (!limit.ok) {
+        await logAbuse({
+          kind: 'rate_limit_ip',
+          ip,
+          detail: `demo_judge reset_ms=${limit.resetMs}`,
+          log: request.log,
+        });
+        reply.header('retry-after', Math.ceil(limit.resetMs / 1000));
+        return reply.status(429).send({
+          error: 'Demo rate limit exceeded — try again tomorrow',
+          retry_after_ms: limit.resetMs,
+          remaining: 0,
+          limit: DEMO_IP_DAILY_LIMIT,
+        });
+      }
+      remaining = limit.remaining;
     }
 
-    const result = await demoJudgeRequest(parsed.data, llm, request.log);
+    const result = await demoJudgeRequest({ ...parsed.data, message }, llm, request.log);
     if ('error' in result) {
       if (isBusyFailure(result)) {
-        return reply.status(503).send({ error: result.error, remaining: limit.remaining });
+        return reply.status(503).send({ error: result.error, remaining });
       }
-      return reply.status(400).send({ error: result.error, remaining: limit.remaining });
+      return reply.status(400).send({ error: result.error, remaining });
     }
 
     // Never leak reason_private on the public demo endpoint.
@@ -235,7 +253,7 @@ export async function registerDemoRoutes(app: FastifyInstance): Promise<void> {
 
     return {
       ...body,
-      remaining: limit.remaining,
+      remaining,
       limit: DEMO_IP_DAILY_LIMIT,
       cached: false,
     } satisfies DemoJudgeBody;

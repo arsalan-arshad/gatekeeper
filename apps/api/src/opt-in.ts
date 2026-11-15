@@ -1,17 +1,20 @@
 import type { EmailSender } from './email.js';
+import {
+  buildDeclineAutoReplyEmail,
+  buildIntroEmail,
+  buildOwnerNotificationEmail,
+  buildReceiverOptInEmail,
+  buildRejectEmail,
+} from './email-templates.js';
 import type { JudgeDecision, JudgeResult } from './judge.js';
 import { createHelpfulToken, createOptInToken } from './tokens.js';
 
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;');
-}
-
 export function getPublicBaseUrl(env: NodeJS.ProcessEnv = process.env): string {
   return (env.API_URL ?? env.APP_URL ?? 'http://localhost:4000').replace(/\/$/, '');
+}
+
+export function getAppBaseUrl(env: NodeJS.ProcessEnv = process.env): string {
+  return (env.APP_URL ?? 'http://localhost:3000').replace(/\/$/, '');
 }
 
 export function buildOptInLinks(
@@ -41,37 +44,51 @@ export async function sendReceiverOptInEmail(
   },
 ) {
   const { acceptUrl, declineUrl } = buildOptInLinks(input.requestId, input.env);
-  const preview = input.message.trim().slice(0, 600);
-  const subject = `Gatekeeper: intro request from ${input.senderName}`;
-  const text = [
-    `Hi ${input.receiverName},`,
-    '',
-    `Gatekeeper scored an intro request from ${input.senderName} (${input.senderType}) at ${input.score}/100.`,
-    '',
-    'Message:',
-    preview,
-    '',
-    `Accept: ${acceptUrl}`,
-    `Decline: ${declineUrl}`,
-    '',
-    'If you Accept, Gatekeeper will email both of you a shared intro.',
-  ].join('\n');
+  const content = buildReceiverOptInEmail({
+    receiverName: input.receiverName,
+    senderName: input.senderName,
+    senderType: input.senderType,
+    message: input.message,
+    score: input.score,
+    acceptUrl,
+    declineUrl,
+    env: input.env,
+  });
+  return send({ to: input.receiverEmail, ...content });
+}
 
-  const html = `
-    <p>Hi ${escapeHtml(input.receiverName)},</p>
-    <p>Gatekeeper scored an intro request from <strong>${escapeHtml(input.senderName)}</strong>
-    (${escapeHtml(input.senderType)}) at <strong>${input.score}/100</strong>.</p>
-    <p><strong>Message</strong></p>
-    <blockquote>${escapeHtml(preview)}</blockquote>
-    <p>
-      <a href="${escapeHtml(acceptUrl)}">Accept intro</a>
-      &nbsp;·&nbsp;
-      <a href="${escapeHtml(declineUrl)}">Decline</a>
-    </p>
-    <p>If you Accept, Gatekeeper will email both of you a shared intro.</p>
-  `;
-
-  return send({ to: input.receiverEmail, subject, text, html });
+/** Notify the owner about any judged request (respect notification_email_mode upstream). */
+export async function sendOwnerNotificationEmail(
+  send: EmailSender,
+  input: {
+    receiverEmail: string;
+    receiverName: string;
+    senderName: string;
+    senderType: string;
+    message: string;
+    score: number;
+    decision: string;
+    reasonPublic: string;
+    requestId: string;
+    env?: NodeJS.ProcessEnv;
+  },
+) {
+  const { acceptUrl, declineUrl } = buildOptInLinks(input.requestId, input.env);
+  const inboxUrl = `${getAppBaseUrl(input.env)}/dashboard?filter=${encodeURIComponent(input.decision)}`;
+  const content = buildOwnerNotificationEmail({
+    receiverName: input.receiverName,
+    senderName: input.senderName,
+    senderType: input.senderType,
+    message: input.message,
+    score: input.score,
+    decision: input.decision,
+    reasonPublic: input.reasonPublic,
+    approveUrl: acceptUrl,
+    declineUrl,
+    inboxUrl,
+    env: input.env,
+  });
+  return send({ to: input.receiverEmail, ...content });
 }
 
 export async function sendRejectEmailToSender(
@@ -81,37 +98,35 @@ export async function sendRejectEmailToSender(
     senderName: string;
     receiverName: string;
     judgment: Pick<JudgeResult, 'reason_public' | 'suggested_rewrite' | 'decision'>;
+    env?: NodeJS.ProcessEnv;
   },
 ) {
-  const subject = `Gatekeeper update: your intro to ${input.receiverName}`;
-  const rewrite = input.judgment.suggested_rewrite?.trim();
-  const text = [
-    `Hi ${input.senderName},`,
-    '',
-    `Your intro request to ${input.receiverName} was not forwarded (${input.judgment.decision}).`,
-    '',
-    input.judgment.reason_public,
-    rewrite ? `\nSuggested rewrite:\n${rewrite}` : '',
-    '',
-    'You can revise and try again from their public Gatekeeper page.',
-  ]
-    .filter(Boolean)
-    .join('\n');
+  const content = buildRejectEmail({
+    senderName: input.senderName,
+    receiverName: input.receiverName,
+    decision: input.judgment.decision,
+    reasonPublic: input.judgment.reason_public,
+    suggestedRewrite: input.judgment.suggested_rewrite,
+    env: input.env,
+  });
+  return send({ to: input.senderEmail, ...content });
+}
 
-  const html = `
-    <p>Hi ${escapeHtml(input.senderName)},</p>
-    <p>Your intro request to <strong>${escapeHtml(input.receiverName)}</strong>
-    was not forwarded (${escapeHtml(input.judgment.decision)}).</p>
-    <p>${escapeHtml(input.judgment.reason_public)}</p>
-    ${
-      rewrite
-        ? `<p><strong>Suggested rewrite</strong></p><blockquote>${escapeHtml(rewrite)}</blockquote>`
-        : ''
-    }
-    <p>You can revise and try again from their public Gatekeeper page.</p>
-  `;
-
-  return send({ to: input.senderEmail, subject, text, html });
+export async function sendDeclineAutoReply(
+  send: EmailSender,
+  input: {
+    senderEmail: string;
+    senderName: string;
+    receiverName: string;
+    env?: NodeJS.ProcessEnv;
+  },
+) {
+  const content = buildDeclineAutoReplyEmail({
+    senderName: input.senderName,
+    receiverName: input.receiverName,
+    env: input.env,
+  });
+  return send({ to: input.senderEmail, ...content });
 }
 
 export function buildHelpfulLinks(
@@ -140,51 +155,28 @@ export async function sendIntroEmailToBoth(
   },
 ) {
   const { yesUrl, noUrl } = buildHelpfulLinks(input.requestId, input.env);
-  const subject = `Intro: ${input.senderName} ↔ ${input.receiverName}`;
-  const text = [
-    `You're connected via Gatekeeper.`,
-    '',
-    `${input.receiverName} accepted an intro with ${input.senderName}.`,
-    '',
-    'Original request:',
-    input.message.trim(),
-    '',
-    `Reply-all to continue the conversation.`,
-    `${input.receiverName}: ${input.receiverEmail}`,
-    `${input.senderName}: ${input.senderEmail}`,
-    '',
-    `${input.receiverName} — was this intro helpful?`,
-    `Yes: ${yesUrl}`,
-    `No: ${noUrl}`,
-  ].join('\n');
-
-  const html = `
-    <p>You're connected via Gatekeeper.</p>
-    <p><strong>${escapeHtml(input.receiverName)}</strong> accepted an intro with
-    <strong>${escapeHtml(input.senderName)}</strong>.</p>
-    <p><strong>Original request</strong></p>
-    <blockquote>${escapeHtml(input.message.trim())}</blockquote>
-    <p>Reply-all to continue.</p>
-    <ul>
-      <li>${escapeHtml(input.receiverName)}: ${escapeHtml(input.receiverEmail)}</li>
-      <li>${escapeHtml(input.senderName)}: ${escapeHtml(input.senderEmail)}</li>
-    </ul>
-    <p><strong>${escapeHtml(input.receiverName)}</strong> — was this intro helpful?</p>
-    <p>
-      <a href="${escapeHtml(yesUrl)}">Yes, helpful</a>
-      &nbsp;·&nbsp;
-      <a href="${escapeHtml(noUrl)}">No</a>
-    </p>
-  `;
-
+  const content = buildIntroEmail({
+    receiverName: input.receiverName,
+    receiverEmail: input.receiverEmail,
+    senderName: input.senderName,
+    senderEmail: input.senderEmail,
+    message: input.message,
+    yesUrl,
+    noUrl,
+    env: input.env,
+  });
   return send({
     to: [input.receiverEmail, input.senderEmail],
-    subject,
-    text,
-    html,
+    ...content,
   });
 }
 
 export function statusAfterJudgment(decision: JudgeDecision): 'delivered' | 'pending' {
   return decision === 'accept' ? 'delivered' : 'pending';
+}
+
+export function shouldSendInstantOwnerEmail(
+  mode: 'instant' | 'daily_digest' | 'off' | null | undefined,
+): boolean {
+  return (mode ?? 'instant') === 'instant';
 }

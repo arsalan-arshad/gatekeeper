@@ -180,9 +180,19 @@ export async function setUserProPlan(options: {
     .where(eq(users.email, email));
 }
 
+export function lemonCheckoutConfigured(env: NodeJS.ProcessEnv = process.env): boolean {
+  return Boolean(
+    env.LEMON_SQUEEZY_API_KEY?.trim() &&
+    env.LEMON_SQUEEZY_STORE_ID?.trim() &&
+    env.LEMON_SQUEEZY_PRO_VARIANT_ID?.trim(),
+  );
+}
+
 export function paymentsConfigPublic(env: NodeJS.ProcessEnv = process.env) {
   return {
     enabled: paymentsEnabled(env),
+    lemonConfigured: lemonCheckoutConfigured(env),
+    checkoutAvailable: paymentsEnabled(env) && lemonCheckoutConfigured(env),
     proPriceUsd: PRO_PRICE_USD,
     stakeCents: stakeCentsFromEnv(env),
     introCreditCents: introCreditCentsFromEnv(env),

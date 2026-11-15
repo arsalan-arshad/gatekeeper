@@ -8,7 +8,12 @@ import { getDb } from './db.js';
 import { createEmailSender } from './email.js';
 import { judgeRequest } from './judge.js';
 import { createLlm } from './llm.js';
-import { sendReceiverOptInEmail, sendRejectEmailToSender, statusAfterJudgment } from './opt-in.js';
+import {
+  sendOwnerNotificationEmail,
+  sendRejectEmailToSender,
+  shouldSendInstantOwnerEmail,
+  statusAfterJudgment,
+} from './opt-in.js';
 import {
   forfeitStakeToReceiver,
   holdSenderStake,
@@ -177,6 +182,7 @@ export async function submitIntroRequest(options: {
     .set({
       aiScore: judgment.score,
       aiReason: judgment.reason_private,
+      aiReasonPublic: judgment.reason_public,
       decision: judgment.decision,
       status: nextStatus,
     })
@@ -205,18 +211,22 @@ export async function submitIntroRequest(options: {
   let email: { kind: string; id: string; mode: string } | null = null;
 
   try {
-    if (judgment.decision === 'accept') {
-      const result = await sendReceiverOptInEmail(send, {
+    if (shouldSendInstantOwnerEmail(user.notificationEmailMode)) {
+      const ownerMail = await sendOwnerNotificationEmail(send, {
         receiverEmail: user.email,
         receiverName: user.name,
         senderName: options.body.senderName,
         senderType: options.body.senderType,
         message: options.body.message,
         score: judgment.score,
+        decision: judgment.decision,
+        reasonPublic: judgment.reason_public,
         requestId: created!.id,
       });
-      email = { kind: 'receiver_opt_in', id: result.id, mode: result.mode };
-    } else {
+      email = { kind: 'owner_notification', id: ownerMail.id, mode: ownerMail.mode };
+    }
+
+    if (judgment.decision !== 'accept') {
       const result = await sendRejectEmailToSender(send, {
         senderEmail: options.body.senderContact,
         senderName: options.body.senderName,
@@ -227,10 +237,12 @@ export async function submitIntroRequest(options: {
           suggested_rewrite: judgment.suggested_rewrite,
         },
       });
-      email = { kind: 'sender_reject', id: result.id, mode: result.mode };
+      if (!email) {
+        email = { kind: 'sender_reject', id: result.id, mode: result.mode };
+      }
     }
   } catch (error) {
-    options.log?.error({ err: error }, 'opt-in email failed');
+    options.log?.error({ err: error }, 'request notification email failed');
   }
 
   return {

@@ -17,10 +17,14 @@
     "format:check": "prettier --check .",
     "test": "pnpm -r --if-present test",
     "typecheck": "pnpm -r --if-present typecheck",
-    "eval:judge": "pnpm --filter @gatekeeper/api eval:judge"
+    "eval:judge": "pnpm --filter @gatekeeper/api eval:judge",
+    "e2e:serve": "node ./scripts/e2e-serve.mjs",
+    "e2e": "playwright test",
+    "e2e:install": "playwright install chromium --with-deps"
   },
   "devDependencies": {
     "@gatekeeper/eslint-config": "workspace:*",
+    "@playwright/test": "^1.51.0",
     "eslint": "^9.22.0",
     "prettier": "^3.5.3",
     "typescript": "^5.8.2"

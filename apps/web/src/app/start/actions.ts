@@ -17,7 +17,7 @@ export async function requestMagicLink(formData: FormData): Promise<void> {
   try {
     await signIn('resend', {
       email,
-      redirectTo: '/start',
+      redirectTo: '/dashboard',
       redirect: false,
     });
   } catch (error) {
@@ -72,9 +72,8 @@ export async function completeOnboarding(input: {
     return { error: 'You must be signed in' };
   }
 
-  let result: { user: { handle: string } };
   try {
-    result = await apiFetch<{ user: { handle: string } }>('/v1/onboarding/complete', {
+    await apiFetch<{ user: { handle: string } }>('/v1/onboarding/complete', {
       method: 'POST',
       email,
       body: JSON.stringify({ ...input, email }),
@@ -83,7 +82,7 @@ export async function completeOnboarding(input: {
     return { error: error instanceof Error ? error.message : 'Failed to save profile' };
   }
 
-  redirect(`/@${result.user.handle}`);
+  redirect('/dashboard');
 }
 
 export async function loadOnboardingState() {

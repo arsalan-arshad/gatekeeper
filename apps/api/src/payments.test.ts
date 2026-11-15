@@ -18,7 +18,14 @@ test('paymentsEnabled is off unless explicitly true', () => {
 });
 
 test('paymentsConfigPublic exposes Pro price and stake defaults', () => {
-  const config = paymentsConfigPublic({ PAYMENTS_ENABLED: 'true' });
+  const config = paymentsConfigPublic({
+    PAYMENTS_ENABLED: 'true',
+    LEMON_SQUEEZY_API_KEY: 'x',
+    LEMON_SQUEEZY_STORE_ID: '1',
+    LEMON_SQUEEZY_PRO_VARIANT_ID: '2',
+  });
+  assert.equal(config.lemonConfigured, true);
+  assert.equal(config.checkoutAvailable, true);
   assert.equal(config.enabled, true);
   assert.equal(config.proPriceUsd, PRO_PRICE_USD);
   assert.equal(config.stakeCents, stakeCentsFromEnv({}));
