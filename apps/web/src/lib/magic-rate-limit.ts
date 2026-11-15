@@ -1,5 +1,7 @@
 import { createDb, rateLimitBuckets } from '@gatekeeper/db';
-import { eq } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
+
+import { normalizeEmailForRateLimit } from './email-normalize';
 
 const MAGIC_EMAIL_LIMIT = 3;
 const MAGIC_EMAIL_WINDOW_MS = 60 * 60 * 1000;
@@ -12,41 +14,100 @@ function getDb() {
   return createDb(url);
 }
 
+/** Thrown / returned when the durable limiter cannot be reached — callers must fail closed. */
+export class MagicLinkLimiterUnavailableError extends Error {
+  readonly statusCode = 503 as const;
+  constructor(cause?: unknown) {
+    super('Magic link rate limiter unavailable');
+    this.name = 'MagicLinkLimiterUnavailableError';
+    if (cause instanceof Error) {
+      this.cause = cause;
+    }
+  }
+}
+
+export type MagicLinkGate = { ok: true } | { ok: false; status: 429 | 503 };
+
+/**
+ * Atomic fixed-window consume: INSERT … ON CONFLICT DO UPDATE … RETURNING count.
+ */
 async function consume(key: string, limit: number, windowMs: number): Promise<boolean> {
   const db = getDb();
   const nowMs = Date.now();
   const windowStart = new Date(nowMs);
-  const [existing] = await db
-    .select()
-    .from(rateLimitBuckets)
-    .where(eq(rateLimitBuckets.bucketKey, key))
-    .limit(1);
+  // postgres.js sql`` params must be strings/numbers — never Date instances.
+  const windowStartIso = windowStart.toISOString();
+  const expiredBeforeMs = nowMs - windowMs;
+  const [row] = await db
+    .insert(rateLimitBuckets)
+    .values({
+      bucketKey: key,
+      windowStart,
+      count: 1,
+      updatedAt: windowStart,
+    })
+    .onConflictDoUpdate({
+      target: rateLimitBuckets.bucketKey,
+      set: {
+        count: sql`CASE
+          WHEN (EXTRACT(EPOCH FROM ${rateLimitBuckets.windowStart}) * 1000) <= ${expiredBeforeMs}
+          THEN 1
+          ELSE ${rateLimitBuckets.count} + 1
+        END`,
+        windowStart: sql`CASE
+          WHEN (EXTRACT(EPOCH FROM ${rateLimitBuckets.windowStart}) * 1000) <= ${expiredBeforeMs}
+          THEN ${windowStartIso}::timestamptz
+          ELSE ${rateLimitBuckets.windowStart}
+        END`,
+        updatedAt: windowStart,
+      },
+    })
+    .returning({ count: rateLimitBuckets.count });
 
-  if (!existing || nowMs - existing.windowStart.getTime() >= windowMs) {
-    await db
-      .insert(rateLimitBuckets)
-      .values({ bucketKey: key, windowStart, count: 1, updatedAt: windowStart })
-      .onConflictDoUpdate({
-        target: rateLimitBuckets.bucketKey,
-        set: { windowStart, count: 1, updatedAt: windowStart },
-      });
-    return true;
+  if (!row) {
+    throw new Error('rate_limit_buckets upsert returned no row');
   }
-  if (existing.count >= limit) return false;
-  await db
-    .update(rateLimitBuckets)
-    .set({ count: existing.count + 1, updatedAt: new Date(nowMs) })
-    .where(eq(rateLimitBuckets.bucketKey, key));
-  return true;
+  return row.count <= limit;
 }
 
-/** Magic-link: 3/email/hour + 10/IP/hour. Returns false when blocked. */
+/** Magic-link: 3/email/hour + 10/IP/hour. Returns false when blocked. Throws on DB errors. */
 export async function allowMagicLinkSend(email: string, ip: string): Promise<boolean> {
+  const normalized = normalizeEmailForRateLimit(email);
   const emailOk = await consume(
-    `magic-email:${email.trim().toLowerCase()}`,
+    `magic-email:${normalized}`,
     MAGIC_EMAIL_LIMIT,
     MAGIC_EMAIL_WINDOW_MS,
   );
   if (!emailOk) return false;
   return consume(`magic-ip:${ip || 'unknown'}`, MAGIC_IP_LIMIT, MAGIC_IP_WINDOW_MS);
+}
+
+/**
+ * Fail-closed gate: limiter/DB errors become status 503 (deny + log), never allow-through.
+ */
+export async function gateMagicLinkSend(
+  email: string,
+  ip: string,
+  options?: { allow?: typeof allowMagicLinkSend; log?: (err: unknown) => void },
+): Promise<MagicLinkGate> {
+  const allow = options?.allow ?? allowMagicLinkSend;
+  const log =
+    options?.log ??
+    ((err: unknown) => {
+      console.error('[gatekeeper] magic-link rate limiter error (fail closed)', err);
+    });
+  try {
+    const allowed = await allow(email, ip);
+    return allowed ? { ok: true } : { ok: false, status: 429 };
+  } catch (err) {
+    log(err);
+    return { ok: false, status: 503 };
+  }
+}
+
+/** Test helper: clear magic buckets by prefix when DATABASE_URL is set. */
+export async function clearMagicRateLimitBucketsForTests(): Promise<void> {
+  if (!process.env.DATABASE_URL) return;
+  const db = getDb();
+  await db.execute(sql`DELETE FROM rate_limit_buckets WHERE bucket_key LIKE ${'magic-%'}`);
 }

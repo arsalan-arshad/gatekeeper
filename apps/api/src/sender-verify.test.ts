@@ -1,12 +1,18 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+import { clearConsoleEmailLog, createConsoleEmailSender } from './email.ts';
+import { buildSenderVerifyEmail } from './email-templates.ts';
 import {
   createSenderVerifyToken,
   resetSenderOutboundLimiterForTests,
   verifySenderVerifyToken,
   consumeSenderOutboundSlot,
+  maybeSendSenderVerificationEmail,
+  setSenderVerifiedForTests,
   SENDER_OUTBOUND_DAILY_LIMIT,
+  SENDER_VERIFY_EMAIL_LIMIT,
+  SENDER_VERIFY_IP_LIMIT,
 } from './sender-verify.ts';
 
 const env = { AUTH_SECRET: 'sender-verify-test-secret-32chars!!' };
@@ -37,4 +43,60 @@ test('outbound mails to sender capped at 3/day', async () => {
     assert.equal((await consumeSenderOutboundSlot('sender@example.com')).ok, true);
   }
   assert.equal((await consumeSenderOutboundSlot('sender@example.com')).ok, false);
+});
+
+test('sender verification emails capped at 1/address/day and 20/IP/day', async () => {
+  resetSenderOutboundLimiterForTests();
+  setSenderVerifiedForTests(null);
+  clearConsoleEmailLog();
+  const send = createConsoleEmailSender();
+
+  assert.equal(SENDER_VERIFY_EMAIL_LIMIT, 1);
+  assert.equal(SENDER_VERIFY_IP_LIMIT, 20);
+
+  const first = await maybeSendSenderVerificationEmail(send, {
+    senderEmail: 'verify-cap@example.com',
+    senderName: 'Casey',
+    clientIp: '203.0.113.10',
+    env: { ...env, API_URL: 'http://localhost:4000' },
+  });
+  assert.equal(first.sent, true);
+
+  const second = await maybeSendSenderVerificationEmail(send, {
+    senderEmail: 'verify-cap@example.com',
+    senderName: 'Casey',
+    clientIp: '203.0.113.11',
+    env: { ...env, API_URL: 'http://localhost:4000' },
+  });
+  assert.equal(second.sent, false);
+  assert.equal(second.reason, 'verify_email_cap');
+
+  // Exhaust IP quota across distinct addresses (1/email already proven).
+  for (let i = 0; i < SENDER_VERIFY_IP_LIMIT - 1; i += 1) {
+    const result = await maybeSendSenderVerificationEmail(send, {
+      senderEmail: `verify-ip-${i}@example.com`,
+      senderName: 'Casey',
+      clientIp: '203.0.113.10',
+      env: { ...env, API_URL: 'http://localhost:4000' },
+    });
+    assert.equal(result.sent, true, `ip send ${i}`);
+  }
+  const ipBlocked = await maybeSendSenderVerificationEmail(send, {
+    senderEmail: 'verify-ip-blocked@example.com',
+    senderName: 'Casey',
+    clientIp: '203.0.113.10',
+    env: { ...env, API_URL: 'http://localhost:4000' },
+  });
+  assert.equal(ipBlocked.sent, false);
+  assert.equal(ipBlocked.reason, 'verify_ip_cap');
+});
+
+test('sender verify email includes ignore-if-unrequested copy', () => {
+  const email = buildSenderVerifyEmail({
+    senderName: 'Casey',
+    verifyUrl: 'https://api.example/v1/senders/verify?token=abc',
+    env: { APP_URL: 'https://app.example' },
+  });
+  assert.match(email.text, /didn't request this/i);
+  assert.match(email.html, /didn(?:'|&apos;)t request this/i);
 });

@@ -2,6 +2,7 @@ import { rateLimitBuckets } from '@gatekeeper/db';
 import { eq, sql } from 'drizzle-orm';
 
 import { getDb } from './db.js';
+import { normalizeEmailForRateLimit } from './email-normalize.js';
 
 export type RateLimitResult =
   { ok: true; remaining: number; resetMs: number } | { ok: false; remaining: 0; resetMs: number };
@@ -89,8 +90,29 @@ function memoryLimiter(limit: number, windowMs: number): FixedWindowRateLimiter 
   return limiter;
 }
 
+/** Map a consumed counter to ok/remaining (count is post-increment). */
+export function rateLimitResultFromCount(
+  count: number,
+  limit: number,
+  windowStartMs: number,
+  nowMs: number,
+  windowMs: number,
+): RateLimitResult {
+  const elapsed = Math.max(0, nowMs - windowStartMs);
+  const resetMs = Math.max(1, windowMs - elapsed);
+  if (count > limit) {
+    return { ok: false, remaining: 0, resetMs };
+  }
+  return {
+    ok: true,
+    remaining: Math.max(0, limit - count),
+    resetMs,
+  };
+}
+
 /**
  * Durable fixed-window consume against Postgres `rate_limit_buckets`.
+ * Single atomic INSERT … ON CONFLICT DO UPDATE … RETURNING (no read-then-write).
  */
 export async function consumePostgresRateLimit(
   key: string,
@@ -104,51 +126,44 @@ export async function consumePostgresRateLimit(
 
   const db = getDb();
   const windowStart = new Date(nowMs);
-  const [existing] = await db
-    .select()
-    .from(rateLimitBuckets)
-    .where(eq(rateLimitBuckets.bucketKey, key))
-    .limit(1);
-
-  if (!existing || nowMs - existing.windowStart.getTime() >= windowMs) {
-    await db
-      .insert(rateLimitBuckets)
-      .values({
-        bucketKey: key,
-        windowStart,
-        count: 1,
+  // postgres.js sql`` params must be strings/numbers — never Date instances.
+  const windowStartIso = windowStart.toISOString();
+  const expiredBeforeMs = nowMs - windowMs;
+  // Single round-trip upsert + RETURNING (no SELECT then UPDATE).
+  const [row] = await db
+    .insert(rateLimitBuckets)
+    .values({
+      bucketKey: key,
+      windowStart,
+      count: 1,
+      updatedAt: windowStart,
+    })
+    .onConflictDoUpdate({
+      target: rateLimitBuckets.bucketKey,
+      set: {
+        count: sql`CASE
+          WHEN (EXTRACT(EPOCH FROM ${rateLimitBuckets.windowStart}) * 1000) <= ${expiredBeforeMs}
+          THEN 1
+          ELSE ${rateLimitBuckets.count} + 1
+        END`,
+        windowStart: sql`CASE
+          WHEN (EXTRACT(EPOCH FROM ${rateLimitBuckets.windowStart}) * 1000) <= ${expiredBeforeMs}
+          THEN ${windowStartIso}::timestamptz
+          ELSE ${rateLimitBuckets.windowStart}
+        END`,
         updatedAt: windowStart,
-      })
-      .onConflictDoUpdate({
-        target: rateLimitBuckets.bucketKey,
-        set: {
-          windowStart,
-          count: 1,
-          updatedAt: windowStart,
-        },
-      });
-    return { ok: true, remaining: Math.max(0, limit - 1), resetMs: windowMs };
+      },
+    })
+    .returning({
+      count: rateLimitBuckets.count,
+      windowStart: rateLimitBuckets.windowStart,
+    });
+
+  if (!row) {
+    throw new Error('rate_limit_buckets upsert returned no row');
   }
 
-  if (existing.count >= limit) {
-    return {
-      ok: false,
-      remaining: 0,
-      resetMs: windowMs - (nowMs - existing.windowStart.getTime()),
-    };
-  }
-
-  const nextCount = existing.count + 1;
-  await db
-    .update(rateLimitBuckets)
-    .set({ count: nextCount, updatedAt: new Date(nowMs) })
-    .where(eq(rateLimitBuckets.bucketKey, key));
-
-  return {
-    ok: true,
-    remaining: Math.max(0, limit - nextCount),
-    resetMs: windowMs - (nowMs - existing.windowStart.getTime()),
-  };
+  return rateLimitResultFromCount(row.count, limit, row.windowStart.getTime(), nowMs, windowMs);
 }
 
 export async function peekPostgresRateLimit(
@@ -205,6 +220,11 @@ export const MAGIC_EMAIL_WINDOW_MS = 60 * 60 * 1000;
 export const MAGIC_IP_LIMIT = 10;
 export const MAGIC_IP_WINDOW_MS = 60 * 60 * 1000;
 
+/** Sender verification emails: 1 / address / day + 20 / IP / day. */
+export const SENDER_VERIFY_EMAIL_LIMIT = 1;
+export const SENDER_VERIFY_IP_LIMIT = 20;
+export const SENDER_VERIFY_WINDOW_MS = 24 * 60 * 60 * 1000;
+
 export async function checkIpRateLimit(ip: string): Promise<RateLimitResult> {
   return consumePostgresRateLimit(`ip:${ip || 'unknown'}`, IP_LIMIT, IP_WINDOW_MS);
 }
@@ -221,7 +241,7 @@ export async function checkPublicFormSenderOwnerRateLimit(
   senderEmail: string,
   ownerUserId: string,
 ): Promise<RateLimitResult> {
-  const sender = senderEmail.trim().toLowerCase();
+  const sender = normalizeEmailForRateLimit(senderEmail);
   return consumePostgresRateLimit(
     `public-sender:${ownerUserId}:${sender}`,
     PUBLIC_FORM_SENDER_LIMIT,
@@ -251,7 +271,7 @@ export async function peekDemoIpRateLimit(ip: string): Promise<RateLimitResult> 
 
 export async function checkMagicEmailRateLimit(email: string): Promise<RateLimitResult> {
   return consumePostgresRateLimit(
-    `magic-email:${email.trim().toLowerCase()}`,
+    `magic-email:${normalizeEmailForRateLimit(email)}`,
     MAGIC_EMAIL_LIMIT,
     MAGIC_EMAIL_WINDOW_MS,
   );
@@ -262,6 +282,22 @@ export async function checkMagicIpRateLimit(ip: string): Promise<RateLimitResult
     `magic-ip:${ip || 'unknown'}`,
     MAGIC_IP_LIMIT,
     MAGIC_IP_WINDOW_MS,
+  );
+}
+
+export async function checkSenderVerifyEmailRateLimit(email: string): Promise<RateLimitResult> {
+  return consumePostgresRateLimit(
+    `sender-verify-email:${normalizeEmailForRateLimit(email)}`,
+    SENDER_VERIFY_EMAIL_LIMIT,
+    SENDER_VERIFY_WINDOW_MS,
+  );
+}
+
+export async function checkSenderVerifyIpRateLimit(ip: string): Promise<RateLimitResult> {
+  return consumePostgresRateLimit(
+    `sender-verify-ip:${ip || 'unknown'}`,
+    SENDER_VERIFY_IP_LIMIT,
+    SENDER_VERIFY_WINDOW_MS,
   );
 }
 

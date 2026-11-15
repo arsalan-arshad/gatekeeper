@@ -21,6 +21,54 @@ const publicIntroSchema = z.object({
   message: z.string().min(1).max(MESSAGE_MAX_CHARS),
 });
 
+/**
+ * Public form guards: resolve handle first so missing profiles 404 without
+ * consuming the shared IP quota.
+ */
+export async function guardPublicFormRequest(input: {
+  handle: string;
+  ip: string;
+  senderContact: string;
+  lookupOwner: (handle: string) => Promise<{ id: string } | null>;
+  checkIp?: typeof checkPublicFormIpRateLimit;
+  checkSender?: typeof checkPublicFormSenderOwnerRateLimit;
+}): Promise<
+  | { ok: true; ownerId: string }
+  | { ok: false; status: 404 | 429; error: string; retry_after_ms?: number; detail?: string }
+> {
+  const checkIp = input.checkIp ?? checkPublicFormIpRateLimit;
+  const checkSender = input.checkSender ?? checkPublicFormSenderOwnerRateLimit;
+
+  const owner = await input.lookupOwner(input.handle.toLowerCase());
+  if (!owner) {
+    return { ok: false, status: 404, error: 'User not found' };
+  }
+
+  const ipLimit = await checkIp(input.ip);
+  if (!ipLimit.ok) {
+    return {
+      ok: false,
+      status: 429,
+      error: 'IP rate limit exceeded',
+      retry_after_ms: ipLimit.resetMs,
+      detail: `public_form_ip reset_ms=${ipLimit.resetMs}`,
+    };
+  }
+
+  const senderLimit = await checkSender(input.senderContact, owner.id);
+  if (!senderLimit.ok) {
+    return {
+      ok: false,
+      status: 429,
+      error: 'Sender rate limit exceeded for this Gatekeeper',
+      retry_after_ms: senderLimit.resetMs,
+      detail: `public_form_sender reset_ms=${senderLimit.resetMs}`,
+    };
+  }
+
+  return { ok: true, ownerId: owner.id };
+}
+
 export async function registerPublicRoutes(app: FastifyInstance): Promise<void> {
   app.get('/v1/users/:handle', async (request, reply) => {
     const { handle } = request.params as { handle: string };
@@ -47,20 +95,6 @@ export async function registerPublicRoutes(app: FastifyInstance): Promise<void> 
 
   app.post('/v1/users/:handle/requests', async (request, reply) => {
     const ip = clientIp(request);
-    const ipLimit = await checkPublicFormIpRateLimit(ip);
-    if (!ipLimit.ok) {
-      await logAbuse({
-        kind: 'rate_limit_ip',
-        ip,
-        detail: `public_form_ip reset_ms=${ipLimit.resetMs}`,
-        log: request.log,
-      });
-      reply.header('retry-after', retryAfterSeconds(ipLimit.resetMs));
-      return reply
-        .status(429)
-        .send({ error: 'IP rate limit exceeded', retry_after_ms: ipLimit.resetMs });
-    }
-
     const { handle } = request.params as { handle: string };
     const parsed = publicIntroSchema.safeParse(request.body);
     if (!parsed.success) {
@@ -70,29 +104,35 @@ export async function registerPublicRoutes(app: FastifyInstance): Promise<void> 
     }
 
     const db = getDb();
-    const [owner] = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.handle, handle.toLowerCase()))
-      .limit(1);
-    if (owner) {
-      const senderLimit = await checkPublicFormSenderOwnerRateLimit(
-        parsed.data.senderContact,
-        owner.id,
-      );
-      if (!senderLimit.ok) {
+    const gate = await guardPublicFormRequest({
+      handle,
+      ip,
+      senderContact: parsed.data.senderContact,
+      lookupOwner: async (h) => {
+        const [owner] = await db
+          .select({ id: users.id })
+          .from(users)
+          .where(eq(users.handle, h))
+          .limit(1);
+        return owner ?? null;
+      },
+    });
+
+    if (!gate.ok) {
+      if (gate.status === 429) {
         await logAbuse({
           kind: 'rate_limit_ip',
           ip,
-          detail: `public_form_sender reset_ms=${senderLimit.resetMs}`,
+          detail: gate.detail ?? gate.error,
           log: request.log,
         });
-        reply.header('retry-after', retryAfterSeconds(senderLimit.resetMs));
+        reply.header('retry-after', retryAfterSeconds(gate.retry_after_ms ?? 1000));
         return reply.status(429).send({
-          error: 'Sender rate limit exceeded for this Gatekeeper',
-          retry_after_ms: senderLimit.resetMs,
+          error: gate.error,
+          retry_after_ms: gate.retry_after_ms,
         });
       }
+      return reply.status(404).send({ error: gate.error });
     }
 
     const outcome = await submitIntroRequest({

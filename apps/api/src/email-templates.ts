@@ -247,6 +247,8 @@ export function buildSenderVerifyEmail(input: {
     'Judgment details stay on-screen until you verify.',
     '',
     `Verify (valid 24h): ${input.verifyUrl}`,
+    '',
+    "If you didn't request this, you can ignore this email.",
     footerText(links),
   ].join('\n');
   const html = layoutHtml({
@@ -259,6 +261,7 @@ export function buildSenderVerifyEmail(input: {
       </p>
       <p style="margin:0 0 12px;">${buttonHtml(input.verifyUrl, 'Verify email')}</p>
       <p style="margin:16px 0 0;font-size:13px;color:#8fa399;word-break:break-all;">${escapeHtml(input.verifyUrl)}</p>
+      <p style="margin:16px 0 0;font-size:13px;line-height:1.5;color:#8fa399;">If you didn&apos;t request this, you can ignore this email.</p>
     `,
   });
   return { subject, html, text };

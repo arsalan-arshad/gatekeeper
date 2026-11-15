@@ -12,7 +12,7 @@ import Credentials from 'next-auth/providers/credentials';
 import Resend from 'next-auth/providers/resend';
 
 import { e2eSecretsEqual, isE2eLoginEnabled } from '@/lib/e2e-gate';
-import { allowMagicLinkSend } from '@/lib/magic-rate-limit';
+import { gateMagicLinkSend, MagicLinkLimiterUnavailableError } from '@/lib/magic-rate-limit';
 
 function getDb() {
   const url =
@@ -59,8 +59,12 @@ const resendProvider = Resend({
     // Prefer platform Real-IP; do not trust raw client X-Forwarded-For.
     const hdrs = await headers();
     const ip = hdrs.get('x-real-ip')?.trim() || 'unknown';
-    const allowed = await allowMagicLinkSend(identifier, ip).catch(() => true);
-    if (!allowed) {
+    // Fail closed on limiter/DB errors (503) — never fail open.
+    const gate = await gateMagicLinkSend(identifier, ip);
+    if (!gate.ok) {
+      if (gate.status === 503) {
+        throw new MagicLinkLimiterUnavailableError();
+      }
       throw new Error('Too many sign-in emails. Try again later.');
     }
 
