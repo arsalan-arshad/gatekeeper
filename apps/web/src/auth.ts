@@ -10,6 +10,8 @@ import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import Resend from 'next-auth/providers/resend';
 
+import { e2eSecretsEqual, isE2eLoginEnabled } from '@/lib/e2e-gate';
+
 function getDb() {
   const url =
     process.env.DATABASE_URL ?? 'postgresql://postgres:postgres@localhost:5432/gatekeeper';
@@ -79,8 +81,8 @@ const resendProvider = Resend({
   },
 });
 
-// Playwright / CI: Credentials provider when E2E_SECRET is configured.
-const e2eProvider = process.env.E2E_SECRET?.trim()
+// Playwright / CI / staging only — never when NODE_ENV=production.
+const e2eProvider = isE2eLoginEnabled()
   ? Credentials({
       id: 'e2e',
       name: 'E2E',
@@ -89,11 +91,13 @@ const e2eProvider = process.env.E2E_SECRET?.trim()
         secret: { label: 'Secret', type: 'text' },
       },
       async authorize(credentials) {
+        if (!isE2eLoginEnabled()) return null;
         const email = String(credentials?.email ?? '')
           .trim()
           .toLowerCase();
         const secret = String(credentials?.secret ?? '');
-        if (!email || !process.env.E2E_SECRET || secret !== process.env.E2E_SECRET) {
+        const expected = process.env.E2E_SECRET!.trim();
+        if (!email || !e2eSecretsEqual(secret, expected)) {
           return null;
         }
         return { id: `e2e:${email}`, email, name: email.split('@')[0] ?? 'e2e' };

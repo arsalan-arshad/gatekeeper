@@ -29,8 +29,11 @@ export default defineConfig({
           PORT: String(PORT),
           APP_URL: baseURL,
           AUTH_URL: baseURL,
+          E2E_ENABLED: '1',
           E2E_SECRET: process.env.E2E_SECRET || 'local-e2e-secret',
           AUTH_SECRET: process.env.AUTH_SECRET || 'e2e-auth-secret-for-tests-only',
+          // Never production — e2e login hard-gates on NODE_ENV !== 'production'.
+          NODE_ENV: process.env.NODE_ENV === 'production' ? 'test' : process.env.NODE_ENV || 'development',
           INTERNAL_API_SECRET:
             process.env.INTERNAL_API_SECRET || 'e2e-internal-api-secret-for-tests-only',
           API_URL: process.env.API_URL || 'http://127.0.0.1:4000',

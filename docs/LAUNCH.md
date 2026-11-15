@@ -8,6 +8,8 @@ Use this before pointing a public domain at production. Secrets stay in Railway 
 - [ ] Deploy `apps/api` from `apps/api/railway.toml` (build db + api, health `/health`).
 - [ ] Deploy `apps/web` from `apps/web/railway.toml` (Next.js, health `/`).
 - [ ] Set shared env from `.env.example`: `DATABASE_URL`, `AUTH_SECRET`, `API_URL`, `APP_URL`, `GEMINI_API_KEY` (or Groq), optional `RESEND_API_KEY`, and **required** `INTERNAL_API_SECRET` (same random value on **api + web**; never `NEXT_PUBLIC_*`).
+- [ ] **Never** set `E2E_SECRET` or `E2E_ENABLED` on Railway **production**. Playwright runs against CI/preview/staging only (`E2E_ENABLED=1` + non-prod `NODE_ENV`). Remove any leftover `E2E_*` vars from the prod web service now.
+- [ ] After the auth bypass fix: **invalidate all API keys** and **rotate `AUTH_SECRET`** (and keep `INTERNAL_API_SECRET` rotated if it was ever exposed).
 - [ ] Run migrations against production (or rely on api start: `db:migrate` then start): `pnpm --filter @gatekeeper/db db:migrate`. Migrate now creates the app database if Postgres only has the default `postgres` DB.
 - [ ] Optional demo data: `pnpm --filter @gatekeeper/db db:seed` (creates `@demo`, `@ada`, `@jonas`, `@mira` + labeled `@demo` ledger requests).
 - [ ] Confirm `GET /health` on the API service and `/` on the web service.
