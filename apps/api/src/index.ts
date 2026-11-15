@@ -50,9 +50,11 @@ export async function buildServer() {
   const app = Fastify({
     logger: true,
     bodyLimit: FASTIFY_BODY_LIMIT,
-    // Railway terminates TLS and forwards one hop — derive request.ip from that.
-    // Never manually trust client-supplied X-Forwarded-For (see client-ip.ts).
-    trustProxy: 1,
+    // Railway is the only public ingress and overwrites X-Forwarded-For with the
+    // real client (+ edge). Fastify ≥5.12 removed numeric hop-count trustProxy
+    // (types + fail-closed runtime; GHSA-3m5p-2c4r-xxw2) — use boolean trust for
+    // the platform proxy. clientIp() still never reads raw XFF headers itself.
+    trustProxy: true,
   });
 
   await app.register(cors, {
