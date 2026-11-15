@@ -12,10 +12,7 @@ import Credentials from 'next-auth/providers/credentials';
 import Resend from 'next-auth/providers/resend';
 
 import { e2eSecretsEqual, isE2eLoginEnabled } from '@/lib/e2e-gate';
-import {
-  gateMagicLinkSend,
-  MagicLinkLimiterUnavailableError,
-} from '@/lib/magic-rate-limit';
+import { gateMagicLinkSend, MagicLinkLimiterUnavailableError } from '@/lib/magic-rate-limit';
 
 function getDb() {
   const url =
