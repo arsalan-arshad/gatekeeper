@@ -39,6 +39,7 @@ function mockLlm(options: {
 
   return {
     providerName: 'mock',
+    chatModel: 'mock-model',
     provider,
     get calls() {
       return calls;
