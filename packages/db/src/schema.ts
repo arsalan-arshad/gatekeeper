@@ -75,6 +75,12 @@ export const paymentEvents = pgTable('payment_events', {
   processedAt: timestamp('processed_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+/** Pro plan waitlist when Lemon Squeezy checkout is not configured. */
+export const proWaitlist = pgTable('pro_waitlist', {
+  email: text('email').primaryKey(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 /** One editable ruleset per user (user_id is the primary key). */
 export const gateRules = pgTable('gate_rules', {
   userId: uuid('user_id')

@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 
 import {
   approveRequest,
@@ -18,6 +18,19 @@ const FILTERS = [
   { id: 'spam', label: 'Spam' },
 ] as const;
 
+function statusBadgeClass(status: string): string {
+  switch (status) {
+    case 'accepted':
+      return 'border-[var(--accent)]/40 bg-[var(--accent)]/15 text-[var(--accent)]';
+    case 'declined':
+      return 'border-red-400/30 bg-red-400/10 text-red-200';
+    case 'delivered':
+      return 'border-sky-400/30 bg-sky-400/10 text-sky-200';
+    default:
+      return 'border-white/15 bg-white/5 text-[var(--muted)]';
+  }
+}
+
 export function InboxClient({
   initialItems,
   initialFilter,
@@ -27,9 +40,21 @@ export function InboxClient({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [items, setItems] = useState(initialItems);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const filter = searchParams.get('filter') ?? initialFilter;
+
+  useEffect(() => {
+    setItems(initialItems);
+  }, [initialItems]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(null), 4_000);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
 
   function setFilter(next: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -38,12 +63,26 @@ export function InboxClient({
     router.push(params.toString() ? `/dashboard?${params}` : '/dashboard');
   }
 
-  function run(action: () => Promise<{ error?: string; ok?: true }>) {
+  function patchItem(id: string, patch: Partial<InboxItem>) {
+    setItems((prev) => prev.map((item) => (item.id === id ? { ...item, ...patch } : item)));
+  }
+
+  function run(
+    item: InboxItem,
+    action: () => Promise<{ error?: string; ok?: true }>,
+    next: Partial<InboxItem>,
+    message: string,
+  ) {
     setError(null);
+    // Optimistic status badge before the server round-trip finishes.
+    patchItem(item.id, next);
+    setToast(message);
     startTransition(async () => {
       const result = await action();
       if (result.error) {
         setError(result.error);
+        setToast(null);
+        patchItem(item.id, { status: item.status, decision: item.decision });
         return;
       }
       router.refresh();
@@ -69,14 +108,24 @@ export function InboxClient({
         ))}
       </div>
 
+      {toast ? (
+        <p
+          role="status"
+          data-testid="inbox-toast"
+          className="rounded-md border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-3 py-2 text-sm text-[var(--accent)]"
+        >
+          {toast}
+        </p>
+      ) : null}
+
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
 
-      {initialItems.length === 0 ? (
+      {items.length === 0 ? (
         <p className="text-[var(--muted)]">No intro requests in this filter yet.</p>
       ) : (
         <ul className="flex flex-col gap-4">
-          {initialItems.map((item) => (
-            <li key={item.id} className="border-b border-white/10 pb-4">
+          {items.map((item) => (
+            <li key={item.id} className="border-b border-white/10 pb-4" data-testid="inbox-row">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="font-medium text-[var(--fg)]">
@@ -85,8 +134,14 @@ export function InboxClient({
                       · {item.senderType} · {item.senderContact}
                     </span>
                   </p>
-                  <p className="mt-1 text-sm text-[var(--muted)]">
-                    {new Date(item.createdAt).toLocaleString()} · status {item.status}
+                  <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-[var(--muted)]">
+                    <span>{new Date(item.createdAt).toLocaleString()}</span>
+                    <span
+                      data-testid="inbox-status-badge"
+                      className={`rounded-md border px-2 py-0.5 text-xs font-semibold tracking-wide uppercase ${statusBadgeClass(item.status)}`}
+                    >
+                      {item.status}
+                    </span>
                   </p>
                 </div>
                 <div className="text-right text-sm">
@@ -106,7 +161,14 @@ export function InboxClient({
                 <button
                   type="button"
                   disabled={pending || item.status === 'accepted'}
-                  onClick={() => run(() => approveRequest(item.id))}
+                  onClick={() =>
+                    run(
+                      item,
+                      () => approveRequest(item.id),
+                      { status: 'accepted', decision: 'accept' },
+                      `Intro sent to ${item.senderName}`,
+                    )
+                  }
                   className="rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-[#062015] disabled:opacity-50"
                 >
                   Approve intro
@@ -114,7 +176,17 @@ export function InboxClient({
                 <button
                   type="button"
                   disabled={pending || item.status === 'declined'}
-                  onClick={() => run(() => declineRequest(item.id))}
+                  onClick={() =>
+                    run(
+                      item,
+                      () => declineRequest(item.id),
+                      {
+                        status: 'declined',
+                        decision: item.decision === 'accept' ? 'reject' : item.decision,
+                      },
+                      `Declined ${item.senderName}`,
+                    )
+                  }
                   className="rounded-md border border-white/15 px-3 py-1.5 text-sm disabled:opacity-50"
                 >
                   Decline
@@ -133,7 +205,18 @@ export function InboxClient({
                       setError('Override must be accept, reject, or spam');
                       return;
                     }
-                    run(() => overrideRequest(item.id, decision));
+                    const nextStatus =
+                      decision === 'accept'
+                        ? 'delivered'
+                        : decision === 'spam'
+                          ? 'pending'
+                          : 'pending';
+                    run(
+                      item,
+                      () => overrideRequest(item.id, decision),
+                      { decision, status: nextStatus },
+                      `Overrode ${item.senderName} → ${decision}`,
+                    );
                   }}
                   className="rounded-md border border-white/15 px-3 py-1.5 text-sm disabled:opacity-50"
                 >
@@ -142,7 +225,14 @@ export function InboxClient({
                 <button
                   type="button"
                   disabled={pending}
-                  onClick={() => run(() => markSpam(item.id))}
+                  onClick={() =>
+                    run(
+                      item,
+                      () => markSpam(item.id),
+                      { status: 'declined', decision: 'spam' },
+                      `Marked ${item.senderName} as spam`,
+                    )
+                  }
                   className="rounded-md border border-red-400/30 px-3 py-1.5 text-sm text-red-200 disabled:opacity-50"
                 >
                   Mark spam

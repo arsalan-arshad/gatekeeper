@@ -36,3 +36,28 @@ test('POST /v1/payments/checkout is 503 when payments disabled', async () => {
   if (previous !== undefined) process.env.PAYMENTS_ENABLED = previous;
   else delete process.env.PAYMENTS_ENABLED;
 });
+
+test('POST /v1/payments/waitlist rejects missing auth', async () => {
+  const app = await buildServer();
+  app.log.level = 'silent';
+  const response = await app.inject({
+    method: 'POST',
+    url: '/v1/payments/waitlist',
+    payload: { email: 'wait@example.com' },
+  });
+  assert.equal(response.statusCode, 401);
+  await app.close();
+});
+
+test('POST /v1/payments/waitlist rejects invalid email', async () => {
+  const app = await buildServer();
+  app.log.level = 'silent';
+  const response = await app.inject({
+    method: 'POST',
+    url: '/v1/payments/waitlist',
+    headers: { 'x-user-email': 'ada@example.com' },
+    payload: { email: 'not-an-email' },
+  });
+  assert.equal(response.statusCode, 400);
+  await app.close();
+});

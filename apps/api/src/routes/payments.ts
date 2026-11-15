@@ -1,4 +1,4 @@
-import { billingAccounts, paymentEvents, users } from '@gatekeeper/db';
+import { billingAccounts, paymentEvents, proWaitlist, users } from '@gatekeeper/db';
 import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -20,6 +20,10 @@ function requireUserEmail(header: string | string[] | undefined): string | null 
 const checkoutSchema = z.object({
   kind: z.enum(['pro', 'credits']),
   creditCents: z.number().int().positive().optional(),
+});
+
+const waitlistSchema = z.object({
+  email: z.string().email(),
 });
 
 export async function registerPaymentRoutes(app: FastifyInstance): Promise<void> {
@@ -51,6 +55,27 @@ export async function registerPaymentRoutes(app: FastifyInstance): Promise<void>
         : { email, plan: 'free' as const, lemonSubscriptionId: null },
       creditsCents: account?.creditsCents ?? 0,
     };
+  });
+
+  app.post('/v1/payments/waitlist', async (request, reply) => {
+    const sessionEmail = requireUserEmail(request.headers['x-user-email']);
+    if (!sessionEmail) {
+      return reply.status(401).send({ error: 'Missing x-user-email' });
+    }
+
+    const parsed = waitlistSchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'Invalid email', details: parsed.error.flatten() });
+    }
+
+    const email = parsed.data.email.trim().toLowerCase();
+    const db = getDb();
+    await db
+      .insert(proWaitlist)
+      .values({ email })
+      .onConflictDoNothing({ target: proWaitlist.email });
+
+    return { ok: true, email };
   });
 
   app.post('/v1/payments/checkout', async (request, reply) => {

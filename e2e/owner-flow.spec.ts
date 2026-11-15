@@ -62,8 +62,10 @@ test('owner flow: login, interview, publish, inbox approve, sign out', async ({ 
   await page.goto('/dashboard');
   await expect(page.getByText('Casey Sender')).toBeVisible({ timeout: 15_000 });
 
-  // 6. Approve
+  // 6. Approve — toast + status badge
   await page.getByRole('button', { name: 'Approve intro' }).first().click();
+  await expect(page.getByTestId('inbox-toast')).toHaveText(/Intro sent to Casey Sender/i);
+  await expect(page.getByTestId('inbox-status-badge').first()).toHaveText(/accepted/i);
   await expect(page.getByText('Casey Sender')).toBeVisible({ timeout: 15_000 });
 
   // 7. Sign out

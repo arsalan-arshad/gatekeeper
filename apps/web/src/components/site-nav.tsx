@@ -1,87 +1,109 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 
 import { BRAND } from '@/lib/brand';
 
 export function SiteNav({ compact = false }: { compact?: boolean } = {}) {
   const [open, setOpen] = useState(false);
+  const menuId = useId();
+  const navRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [open]);
+
+  function closeMenu() {
+    setOpen(false);
+  }
 
   return (
-    <nav className="relative flex items-center justify-between gap-4 text-[0.9375rem] text-[var(--muted)]">
-      <Link
-        href="/"
-        className="tracking-[0.18em] text-[var(--accent)] uppercase hover:brightness-110"
-      >
-        {BRAND.name}
-      </Link>
+    <nav
+      ref={navRef}
+      className="relative flex flex-col gap-0 text-[0.9375rem] text-[var(--muted)]"
+      data-testid="site-nav"
+    >
+      <div className="flex items-center justify-between gap-4">
+        <Link
+          href="/"
+          className="tracking-[0.18em] text-[var(--accent)] uppercase hover:brightness-110"
+        >
+          {BRAND.name}
+        </Link>
 
-      <div className="hidden items-center gap-x-5 sm:flex">
-        {!compact ? (
-          <>
-            <a href="/#how-it-works" className="hover:text-[var(--fg)]">
-              How it works
-            </a>
+        <div className="hidden items-center gap-x-5 sm:flex" data-testid="desktop-nav-links">
+          {!compact ? (
+            <>
+              <a href="/#how-it-works" className="hover:text-[var(--fg)]">
+                How it works
+              </a>
+              <Link href="/ledger" className="hover:text-[var(--fg)]">
+                Ledger
+              </Link>
+              <Link href="/@demo" className="hover:text-[var(--fg)]">
+                @demo
+              </Link>
+            </>
+          ) : (
             <Link href="/ledger" className="hover:text-[var(--fg)]">
               Ledger
             </Link>
-            <Link href="/@demo" className="hover:text-[var(--fg)]">
-              @demo
-            </Link>
-          </>
-        ) : (
-          <Link href="/ledger" className="hover:text-[var(--fg)]">
-            Ledger
-          </Link>
-        )}
-        <Link
-          href="/start"
-          className="rounded-md bg-[var(--accent)] px-3.5 py-2 text-sm font-semibold text-[#062015] transition hover:brightness-110"
-        >
-          Start free
-        </Link>
-      </div>
-
-      <button
-        type="button"
-        className="inline-flex items-center justify-center rounded-md border border-white/15 px-3 py-2 text-sm text-[var(--fg)] sm:hidden"
-        aria-expanded={open}
-        aria-controls="mobile-nav"
-        onClick={() => setOpen((v) => !v)}
-      >
-        {open ? 'Close' : 'Menu'}
-      </button>
-
-      {open ? (
-        <div
-          id="mobile-nav"
-          className="absolute top-full right-0 z-20 mt-2 flex w-56 flex-col gap-3 rounded-md border border-white/10 bg-[#0b1612] p-4 shadow-lg sm:hidden"
-        >
-          {!compact ? (
-            <a
-              href="/#how-it-works"
-              className="hover:text-[var(--fg)]"
-              onClick={() => setOpen(false)}
-            >
-              How it works
-            </a>
-          ) : null}
-          <Link href="/ledger" className="hover:text-[var(--fg)]" onClick={() => setOpen(false)}>
-            Ledger
-          </Link>
-          <Link href="/@demo" className="hover:text-[var(--fg)]" onClick={() => setOpen(false)}>
-            @demo
-          </Link>
+          )}
           <Link
             href="/start"
-            className="rounded-md bg-[var(--accent)] px-3.5 py-2 text-center text-sm font-semibold text-[#062015]"
-            onClick={() => setOpen(false)}
+            className="rounded-md bg-[var(--accent)] px-3.5 py-2 text-sm font-semibold text-[#062015] transition hover:brightness-110"
           >
             Start free
           </Link>
         </div>
-      ) : null}
+
+        <button
+          type="button"
+          className="inline-flex items-center justify-center rounded-md border border-white/15 px-3 py-2 text-sm text-[var(--fg)] sm:hidden"
+          aria-expanded={open}
+          aria-controls={menuId}
+          data-testid="mobile-nav-toggle"
+          onClick={() => setOpen((v) => !v)}
+        >
+          {open ? 'Close' : 'Menu'}
+        </button>
+      </div>
+
+      <div
+        id={menuId}
+        data-testid="mobile-nav-menu"
+        hidden={!open}
+        className="mt-3 flex flex-col gap-3 border-t border-white/10 pt-3 sm:hidden"
+      >
+        {!compact ? (
+          <a href="/#how-it-works" className="hover:text-[var(--fg)]" onClick={closeMenu}>
+            How it works
+          </a>
+        ) : null}
+        <Link href="/ledger" className="hover:text-[var(--fg)]" onClick={closeMenu}>
+          Ledger
+        </Link>
+        <Link href="/@demo" className="hover:text-[var(--fg)]" onClick={closeMenu}>
+          @demo
+        </Link>
+        <Link
+          href="/start"
+          className="rounded-md bg-[var(--accent)] px-3.5 py-2 text-center text-sm font-semibold text-[#062015]"
+          onClick={closeMenu}
+        >
+          Start free
+        </Link>
+      </div>
     </nav>
   );
 }

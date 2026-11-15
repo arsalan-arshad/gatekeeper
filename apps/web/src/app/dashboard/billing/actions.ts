@@ -50,3 +50,23 @@ export async function startCheckout(
     return { error: error instanceof Error ? error.message : 'Checkout failed' };
   }
 }
+
+export async function joinWaitlist(email: string): Promise<{ ok?: true; error?: string }> {
+  const session = await auth();
+  const sessionEmail = session?.user?.email;
+  if (!sessionEmail) return { error: 'Sign in required' };
+
+  const normalized = email.trim().toLowerCase();
+  if (!normalized.includes('@')) return { error: 'Enter a valid email' };
+
+  try {
+    await apiFetch('/v1/payments/waitlist', {
+      method: 'POST',
+      email: sessionEmail,
+      body: JSON.stringify({ email: normalized }),
+    });
+    return { ok: true };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Waitlist failed' };
+  }
+}

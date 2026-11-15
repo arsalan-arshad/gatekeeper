@@ -36,8 +36,8 @@ export default async function BillingDashboardPage() {
           Billing
         </h1>
         <p className="mt-3 text-[var(--muted)]">
-          Free vs Pro ($9/mo). Upgrade uses Lemon Squeezy when configured — otherwise Coming soon.
-          No Stripe.
+          Free vs Pro ($9/mo). When Lemon Squeezy is configured, Upgrade to Pro opens checkout;
+          otherwise Coming soon with a Pro waitlist. No Stripe.
         </p>
       </div>
 
