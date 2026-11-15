@@ -3,7 +3,7 @@
  */
 export function sanitizeEmailSubject(raw: string): string {
   return raw
-    .replace(/[\r\n\u0000]+/g, ' ')
+    .replace(new RegExp('[\\r\\n' + String.fromCharCode(0) + ']+', 'g'), ' ')
     .replace(/<[^>]*>/g, '')
     .replace(/\s+/g, ' ')
     .trim()
