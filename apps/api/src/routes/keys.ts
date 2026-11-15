@@ -6,20 +6,15 @@ import { z } from 'zod';
 import { generateApiKey, hashApiKey } from '../api-keys.js';
 import { getDb } from '../db.js';
 
-function requireUserEmail(header: string | string[] | undefined): string | null {
-  if (typeof header !== 'string' || !header.includes('@')) return null;
-  return header.trim().toLowerCase();
-}
-
 const createSchema = z.object({
   rateLimit: z.number().int().min(1).max(10_000).optional(),
 });
 
 export async function registerKeyRoutes(app: FastifyInstance): Promise<void> {
   app.get('/v1/api-keys', async (request, reply) => {
-    const email = requireUserEmail(request.headers['x-user-email']);
+    const email = request.gatekeeperEmail;
     if (!email) {
-      return reply.status(401).send({ error: 'Missing x-user-email' });
+      return reply.status(401).send({ error: 'Unauthorized' });
     }
 
     const db = getDb();
@@ -44,9 +39,9 @@ export async function registerKeyRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.post('/v1/api-keys', async (request, reply) => {
-    const email = requireUserEmail(request.headers['x-user-email']);
+    const email = request.gatekeeperEmail;
     if (!email) {
-      return reply.status(401).send({ error: 'Missing x-user-email' });
+      return reply.status(401).send({ error: 'Unauthorized' });
     }
 
     const parsed = createSchema.safeParse(request.body ?? {});
@@ -81,9 +76,9 @@ export async function registerKeyRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.delete('/v1/api-keys/:id', async (request, reply) => {
-    const email = requireUserEmail(request.headers['x-user-email']);
+    const email = request.gatekeeperEmail;
     if (!email) {
-      return reply.status(401).send({ error: 'Missing x-user-email' });
+      return reply.status(401).send({ error: 'Unauthorized' });
     }
 
     const { id } = request.params as { id: string };

@@ -80,6 +80,7 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/gatekeeper
       AUTH_SECRET: e2e-auth-secret-for-ci-only
       E2E_SECRET: e2e-ci-secret
+      INTERNAL_API_SECRET: e2e-internal-api-secret-for-ci-only
       APP_URL: http://127.0.0.1:3000
       AUTH_URL: http://127.0.0.1:3000
       API_URL: http://127.0.0.1:4000

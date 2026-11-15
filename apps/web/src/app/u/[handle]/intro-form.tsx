@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 
-import { API_URL } from '@/lib/api';
+import { API_URL } from '@/lib/api-url';
 
 export function IntroRequestForm({ handle }: { handle: string }) {
   const [status, setStatus] = useState<string | null>(null);
