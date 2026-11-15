@@ -1,6 +1,7 @@
 export const BRAND = {
   name: 'Gatekeeper',
-  tagline: 'Your AI front door that says no for you',
+  tagline: 'Let anyone reach you. Only the right ones get through.',
   summary:
-    'Inbound requests meet your plain-English rules first. Spam and bad fits bounce. Only double-opt-in intros get through — and the public ledger is your reputation.',
+    'Gatekeeper is an AI principal with its own reputation. It reads every request against your rules, says no to spam, and only makes intros you both accept.',
+  githubUrl: 'https://github.com/arsalan-arshad/gatekeeper',
 } as const;

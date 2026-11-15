@@ -9,7 +9,7 @@ Use this before pointing a public domain at production. Secrets stay in Railway 
 - [ ] Deploy `apps/web` from `apps/web/railway.toml` (Next.js, health `/`).
 - [ ] Set shared env from `.env.example`: `DATABASE_URL`, `AUTH_SECRET`, `API_URL`, `APP_URL`, `GEMINI_API_KEY` (or Groq), optional `RESEND_API_KEY`, `INTERNAL_API_SECRET`.
 - [ ] Run migrations against production (or rely on api start: `db:migrate` then start): `pnpm --filter @gatekeeper/db db:migrate`. Migrate now creates the app database if Postgres only has the default `postgres` DB.
-- [ ] Optional demo data: `pnpm --filter @gatekeeper/db db:seed` (creates `@ada`, `@jonas`, `@mira`).
+- [ ] Optional demo data: `pnpm --filter @gatekeeper/db db:seed` (creates `@demo`, `@ada`, `@jonas`, `@mira` + labeled `@demo` ledger requests).
 - [ ] Confirm `GET /health` on the API service and `/` on the web service.
 
 ## 2. Custom domain
@@ -59,4 +59,4 @@ pnpm --filter @gatekeeper/db db:migrate
 pnpm --filter @gatekeeper/db db:seed
 ```
 
-Demo handles: `@ada`, `@jonas`, `@mira` (emails `*@demo.gatekeeper.local`).
+Demo handles: `@demo`, `@ada`, `@jonas`, `@mira` (emails `*@demo.gatekeeper.local`).

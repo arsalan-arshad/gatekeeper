@@ -174,7 +174,7 @@ Schema: `users`, `gate_rules`, `requests`, `api_keys`, `abuse_events`, plus mont
 # requires DATABASE_URL (Postgres with permission to create the vector extension)
 export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/gatekeeper
 pnpm --filter @gatekeeper/db db:migrate
-pnpm --filter @gatekeeper/db db:seed   # demo users @ada @jonas @mira
+pnpm --filter @gatekeeper/db db:seed   # demo users @demo @ada @jonas @mira (+ labeled @demo ledger)
 ```
 
 Regenerate SQL after schema edits: `pnpm --filter @gatekeeper/db db:generate`

@@ -16,9 +16,9 @@ const display = Syne({
 });
 
 export const metadata: Metadata = {
-  title: 'Gatekeeper — Your AI front door that says no for you',
+  title: 'Gatekeeper — Let anyone reach you. Only the right ones get through.',
   description:
-    'Open-source AI principal. Requests meet your rules first. Only double-opt-in intros get through.',
+    'Gatekeeper is an AI principal with its own reputation. It reads every request against your rules, says no to spam, and only makes intros you both accept.',
   icons: {
     icon: [
       { url: '/favicon.ico', sizes: 'any' },
@@ -29,23 +29,23 @@ export const metadata: Metadata = {
     apple: [{ url: '/apple-touch-icon.png', sizes: '180x180' }],
   },
   openGraph: {
-    title: 'Gatekeeper — Your AI front door that says no for you',
+    title: 'Gatekeeper — Let anyone reach you. Only the right ones get through.',
     description:
-      'Open-source AI principal. Requests meet your rules first. Only double-opt-in intros get through.',
+      'Gatekeeper is an AI principal with its own reputation. It reads every request against your rules, says no to spam, and only makes intros you both accept.',
     images: [
       {
         url: '/og.png',
         width: 1200,
         height: 630,
-        alt: 'Gatekeeper — Your AI front door that says no for you',
+        alt: 'Gatekeeper — Let anyone reach you. Only the right ones get through.',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Gatekeeper — Your AI front door that says no for you',
+    title: 'Gatekeeper — Let anyone reach you. Only the right ones get through.',
     description:
-      'Open-source AI principal. Requests meet your rules first. Only double-opt-in intros get through.',
+      'Gatekeeper is an AI principal with its own reputation. It reads every request against your rules, says no to spam, and only makes intros you both accept.',
     images: ['/og.png'],
   },
 };
