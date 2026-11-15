@@ -20,7 +20,8 @@
     "eval:judge": "pnpm --filter @gatekeeper/api eval:judge",
     "e2e:serve": "node ./scripts/e2e-serve.mjs",
     "e2e": "playwright test",
-    "e2e:install": "playwright install chromium --with-deps"
+    "e2e:install": "playwright install chromium --with-deps",
+    "audit:prod": "pnpm audit --prod --audit-level=high"
   },
   "devDependencies": {
     "@gatekeeper/eslint-config": "workspace:*",
@@ -28,5 +29,11 @@
     "eslint": "^9.22.0",
     "prettier": "^3.5.3",
     "typescript": "^5.8.2"
+  },
+  "pnpm": {
+    "overrides": {
+      "drizzle-orm": ">=0.45.2",
+      "postcss": ">=8.5.23"
+    }
   }
 }
