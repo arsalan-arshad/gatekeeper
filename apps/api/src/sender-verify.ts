@@ -133,10 +133,13 @@ export async function maybeSendSenderVerificationEmail(
   }
 
   const token = createSenderVerifyToken(input.senderEmail, { env: input.env });
-  const base = (input.env?.API_URL ?? input.env?.APP_URL ?? process.env.API_URL ?? process.env.APP_URL ?? 'http://localhost:4000').replace(
-    /\/$/,
-    '',
-  );
+  const base = (
+    input.env?.API_URL ??
+    input.env?.APP_URL ??
+    process.env.API_URL ??
+    process.env.APP_URL ??
+    'http://localhost:4000'
+  ).replace(/\/$/, '');
   const verifyUrl = `${base}/v1/senders/verify?token=${encodeURIComponent(token)}`;
   const content = buildSenderVerifyEmail({
     senderName: input.senderName,
