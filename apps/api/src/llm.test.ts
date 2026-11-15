@@ -384,8 +384,9 @@ test('429 cooldown skips gemini on next call', async () => {
   assert.equal(geminiHits, 2, 'cooldown expired — gemini tried again');
 });
 
-test('isFailoverError covers 429 / 5xx / timeout / invalid JSON', () => {
+test('isFailoverError covers 404 / 429 / 5xx / timeout / invalid JSON', () => {
   assert.equal(isFailoverError(new LlmTimeoutError()), true);
+  assert.equal(isFailoverError(new LlmProviderError('x', { status: 404, retryable: true })), true);
   assert.equal(isFailoverError(new LlmProviderError('x', { status: 429, retryable: true })), true);
   assert.equal(isFailoverError(new LlmProviderError('x', { status: 503, retryable: true })), true);
   assert.equal(
@@ -402,7 +403,7 @@ test('isFailoverError covers 429 / 5xx / timeout / invalid JSON', () => {
   );
 });
 
-test('groq defaults to llama-3.3-70b-versatile with json_object', async () => {
+test('groq defaults to openai/gpt-oss-120b with json_object', async () => {
   let seenBody: Record<string, unknown> | undefined;
 
   const fetchImpl: typeof fetch = async (_input, init) => {

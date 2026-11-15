@@ -79,7 +79,7 @@ API health check: `GET http://localhost:4000/health`
 
 Chat tries **Gemini first**, then **Groq**, for whichever of `GEMINI_API_KEY` / `GROQ_API_KEY` are set. Failover on 429 / `RESOURCE_EXHAUSTED` / 5xx / 8s timeout / invalid JSON; 429 starts a 10-minute in-memory cooldown. Embeddings always use Gemini (`gemini-embedding-001` at 768 dims); if embed fails, judging skips similarity and continues LLM-only (no 503). Both chat providers failing → `503` “AI busy”.
 
-Defaults: `GEMINI_MODEL=gemini-3.8-flash` (free-tier Flash), `GROQ_MODEL=llama-3.3-70b-versatile` with `response_format: json_object` for judge calls.
+Defaults: `GEMINI_MODEL=gemini-3.8-flash` (free-tier Flash), `GROQ_MODEL=openai/gpt-oss-120b` (Groq’s free/dev replacement for retired `llama-3.3-70b-versatile`) with `response_format: json_object` for judge calls.
 
 Admin probe (requires `ADMIN_TOKEN`):
 
