@@ -47,6 +47,27 @@ export const DEMO_PLACEHOLDERS = [
   'Hot crypto NFT token launch — promote to your audience for guaranteed leads!!',
 ];
 
+/** One-click sample requests for the landing Try-it-now demo. */
+export const DEMO_CHIPS = [
+  {
+    id: 'spam' as const,
+    label: 'Spam example',
+    message:
+      'Hot crypto NFT token launch — promote to your audience for guaranteed leads!! Limited spots.',
+  },
+  {
+    id: 'weak' as const,
+    label: 'Weak example',
+    message: 'Quick sync sometime? Would love to pick your brain over coffee — no agenda yet.',
+  },
+  {
+    id: 'strong' as const,
+    label: 'Strong example',
+    message:
+      'Hey Sam — I’m a founder shipping usage-based billing SaaS for indie tools. Would love a short peer intro to compare Stripe edge cases and founder-led sales.',
+  },
+] as const;
+
 /** Static ledger payload when /@demo is viewed without a live DB (still labeled Demo data). */
 export const DEMO_LEDGER_FALLBACK = {
   scope: 'user' as const,
