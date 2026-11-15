@@ -124,15 +124,17 @@ test('email aliases share public-form sender+owner quota', async () => {
   assert.equal((await checkPublicFormSenderOwnerRateLimit('ab@gmail.com', 'owner-1')).ok, false);
 });
 
-test('postgres consume path is a single INSERT ON CONFLICT RETURNING', async () => {
+test('postgres consume path is a single upsert RETURNING (no read-then-write)', async () => {
   const src = await readFile(fileURLToPath(new URL('./rate-limit.ts', import.meta.url)), 'utf8');
   const consumeFn = src.slice(
     src.indexOf('export async function consumePostgresRateLimit'),
     src.indexOf('export async function peekPostgresRateLimit'),
   );
-  assert.match(consumeFn, /INSERT INTO rate_limit_buckets/);
-  assert.match(consumeFn, /ON CONFLICT \(bucket_key\) DO UPDATE/);
-  assert.match(consumeFn, /RETURNING count/);
+  assert.match(consumeFn, /\.insert\(rateLimitBuckets\)/);
+  assert.match(consumeFn, /\.onConflictDoUpdate\(/);
+  assert.match(consumeFn, /\.returning\(/);
+  assert.match(consumeFn, /CASE/);
   assert.doesNotMatch(consumeFn, /\.select\(/);
-  assert.doesNotMatch(consumeFn, /\.update\(/);
+  // Must not do a separate .update( after a read — only onConflictDoUpdate.
+  assert.doesNotMatch(consumeFn, /\.update\(rateLimitBuckets\)/);
 });

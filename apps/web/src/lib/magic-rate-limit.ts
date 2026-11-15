@@ -1,4 +1,4 @@
-import { createDb } from '@gatekeeper/db';
+import { createDb, rateLimitBuckets } from '@gatekeeper/db';
 import { sql } from 'drizzle-orm';
 
 import { normalizeEmailForRateLimit } from './email-normalize';
@@ -35,31 +35,35 @@ async function consume(key: string, limit: number, windowMs: number): Promise<bo
   const db = getDb();
   const nowMs = Date.now();
   const windowStart = new Date(nowMs);
-  const rows = await db.execute<{ count: number }>(sql`
-    INSERT INTO rate_limit_buckets (bucket_key, window_start, count, updated_at)
-    VALUES (${key}, ${windowStart}, 1, ${windowStart})
-    ON CONFLICT (bucket_key) DO UPDATE SET
-      count = CASE
-        WHEN (EXTRACT(EPOCH FROM (${windowStart}::timestamptz - rate_limit_buckets.window_start)) * 1000)
-          >= ${windowMs}
-        THEN 1
-        ELSE rate_limit_buckets.count + 1
-      END,
-      window_start = CASE
-        WHEN (EXTRACT(EPOCH FROM (${windowStart}::timestamptz - rate_limit_buckets.window_start)) * 1000)
-          >= ${windowMs}
-        THEN ${windowStart}::timestamptz
-        ELSE rate_limit_buckets.window_start
-      END,
-      updated_at = ${windowStart}::timestamptz
-    RETURNING count
-  `);
+  const expiredBefore = new Date(nowMs - windowMs);
+  const [row] = await db
+    .insert(rateLimitBuckets)
+    .values({
+      bucketKey: key,
+      windowStart,
+      count: 1,
+      updatedAt: windowStart,
+    })
+    .onConflictDoUpdate({
+      target: rateLimitBuckets.bucketKey,
+      set: {
+        count: sql`CASE
+          WHEN ${rateLimitBuckets.windowStart} <= ${expiredBefore} THEN 1
+          ELSE ${rateLimitBuckets.count} + 1
+        END`,
+        windowStart: sql`CASE
+          WHEN ${rateLimitBuckets.windowStart} <= ${expiredBefore} THEN ${windowStart}
+          ELSE ${rateLimitBuckets.windowStart}
+        END`,
+        updatedAt: windowStart,
+      },
+    })
+    .returning({ count: rateLimitBuckets.count });
 
-  const row = rows[0] as { count: number } | undefined;
   if (!row) {
     throw new Error('rate_limit_buckets upsert returned no row');
   }
-  return Number(row.count) <= limit;
+  return row.count <= limit;
 }
 
 /** Magic-link: 3/email/hour + 10/IP/hour. Returns false when blocked. Throws on DB errors. */

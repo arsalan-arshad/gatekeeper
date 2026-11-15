@@ -126,39 +126,40 @@ export async function consumePostgresRateLimit(
 
   const db = getDb();
   const windowStart = new Date(nowMs);
-  // Single round-trip: no SELECT then UPDATE (avoids lost updates under concurrency).
-  const rows = await db.execute<{ count: number; window_start: Date | string }>(sql`
-    INSERT INTO rate_limit_buckets (bucket_key, window_start, count, updated_at)
-    VALUES (${key}, ${windowStart}, 1, ${windowStart})
-    ON CONFLICT (bucket_key) DO UPDATE SET
-      count = CASE
-        WHEN (EXTRACT(EPOCH FROM (${windowStart}::timestamptz - rate_limit_buckets.window_start)) * 1000)
-          >= ${windowMs}
-        THEN 1
-        ELSE rate_limit_buckets.count + 1
-      END,
-      window_start = CASE
-        WHEN (EXTRACT(EPOCH FROM (${windowStart}::timestamptz - rate_limit_buckets.window_start)) * 1000)
-          >= ${windowMs}
-        THEN ${windowStart}::timestamptz
-        ELSE rate_limit_buckets.window_start
-      END,
-      updated_at = ${windowStart}::timestamptz
-    RETURNING count, window_start
-  `);
+  const expiredBefore = new Date(nowMs - windowMs);
+  // Single round-trip upsert + RETURNING (no SELECT then UPDATE).
+  const [row] = await db
+    .insert(rateLimitBuckets)
+    .values({
+      bucketKey: key,
+      windowStart,
+      count: 1,
+      updatedAt: windowStart,
+    })
+    .onConflictDoUpdate({
+      target: rateLimitBuckets.bucketKey,
+      set: {
+        count: sql`CASE
+          WHEN ${rateLimitBuckets.windowStart} <= ${expiredBefore} THEN 1
+          ELSE ${rateLimitBuckets.count} + 1
+        END`,
+        windowStart: sql`CASE
+          WHEN ${rateLimitBuckets.windowStart} <= ${expiredBefore} THEN ${windowStart}
+          ELSE ${rateLimitBuckets.windowStart}
+        END`,
+        updatedAt: windowStart,
+      },
+    })
+    .returning({
+      count: rateLimitBuckets.count,
+      windowStart: rateLimitBuckets.windowStart,
+    });
 
-  const row = rows[0] as { count: number; window_start: Date | string } | undefined;
   if (!row) {
     throw new Error('rate_limit_buckets upsert returned no row');
   }
 
-  const count = Number(row.count);
-  const startMs =
-    row.window_start instanceof Date
-      ? row.window_start.getTime()
-      : new Date(row.window_start).getTime();
-
-  return rateLimitResultFromCount(count, limit, startMs, nowMs, windowMs);
+  return rateLimitResultFromCount(row.count, limit, row.windowStart.getTime(), nowMs, windowMs);
 }
 
 export async function peekPostgresRateLimit(
