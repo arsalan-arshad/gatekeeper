@@ -78,6 +78,10 @@ test('reject email includes reason_public and suggested_rewrite only', async () 
 
 test('intro email goes to both parties after receiver accept', async () => {
   clearConsoleEmailLog();
+  const { setSenderVerifiedForTests, resetSenderOutboundLimiterForTests } =
+    await import('./sender-verify.ts');
+  resetSenderOutboundLimiterForTests();
+  setSenderVerifiedForTests('maya@example.com');
   const send = createConsoleEmailSender();
   await sendIntroEmailToBoth(send, {
     receiverEmail: 'ada@example.com',
@@ -100,4 +104,5 @@ test('intro email goes to both parties after receiver accept', async () => {
   assert.match(email.text, /was this intro helpful/i);
   assert.match(email.text, /helpful=true/);
   assert.match(email.text, /helpful=false/);
+  setSenderVerifiedForTests(null);
 });

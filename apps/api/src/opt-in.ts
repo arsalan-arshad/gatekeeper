@@ -7,6 +7,11 @@ import {
   buildRejectEmail,
 } from './email-templates.js';
 import type { JudgeDecision, JudgeResult } from './judge.js';
+import {
+  canEmailSenderContact,
+  consumeSenderOutboundSlot,
+  maybeSendSenderVerificationEmail,
+} from './sender-verify.js';
 import { createHelpfulToken, createOptInToken } from './tokens.js';
 
 export function getPublicBaseUrl(env: NodeJS.ProcessEnv = process.env): string {
@@ -121,6 +126,21 @@ export async function sendDeclineAutoReply(
     env?: NodeJS.ProcessEnv;
   },
 ) {
+  const gate = await canEmailSenderContact(input.senderEmail);
+  if (!gate.ok) {
+    if (gate.reason === 'unverified') {
+      await maybeSendSenderVerificationEmail(send, {
+        senderEmail: input.senderEmail,
+        senderName: input.senderName,
+        env: input.env,
+      });
+    }
+    return { id: 'skipped-unverified-sender', mode: 'console' as const };
+  }
+  const slot = consumeSenderOutboundSlot(input.senderEmail);
+  if (!slot.ok) {
+    return { id: 'skipped-outbound-cap', mode: 'console' as const };
+  }
   const content = buildDeclineAutoReplyEmail({
     senderName: input.senderName,
     receiverName: input.receiverName,
@@ -165,6 +185,23 @@ export async function sendIntroEmailToBoth(
     noUrl,
     env: input.env,
   });
+
+  const gate = await canEmailSenderContact(input.senderEmail);
+  if (!gate.ok) {
+    if (gate.reason === 'unverified') {
+      await maybeSendSenderVerificationEmail(send, {
+        senderEmail: input.senderEmail,
+        senderName: input.senderName,
+        env: input.env,
+      });
+    }
+    // Owner/receiver still gets the intro; never CC unverified senderContact.
+    return send({ to: [input.receiverEmail], ...content });
+  }
+  const slot = consumeSenderOutboundSlot(input.senderEmail);
+  if (!slot.ok) {
+    return send({ to: [input.receiverEmail], ...content });
+  }
   return send({
     to: [input.receiverEmail, input.senderEmail],
     ...content,

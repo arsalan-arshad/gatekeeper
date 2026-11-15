@@ -48,7 +48,9 @@ export function IntroRequestForm({ handle }: { handle: string }) {
         setError(body.error || 'Could not send request');
         return;
       }
-      setStatus('Request received. Gatekeeper will review it before any intro is delivered.');
+      setStatus(
+        'Request received — verdict is on-screen. Check your email to verify your address before Gatekeeper will message you.',
+      );
     });
   }
 

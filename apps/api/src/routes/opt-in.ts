@@ -4,6 +4,7 @@ import type { FastifyInstance } from 'fastify';
 
 import { getDb } from '../db.js';
 import { createEmailSender } from '../email.js';
+import { escapeHtml } from '../email-templates.js';
 import { sendDeclineAutoReply, sendIntroEmailToBoth } from '../opt-in.js';
 import { refundStake, settleAcceptedIntro } from '../payments.js';
 import { verifyOptInToken, type OptInAction } from '../tokens.js';
@@ -141,7 +142,7 @@ export async function registerOptInRoutes(app: FastifyInstance): Promise<void> {
       .send(
         htmlPage(
           'Intro sent',
-          `<p>Accepted. Gatekeeper emailed you and <strong>${row.senderName}</strong> a shared intro.</p>`,
+          `<p>Accepted. Gatekeeper emailed you and <strong>${escapeHtml(row.senderName)}</strong> a shared intro.</p>`,
         ),
       );
   });

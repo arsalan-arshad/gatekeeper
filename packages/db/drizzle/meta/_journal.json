@@ -64,6 +64,13 @@
       "when": 1795000000000,
       "tag": "0008_accept_rate_decided_at",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1795100000000,
+      "tag": "0009_verified_senders",
+      "breakpoints": true
     }
   ]
 }

@@ -111,6 +111,15 @@ export const abuseEvents = pgTable('abuse_events', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+/**
+ * Senders who completed one-click email verification (24h token).
+ * Unverified senderContact must never receive reject/intro/decline mail.
+ */
+export const verifiedSenders = pgTable('verified_senders', {
+  email: text('email').primaryKey(),
+  verifiedAt: timestamp('verified_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 export const requests = pgTable('requests', {
   id: uuid('id').defaultRandom().primaryKey(),
   senderType: senderTypeEnum('sender_type').notNull(),

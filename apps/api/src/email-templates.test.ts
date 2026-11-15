@@ -54,3 +54,20 @@ test('receiver opt-in email keeps double-opt-in copy', () => {
   assert.match(email.html, /Accept intro/);
   assert.match(email.text, /shared intro/);
 });
+
+test('opt-in HTML escapes XSS payload in senderName (S6)', () => {
+  const xss = `<img src=x onerror=alert(1)>`;
+  const email = buildReceiverOptInEmail({
+    receiverName: 'Ada',
+    senderName: xss,
+    senderType: 'human',
+    message: 'Hello',
+    score: 70,
+    acceptUrl: 'https://api.example/accept',
+    declineUrl: 'https://api.example/decline',
+    env: { APP_URL: 'https://app.example' },
+  });
+  assert.doesNotMatch(email.html, /<img src=x onerror/);
+  assert.match(email.html, /&lt;img src=x onerror=alert\(1\)&gt;/);
+  assert.doesNotMatch(email.subject, /</);
+});
