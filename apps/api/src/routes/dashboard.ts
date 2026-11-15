@@ -151,7 +151,7 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
     // Owner approve keeps AI decision/score/reason intact; record owner_decision separately.
     await db
       .update(requests)
-      .set({ ownerDecision: 'accept', status: 'delivered' })
+      .set({ ownerDecision: 'accept', decidedAt: new Date(), status: 'delivered' })
       .where(eq(requests.id, id));
 
     const settlement = await settleAcceptedIntro({
@@ -174,7 +174,7 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
 
     await db
       .update(requests)
-      .set({ ownerDecision: 'accept', status: 'accepted', stakeCents: 0 })
+      .set({ ownerDecision: 'accept', decidedAt: new Date(), status: 'accepted', stakeCents: 0 })
       .where(eq(requests.id, id));
     return { ok: true, status: 'accepted' };
   });
@@ -204,7 +204,7 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
     }
     await db
       .update(requests)
-      .set({ ownerDecision: 'reject', status: 'declined', stakeCents: 0 })
+      .set({ ownerDecision: 'reject', decidedAt: new Date(), status: 'declined', stakeCents: 0 })
       .where(eq(requests.id, id));
 
     const send = createEmailSender();
@@ -255,6 +255,7 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
       .update(requests)
       .set({
         ownerDecision: decision,
+        decidedAt: new Date(),
         status: nextStatus,
         stakeCents: decision === 'accept' ? row.stakeCents : 0,
       })
@@ -296,6 +297,7 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
       .update(requests)
       .set({
         ownerDecision: 'spam',
+        decidedAt: new Date(),
         status: 'declined',
         stakeCents: 0,
       })

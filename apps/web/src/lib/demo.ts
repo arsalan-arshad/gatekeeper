@@ -82,7 +82,8 @@ export const DEMO_LEDGER_FALLBACK = {
     acceptedCount: 5,
     spamCount: 3,
     helpfulCount: 4,
-    acceptRate: 0.5,
+    // accepted / total_requests
+    acceptRate: Number((5 / 12).toFixed(4)),
     trustScore: 0.6667,
   },
   months: [
@@ -93,7 +94,7 @@ export const DEMO_LEDGER_FALLBACK = {
       acceptedCount: 2,
       spamCount: 1,
       helpfulCount: 2,
-      acceptRate: 0.6,
+      acceptRate: 0.4,
     },
     {
       month: (() => {
@@ -119,7 +120,7 @@ export const DEMO_LEDGER_FALLBACK = {
       acceptedCount: 1,
       spamCount: 1,
       helpfulCount: 1,
-      acceptRate: 0.3333,
+      acceptRate: Number((1 / 3).toFixed(4)),
     },
   ],
 };

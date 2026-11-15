@@ -1,13 +1,28 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { computeTrustScore, isDemoLedgerHandle, summarizeLedgerMonths } from './ledger.ts';
+import {
+  computeAcceptRate,
+  computeTrustScore,
+  isDemoLedgerHandle,
+  summarizeLedgerMonths,
+} from './ledger.ts';
 import { createHelpfulToken, verifyHelpfulToken } from './tokens.ts';
 
 test('computeTrustScore is helpful / delivered', () => {
   assert.equal(computeTrustScore(0, 0), null);
   assert.equal(computeTrustScore(3, 4), 0.75);
   assert.equal(computeTrustScore(0, 5), 0);
+});
+
+test('computeAcceptRate is accepted / total_requests (0 if total=0)', () => {
+  // Spec: total/delivered/accepted → rate
+  // 20 requests, 10 delivered, 8 accepted → 40%
+  assert.equal(computeAcceptRate(8, 20), 0.4);
+  // 4 requests, 2 delivered, 3 accepted → 75%
+  assert.equal(computeAcceptRate(3, 4), 0.75);
+  assert.equal(computeAcceptRate(0, 0), 0);
+  assert.equal(computeAcceptRate(5, 0), 0);
 });
 
 test('isDemoLedgerHandle matches seeded demo profiles', () => {
@@ -44,7 +59,8 @@ test('summarizeLedgerMonths aggregates months and trust', () => {
   assert.equal(summary.acceptedCount, 3);
   assert.equal(summary.spamCount, 4);
   assert.equal(summary.helpfulCount, 2);
-  assert.equal(summary.acceptRate, 0.4);
+  // accepted / total_requests = 3/15
+  assert.equal(summary.acceptRate, 0.2);
   assert.equal(summary.trustScore, Number((2 / 6).toFixed(4)));
 });
 

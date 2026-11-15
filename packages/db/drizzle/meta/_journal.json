@@ -57,6 +57,13 @@
       "when": 1794900000000,
       "tag": "0007_owner_decision",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795000000000,
+      "tag": "0008_accept_rate_decided_at",
+      "breakpoints": true
     }
   ]
 }

@@ -133,6 +133,8 @@ export const requests = pgTable('requests', {
    * Null until the owner acts. Does not replace `decision` / AI score / reason.
    */
   ownerDecision: decisionEnum('owner_decision'),
+  /** When the owner last set owner_decision (approve / decline / override / spam). */
+  decidedAt: timestamp('decided_at', { withTimezone: true }),
   status: requestStatusEnum('status').notNull().default('pending'),
   stakeCents: integer('stake_cents').notNull().default(0),
   /** Receiver 1-click helpful rating from the intro email; null = not rated. */
@@ -144,7 +146,7 @@ export const requests = pgTable('requests', {
  * Monthly public-ledger aggregates per target user.
  * - delivered = AI accepted (forwarded to receiver for opt-in)
  * - accepted = receiver opted in
- * - accept_rate = delivered / requests
+ * - accept_rate = accepted / requests (0 when no requests)
  * - trust uses helpful among delivered (computed in API all-time too)
  */
 export const ledgerStats = pgView('ledger_stats', {
@@ -168,7 +170,7 @@ export const ledgerStats = pgView('ledger_stats', {
       count(*) FILTER (WHERE helpful IS TRUE)::int AS helpful_count,
       CASE
         WHEN count(*) = 0 THEN 0::float8
-        ELSE (count(*) FILTER (WHERE decision = 'accept'))::float8 / count(*)::float8
+        ELSE (count(*) FILTER (WHERE status = 'accepted'))::float8 / count(*)::float8
       END AS accept_rate
     FROM requests
     GROUP BY target_user_id, date_trunc('month', created_at)
