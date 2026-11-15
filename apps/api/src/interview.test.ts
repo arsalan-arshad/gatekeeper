@@ -31,6 +31,7 @@ test('fallback synthesis builds editable plain-English rules', () => {
 test('synthesizeProfile uses LLM JSON when available', async () => {
   const llm = {
     providerName: 'mock',
+    chatModel: 'mock-model',
     async complete() {
       return JSON.stringify({
         name: 'Ada',
@@ -49,6 +50,9 @@ test('synthesizeProfile uses LLM JSON when available', async () => {
     getDailyUsage() {
       return 0;
     },
+    async healthCheck() {
+      return [];
+    },
   } satisfies Llm;
 
   const profile = await synthesizeProfile(sampleAnswers, llm);
@@ -59,6 +63,7 @@ test('synthesizeProfile uses LLM JSON when available', async () => {
 test('synthesizeProfile falls back when LLM fails', async () => {
   const llm = {
     providerName: 'mock',
+    chatModel: 'mock-model',
     async complete() {
       throw new Error('boom');
     },
@@ -68,6 +73,9 @@ test('synthesizeProfile falls back when LLM fails', async () => {
     clearEmbeddingCache() {},
     getDailyUsage() {
       return 0;
+    },
+    async healthCheck() {
+      return [];
     },
   } satisfies Llm;
 

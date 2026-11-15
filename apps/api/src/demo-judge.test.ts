@@ -32,6 +32,7 @@ function mockLlm(options: {
 
   return {
     providerName: 'mock',
+    chatModel: 'mock-model',
     provider,
     complete: (messages, completeOptions) => provider.complete(messages, completeOptions),
     embed: (text) => provider.embed(text),
@@ -169,7 +170,7 @@ test('POST /v1/demo/judge is IP rate limited (20/day), exposes remaining, cache 
       completion: JSON.stringify({
         score: 75,
         decision: 'accept',
-        reason_public: 'Peer founder billing intro looks relevant.',
+        reason_public: "I'll pass this to Sam — clear peer billing ask.",
         reason_private: 'secret rules',
         suggested_rewrite: null,
         deal_breaker_hit: false,
@@ -240,6 +241,146 @@ test('POST /v1/demo/judge is IP rate limited (20/day), exposes remaining, cache 
     });
     assert.equal(cachedAfter.statusCode, 200);
     assert.equal((cachedAfter.json() as { cached?: boolean }).cached, true);
+
+    await app.close();
+  } finally {
+    setDemoLlmForTests(undefined);
+    resetDemoRateLimiterForTests();
+  }
+});
+
+test('demo verdict cache key includes PROMPT_VERSION and ignores whitespace', async () => {
+  const { PROMPT_VERSION } = await import('./judge.js');
+  const { normalizeJudgeMessage, verdictCacheKey } = await import('./routes/demo.js');
+
+  assert.equal(normalizeJudgeMessage('  hi   there  '), 'hi there');
+  const a = verdictCacheKey({
+    promptVersion: PROMPT_VERSION,
+    model: 'mock-model',
+    ruleText: 'rules',
+    message: 'Quick sync?',
+  });
+  const b = verdictCacheKey({
+    promptVersion: PROMPT_VERSION,
+    model: 'mock-model',
+    ruleText: 'rules',
+    message: '  Quick   sync?  ',
+  });
+  const c = verdictCacheKey({
+    promptVersion: `${PROMPT_VERSION}-bumped`,
+    model: 'mock-model',
+    ruleText: 'rules',
+    message: 'Quick sync?',
+  });
+  assert.equal(a, b);
+  assert.notEqual(a, c);
+});
+
+test('POST /admin/cache/clear requires ADMIN_TOKEN and clears demo cache', async () => {
+  resetDemoRateLimiterForTests();
+  const previous = process.env.ADMIN_TOKEN;
+  process.env.ADMIN_TOKEN = 'test-admin-token';
+
+  setDemoLlmForTests(
+    mockLlm({
+      completion: JSON.stringify({
+        score: 88,
+        decision: 'accept',
+        reason_public: "I'll pass this to Sam — strong peer ask.",
+        reason_private: 'ok',
+        suggested_rewrite: null,
+        deal_breaker_hit: false,
+      }),
+    }),
+  );
+
+  try {
+    const app = await buildServer();
+    const first = await app.inject({
+      method: 'POST',
+      url: '/v1/demo/judge',
+      headers: { 'x-forwarded-for': '198.51.100.9' },
+      payload: { handle: 'demo', message: STRONG_MESSAGE },
+    });
+    assert.equal(first.statusCode, 200);
+
+    const cached = await app.inject({
+      method: 'POST',
+      url: '/v1/demo/judge',
+      headers: { 'x-forwarded-for': '198.51.100.9' },
+      payload: { handle: 'demo', message: STRONG_MESSAGE },
+    });
+    assert.equal((cached.json() as { cached?: boolean }).cached, true);
+
+    const denied = await app.inject({
+      method: 'POST',
+      url: '/admin/cache/clear?token=wrong',
+    });
+    assert.equal(denied.statusCode, 401);
+
+    const cleared = await app.inject({
+      method: 'POST',
+      url: '/admin/cache/clear?token=test-admin-token',
+    });
+    assert.equal(cleared.statusCode, 200);
+    assert.equal((cleared.json() as { ok?: boolean }).ok, true);
+    assert.ok(((cleared.json() as { cleared?: number }).cleared ?? 0) >= 1);
+
+    const after = await app.inject({
+      method: 'POST',
+      url: '/v1/demo/judge',
+      headers: { 'x-forwarded-for': '198.51.100.9' },
+      payload: { handle: 'demo', message: STRONG_MESSAGE },
+    });
+    assert.equal((after.json() as { cached?: boolean }).cached, false);
+
+    await app.close();
+  } finally {
+    setDemoLlmForTests(undefined);
+    resetDemoRateLimiterForTests();
+    if (previous === undefined) delete process.env.ADMIN_TOKEN;
+    else process.env.ADMIN_TOKEN = previous;
+  }
+});
+
+test('demo judge does not cache coerce/fallback outputs', async () => {
+  resetDemoRateLimiterForTests();
+  // Invalid spam+rewrite → retry same → coerce → schema_valid false → not cached
+  setDemoLlmForTests(
+    mockLlm({
+      completion: JSON.stringify({
+        score: 9,
+        decision: 'spam',
+        reason_public: 'Blocked.',
+        reason_private: 'x',
+        suggested_rewrite: 'Rewrite with <YourCompany>',
+        deal_breaker_hit: true,
+      }),
+    }),
+  );
+
+  try {
+    const app = await buildServer();
+    const msg = 'Hot crypto NFT guaranteed leads blast!!!';
+    const first = await app.inject({
+      method: 'POST',
+      url: '/v1/demo/judge',
+      headers: { 'x-forwarded-for': '198.51.100.11' },
+      payload: { handle: 'demo', message: msg },
+    });
+    assert.equal(first.statusCode, 200);
+    assert.equal((first.json() as { decision?: string }).decision, 'spam');
+    assert.equal((first.json() as { cached?: boolean }).cached, false);
+
+    const second = await app.inject({
+      method: 'POST',
+      url: '/v1/demo/judge',
+      headers: { 'x-forwarded-for': '198.51.100.11' },
+      payload: { handle: 'demo', message: msg },
+    });
+    assert.equal(second.statusCode, 200);
+    // Not served from cache — rate limit consumed again path still returns body
+    assert.equal((second.json() as { cached?: boolean }).cached, false);
 
     await app.close();
   } finally {

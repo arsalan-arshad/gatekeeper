@@ -11,6 +11,8 @@ export type ChatMessage = {
 export type CompleteOptions = {
   /** Ask the model to return JSON (provider-specific hints applied). */
   json?: boolean;
+  /** Sampling temperature (0 = deterministic). Provider default when omitted. */
+  temperature?: number;
   /** When set, this call counts toward the user's daily LLM budget. */
   userId?: string;
 };
@@ -23,11 +25,16 @@ export type EmbedOptions = {
 export type LlmProviderName = 'gemini' | 'groq';
 
 /** Minimal swappable backend — inject a mock in unit tests. */
+export type LlmProviderCompleteOptions = {
+  json?: boolean;
+  temperature?: number;
+};
+
 export type LlmProvider = {
   readonly name: LlmProviderName | string;
   /** Chat model id when known (omitted on test mocks). */
   readonly model?: string;
-  complete(messages: ChatMessage[], options?: { json?: boolean }): Promise<string>;
+  complete(messages: ChatMessage[], options?: LlmProviderCompleteOptions): Promise<string>;
   embed(text: string): Promise<number[]>;
 };
 
@@ -103,6 +110,8 @@ export type Llm = {
   getDailyUsage(userId: string): number;
   /** Active chat provider name (first available / last successful). */
   readonly providerName: string;
+  /** Active chat model id when known (for cache keys / diagnostics). */
+  readonly chatModel: string;
   /** Probe configured providers (no secrets returned). */
   healthCheck(): Promise<ProviderHealth[]>;
 };
@@ -279,9 +288,16 @@ function createGeminiProvider(
     model: chatModel,
     async complete(messages, options) {
       const { systemInstruction, contents } = toGeminiContents(messages);
+      const generationConfig: Record<string, unknown> = {};
+      if (options?.json) {
+        generationConfig.responseMimeType = 'application/json';
+      }
+      if (options?.temperature !== undefined) {
+        generationConfig.temperature = options.temperature;
+      }
       const body: Record<string, unknown> = {
         contents,
-        generationConfig: options?.json ? { responseMimeType: 'application/json' } : undefined,
+        generationConfig: Object.keys(generationConfig).length > 0 ? generationConfig : undefined,
       };
       if (systemInstruction) {
         body.systemInstruction = systemInstruction;
@@ -401,7 +417,7 @@ function createGroqProvider(options: {
           body: JSON.stringify({
             model,
             messages: openAiMessages,
-            temperature: 0.2,
+            temperature: completeOptions?.temperature ?? 0.2,
             ...(completeOptions?.json ? { response_format: { type: 'json_object' } } : {}),
           }),
         },
@@ -671,7 +687,11 @@ export function createLlm(options: CreateLlmOptions = {}): Llm {
 
       try {
         const text = await withRetries(
-          () => provider.complete(messages, { json: completeOptions.json }),
+          () =>
+            provider.complete(messages, {
+              json: completeOptions.json,
+              temperature: completeOptions.temperature,
+            }),
           maxRetries,
         );
 
@@ -707,6 +727,11 @@ export function createLlm(options: CreateLlmOptions = {}): Llm {
   return {
     get providerName() {
       return activeName;
+    },
+
+    get chatModel() {
+      const active = providers.find((provider) => provider.name === activeName) ?? providers[0];
+      return active?.model?.trim() || activeName;
     },
 
     async complete(messages, completeOptions = {}) {

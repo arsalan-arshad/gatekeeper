@@ -7,13 +7,14 @@ import { defaultCoachingTip } from './judge.ts';
 import type { Llm, LlmProvider } from './llm.ts';
 
 test('judge eval suite covers verdicts plus rewrite/reason polish cases', () => {
-  assert.ok(JUDGE_EVAL_CASES.length >= 15);
+  assert.ok(JUDGE_EVAL_CASES.length >= 18);
   assert.ok(JUDGE_EVAL_CASES.filter((c) => c.expected === 'accept').length >= 3);
   assert.ok(JUDGE_EVAL_CASES.filter((c) => c.expected === 'reject').length >= 3);
   assert.ok(JUDGE_EVAL_CASES.filter((c) => c.expected === 'spam').length >= 3);
   assert.ok(JUDGE_EVAL_CASES.some((c) => c.checks?.rewriteIsCoachingTip));
   assert.ok(JUDGE_EVAL_CASES.some((c) => c.checks?.reasonPersonalVoice));
   assert.ok(JUDGE_EVAL_CASES.some((c) => c.checks?.rewriteNoPlaceholders));
+  assert.ok(JUDGE_EVAL_CASES.some((c) => c.id.startsWith('reject-borderline-')));
 });
 
 test('runJudgeEval scores mock LLM labels, bands, and polish checks', async () => {
@@ -31,6 +32,7 @@ test('runJudgeEval scores mock LLM labels, bands, and polish checks', async () =
 
   const llm: Llm = {
     providerName: 'mock',
+    chatModel: 'mock-model',
     provider,
     async complete(messages) {
       const blob = messages.map((m) => m.content).join('\n');

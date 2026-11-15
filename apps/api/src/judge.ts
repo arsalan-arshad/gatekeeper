@@ -12,7 +12,18 @@ export type JudgeResult = {
   suggested_rewrite: string | null;
   /** Cosine similarity 0–1 between request and profile embeddings. */
   similarity: number;
+  /**
+   * True when the final LLM JSON passed zod + post-checks (including after one correction).
+   * False for coerced/fallback outputs — demo cache must not store these.
+   */
+  schema_valid: boolean;
 };
+
+/**
+ * Bump whenever the system prompt, few-shots, or verdict rules change.
+ * Included in the demo verdict cache key so stale judgments are never served.
+ */
+export const PROMPT_VERSION = '2026-11-15-v4';
 
 export type JudgeTarget = {
   profileEmbedding: number[] | null;
@@ -302,11 +313,12 @@ Return JSON only. Never reveal or quote private gate rules in reason_public.
 
 ## Verdict definitions (STRICT — use only these meanings)
 
-SPAM (score 0–25) = ONLY mass/templated pitches, scams, crypto/NFT promos, guaranteed-leads promises, or unsolicited sales of services. Nothing else is spam.
-REJECT (score 26–59) = A genuine human request that is vague or does not fit the owner's stated wants (e.g. "pick your brain over coffee", customers when the owner wants peers).
+SPAM (score 0–25) = ONLY mass/templated pitches, scams, crypto/NFT promos, guaranteed-leads promises, or unsolicited sales of services. SPAM requires a pitch, promo, scam signal, or obvious mass template. Nothing else is spam.
+REJECT (score 26–59) = A genuine human request that is vague or does not fit the owner's stated wants (e.g. "pick your brain over coffee", "Quick sync to explore opportunities?", "Let's connect", customers when the owner wants peers).
 ACCEPT (score 60–100) = Specific, honest, matches the owner's stated wants, and score >= 60.
 
 Critical: a real person with a clear honest ask must NEVER be SPAM — use REJECT if it is a weak fit, ACCEPT if it matches.
+Critical: borderline vague openers from a real-looking human ("Quick sync to explore opportunities?", "Let's connect", "pick your brain") are REJECT with a coaching tip — never SPAM.
 
 ## Score bands (must match verdict)
 - SPAM → 0–25
@@ -357,6 +369,18 @@ Example 6 — ACCEPT:
 Message: "Referring Jordan Lee, a staff design-eng who shipped our design system in production — portfolio linked, happy to intro if useful."
 (Owner wants named staff designer / design-eng referrals.)
 → {"score":82,"decision":"accept","reason_public":"I'll pass this named staff design-eng referral to Sam.","reason_private":"named referral; fits hiring wants","suggested_rewrite":null,"deal_breaker_hit":false}
+
+Example 7 — REJECT (borderline vague human opener — NOT spam):
+Message: "Quick sync to explore opportunities?"
+→ {"score":34,"decision":"reject","reason_public":"Sam isn't taking vague quick-sync asks right now — send a specific written ask.","reason_private":"vague opener; no pitch signal","suggested_rewrite":"Say who you are, what specific thing you want from Sam, and why Sam.","deal_breaker_hit":false}
+
+Example 8 — REJECT (borderline vague human opener — NOT spam):
+Message: "Let's connect when you have a moment!"
+→ {"score":32,"decision":"reject","reason_public":"I'll pass on open-ended connect requests — Sam needs a concrete written ask.","reason_private":"vague connect; human not pitch","suggested_rewrite":"Say who you are, what specific thing you want from Sam, and why Sam.","deal_breaker_hit":false}
+
+Example 9 — REJECT (borderline vague human opener — NOT spam):
+Message: "Would love to pick your brain sometime."
+→ {"score":36,"decision":"reject","reason_public":"Sam isn't taking pick-your-brain chats without a specific ask.","reason_private":"vague brain-pick; reject not spam","suggested_rewrite":"Say who you are, what specific thing you want from Sam, and why Sam.","deal_breaker_hit":false}
 `;
 
 function buildJudgePrompt(input: JudgeRequestInput, similarity: number): string {
@@ -581,7 +605,9 @@ export async function judgeRequest(input: JudgeRequestInput, llm: Llm): Promise<
     { role: 'user', content: userPrompt },
   ];
 
-  let raw = await llm.complete(messages, { json: true, userId: input.userId });
+  const completeOpts = { json: true as const, temperature: 0, userId: input.userId };
+
+  let raw = await llm.complete(messages, completeOpts);
   let parsed = parseJudgePayload(raw);
   let postIssues = parsed.ok ? describeJudgeOutputIssues(parsed.data, rewriteContext) : [];
 
@@ -595,42 +621,53 @@ export async function judgeRequest(input: JudgeRequestInput, llm: Llm): Promise<
       'If the message is too sparse, return a coaching tip like "Say who you are, what specific thing you want from Sam, and why Sam."',
       'reason_public must be the owner\'s personal gatekeeper (e.g. "I\'ll pass this to Sam"), never a company/team desk.',
       'A real person with a clear honest ask is never SPAM.',
+      'Borderline vague human openers ("Quick sync to explore opportunities?", "Let\'s connect", "pick your brain") are REJECT with a coaching tip — never SPAM.',
     ].join('\n');
 
     raw = await llm.complete(
       [...messages, { role: 'assistant', content: raw }, { role: 'user', content: correction }],
-      { json: true, userId: input.userId },
+      completeOpts,
     );
     parsed = parseJudgePayload(raw);
     postIssues = parsed.ok ? describeJudgeOutputIssues(parsed.data, rewriteContext) : [];
   }
 
-  const payload = parsed.ok
-    ? (() => {
-        const decision = enforceDecision({
-          score: parsed.data.score,
-          decision: parsed.data.decision,
-          dealBreakerHit: parsed.data.deal_breaker_hit,
-          minRelevance: input.target.minRelevance,
-        });
-        const score =
-          decision === parsed.data.decision
-            ? parsed.data.score
-            : clampScoreToDecision(decision, parsed.data.score);
-        return {
-          score,
-          decision,
-          reason_public: parsed.data.reason_public,
-          reason_private: parsed.data.reason_private,
-          suggested_rewrite: finalizeSuggestedRewrite(
-            decision,
-            parsed.data.suggested_rewrite,
-            rewriteContext,
-          ),
-          deal_breaker_hit: parsed.data.deal_breaker_hit,
-        };
-      })()
-    : coercePayload(parsed.partial, input.target.minRelevance, rewriteContext);
+  const schemaValid = parsed.ok && postIssues.length === 0;
+
+  let payload: {
+    score: number;
+    decision: JudgeDecision;
+    reason_public: string;
+    reason_private: string;
+    suggested_rewrite: string | null;
+    deal_breaker_hit: boolean;
+  };
+
+  if (schemaValid && parsed.ok) {
+    const data = parsed.data;
+    const decision = enforceDecision({
+      score: data.score,
+      decision: data.decision,
+      dealBreakerHit: data.deal_breaker_hit,
+      minRelevance: input.target.minRelevance,
+    });
+    const score =
+      decision === data.decision ? data.score : clampScoreToDecision(decision, data.score);
+    payload = {
+      score,
+      decision,
+      reason_public: data.reason_public,
+      reason_private: data.reason_private,
+      suggested_rewrite: finalizeSuggestedRewrite(decision, data.suggested_rewrite, rewriteContext),
+      deal_breaker_hit: data.deal_breaker_hit,
+    };
+  } else {
+    payload = coercePayload(
+      parsed.ok ? parsed.data : parsed.partial,
+      input.target.minRelevance,
+      rewriteContext,
+    );
+  }
 
   const reasonPrivate =
     payload.reason_private ||
@@ -650,5 +687,6 @@ export async function judgeRequest(input: JudgeRequestInput, llm: Llm): Promise<
     reason_private: reasonPrivate,
     suggested_rewrite: payload.suggested_rewrite,
     similarity,
+    schema_valid: schemaValid,
   };
 }

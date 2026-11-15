@@ -87,6 +87,15 @@ Admin probe (requires `ADMIN_TOKEN`):
 curl "http://localhost:4000/health/llm?token=$ADMIN_TOKEN"
 ```
 
+Clear the in-memory demo verdict cache after a prompt/rules deploy (same token; never commit or print it):
+
+```bash
+# After Railway api redeploys a judge prompt change:
+curl -X POST "https://api-production-5b5be52e.up.railway.app/admin/cache/clear?token=$ADMIN_TOKEN"
+```
+
+`PROMPT_VERSION` in `apps/api/src/judge.ts` is part of the cache key — bump it whenever the system prompt, few-shots, or verdict rules change so stale verdicts are never served even before a manual clear.
+
 ```bash
 pnpm --filter @gatekeeper/api test
 ```

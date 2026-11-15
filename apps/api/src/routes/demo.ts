@@ -5,17 +5,19 @@ import { z } from 'zod';
 
 import { logAbuse } from '../abuse-log.js';
 import { DEMO_BUSY_ERROR, demoJudgeRequest, isBusyFailure } from '../demo-judge.js';
-import { listDemoProfilesPublic } from '../demo-profiles.js';
+import { getDemoProfile, listDemoProfilesPublic } from '../demo-profiles.js';
+import { PROMPT_VERSION } from '../judge.js';
 import { createLlm, type Llm } from '../llm.js';
 import { FixedWindowRateLimiter } from '../rate-limit.js';
 import { MESSAGE_MAX_CHARS } from '../request-limits.js';
 
 /** Custom (uncached) demo requests: 20 / IP / UTC day. Cached chip responses do not count. */
 export const DEMO_IP_DAILY_LIMIT = 20;
-const DAY_MS = 24 * 60 * 60 * 1000;
-const VERDICT_CACHE_TTL_MS = DAY_MS;
 
-const demoIpLimiter = new FixedWindowRateLimiter(DEMO_IP_DAILY_LIMIT, DAY_MS);
+/** Demo verdict cache TTL — 24h. */
+export const CACHE_TTL = 24 * 60 * 60 * 1000;
+
+const demoIpLimiter = new FixedWindowRateLimiter(DEMO_IP_DAILY_LIMIT, CACHE_TTL);
 
 type DemoJudgeBody = {
   handle: string;
@@ -60,7 +62,18 @@ function clientIp(request: { ip: string; headers: Record<string, unknown> }): st
 
 export function resetDemoRateLimiterForTests(): void {
   demoIpLimiter.clear();
+  clearDemoVerdictCache();
+}
+
+/** Clear in-memory demo verdict cache (admin / tests / post-deploy). */
+export function clearDemoVerdictCache(): number {
+  const size = verdictCache.size;
   verdictCache.clear();
+  return size;
+}
+
+export function demoVerdictCacheSize(): number {
+  return verdictCache.size;
 }
 
 function resolveDemoLlm(): Llm {
@@ -68,8 +81,25 @@ function resolveDemoLlm(): Llm {
   return createLlm({ maxRetries: 0 });
 }
 
-function verdictCacheKey(handle: string, message: string): string {
-  return createHash('sha256').update(`${handle}\n${message}`).digest('hex');
+/** Collapse whitespace for stable cache keys. */
+export function normalizeJudgeMessage(message: string): string {
+  return message.trim().replace(/\s+/g, ' ');
+}
+
+/**
+ * Cache key = hash(PROMPT_VERSION + model + profile rules + normalized message).
+ * Bumping PROMPT_VERSION invalidates all prior demo verdicts.
+ */
+export function verdictCacheKey(input: {
+  promptVersion: string;
+  model: string;
+  ruleText: string;
+  message: string;
+}): string {
+  const normalized = normalizeJudgeMessage(input.message);
+  return createHash('sha256')
+    .update([input.promptVersion, input.model, input.ruleText, normalized].join('\0'), 'utf8')
+    .digest('hex');
 }
 
 function getCachedVerdict(key: string): CachedVerdict['body'] | null {
@@ -84,6 +114,24 @@ function getCachedVerdict(key: string): CachedVerdict['body'] | null {
 
 function demoLimitKey(ip: string): string {
   return `demo:${ip || 'unknown'}`;
+}
+
+function requireAdminToken(
+  request: { query: unknown },
+  reply: { status: (code: number) => { send: (body: unknown) => unknown } },
+): boolean {
+  const adminToken = process.env.ADMIN_TOKEN?.trim();
+  if (!adminToken) {
+    reply.status(503).send({ error: 'ADMIN_TOKEN not configured' });
+    return false;
+  }
+  const query = request.query as { token?: string };
+  const provided = typeof query.token === 'string' ? query.token : '';
+  if (provided !== adminToken) {
+    reply.status(401).send({ error: 'Unauthorized' });
+    return false;
+  }
+  return true;
 }
 
 export async function registerDemoRoutes(app: FastifyInstance): Promise<void> {
@@ -101,6 +149,12 @@ export async function registerDemoRoutes(app: FastifyInstance): Promise<void> {
     };
   });
 
+  app.post('/admin/cache/clear', async (request, reply) => {
+    if (!requireAdminToken(request, reply)) return;
+    const cleared = clearDemoVerdictCache();
+    return { ok: true, cleared };
+  });
+
   app.post('/v1/demo/judge', async (request, reply) => {
     const ip = clientIp(request);
     const limitKey = demoLimitKey(ip);
@@ -112,7 +166,25 @@ export async function registerDemoRoutes(app: FastifyInstance): Promise<void> {
         .send({ error: 'Invalid demo request', details: parsed.error.flatten() });
     }
 
-    const cacheKey = verdictCacheKey(parsed.data.handle, parsed.data.message.trim());
+    const profile = getDemoProfile(parsed.data.handle);
+    if (!profile) {
+      return reply.status(400).send({ error: 'Unknown demo profile' });
+    }
+
+    let llm: Llm;
+    try {
+      llm = resolveDemoLlm();
+    } catch (error) {
+      request.log.error({ err: error }, 'demo judge LLM init failed');
+      return reply.status(503).send({ error: DEMO_BUSY_ERROR });
+    }
+
+    const cacheKey = verdictCacheKey({
+      promptVersion: PROMPT_VERSION,
+      model: llm.chatModel,
+      ruleText: profile.ruleText,
+      message: parsed.data.message,
+    });
     const cached = getCachedVerdict(cacheKey);
     if (cached) {
       // Example chips / repeat messages served from cache do not consume quota.
@@ -142,14 +214,6 @@ export async function registerDemoRoutes(app: FastifyInstance): Promise<void> {
       });
     }
 
-    let llm: Llm;
-    try {
-      llm = resolveDemoLlm();
-    } catch (error) {
-      request.log.error({ err: error }, 'demo judge LLM init failed');
-      return reply.status(503).send({ error: DEMO_BUSY_ERROR, remaining: limit.remaining });
-    }
-
     const result = await demoJudgeRequest(parsed.data, llm, request.log);
     if ('error' in result) {
       if (isBusyFailure(result)) {
@@ -159,7 +223,7 @@ export async function registerDemoRoutes(app: FastifyInstance): Promise<void> {
     }
 
     // Never leak reason_private on the public demo endpoint.
-    const cachedBody = {
+    const body = {
       handle: result.handle,
       score: result.score,
       decision: result.decision,
@@ -168,10 +232,13 @@ export async function registerDemoRoutes(app: FastifyInstance): Promise<void> {
       similarity: result.similarity,
     };
 
-    verdictCache.set(cacheKey, { expiresAt: Date.now() + VERDICT_CACHE_TTL_MS, body: cachedBody });
+    // Only cache successful schema-valid verdicts — never errors or coerce/fallback outputs.
+    if (result.schema_valid) {
+      verdictCache.set(cacheKey, { expiresAt: Date.now() + CACHE_TTL, body });
+    }
 
     return {
-      ...cachedBody,
+      ...body,
       remaining: limit.remaining,
       limit: DEMO_IP_DAILY_LIMIT,
       cached: false,

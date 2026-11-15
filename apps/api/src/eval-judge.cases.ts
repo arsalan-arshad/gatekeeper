@@ -141,6 +141,7 @@ export const JUDGE_EVAL_CASES: JudgeEvalCase[] = [
     checks: {
       rewriteIsCoachingTip: true,
       rewriteNoPlaceholders: true,
+      reasonPersonalVoice: true,
     },
   },
   {
@@ -153,6 +154,39 @@ export const JUDGE_EVAL_CASES: JudgeEvalCase[] = [
       reasonPersonalVoice: true,
       rewriteNoPlaceholders: true,
       rewriteIsCoachingTip: true,
+    },
+  },
+  {
+    id: 'reject-borderline-explore-opportunities',
+    senderName: 'Jordan Lee',
+    expected: 'reject',
+    message: 'Quick sync to explore opportunities?',
+    checks: {
+      rewriteIsCoachingTip: true,
+      rewriteNoPlaceholders: true,
+      reasonPersonalVoice: true,
+    },
+  },
+  {
+    id: 'reject-borderline-lets-connect',
+    senderName: 'Morgan Park',
+    expected: 'reject',
+    message: "Let's connect when you have a moment!",
+    checks: {
+      rewriteIsCoachingTip: true,
+      rewriteNoPlaceholders: true,
+      reasonPersonalVoice: true,
+    },
+  },
+  {
+    id: 'reject-borderline-pick-your-brain',
+    senderName: 'Taylor Brooks',
+    expected: 'reject',
+    message: 'Would love to pick your brain sometime.',
+    checks: {
+      rewriteIsCoachingTip: true,
+      rewriteNoPlaceholders: true,
+      reasonPersonalVoice: true,
     },
   },
 ];
