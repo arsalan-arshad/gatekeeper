@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
@@ -8,8 +10,26 @@ import { createLlm, type Llm } from '../llm.js';
 import { FixedWindowRateLimiter } from '../rate-limit.js';
 import { MESSAGE_MAX_CHARS } from '../request-limits.js';
 
-/** Tighter than general IP limit — landing demo is anonymous and free. */
-const demoIpLimiter = new FixedWindowRateLimiter(12, 60_000);
+/** Landing demo: 5 requests / IP / UTC day. */
+const DEMO_IP_DAILY_LIMIT = 5;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const VERDICT_CACHE_TTL_MS = DAY_MS;
+
+const demoIpLimiter = new FixedWindowRateLimiter(DEMO_IP_DAILY_LIMIT, DAY_MS);
+
+type CachedVerdict = {
+  expiresAt: number;
+  body: {
+    handle: string;
+    score: number;
+    decision: string;
+    reason_public: string;
+    suggested_rewrite: string | null;
+    similarity: number;
+  };
+};
+
+const verdictCache = new Map<string, CachedVerdict>();
 
 const demoJudgeSchema = z.object({
   handle: z.string().min(1).max(64),
@@ -35,11 +55,26 @@ function clientIp(request: { ip: string; headers: Record<string, unknown> }): st
 
 export function resetDemoRateLimiterForTests(): void {
   demoIpLimiter.clear();
+  verdictCache.clear();
 }
 
 function resolveDemoLlm(): Llm {
   if (demoLlmOverride) return demoLlmOverride;
-  return createLlm({ maxRetries: 1 });
+  return createLlm({ maxRetries: 0 });
+}
+
+function verdictCacheKey(handle: string, message: string): string {
+  return createHash('sha256').update(`${handle}\n${message}`).digest('hex');
+}
+
+function getCachedVerdict(key: string): CachedVerdict['body'] | null {
+  const hit = verdictCache.get(key);
+  if (!hit) return null;
+  if (Date.now() >= hit.expiresAt) {
+    verdictCache.delete(key);
+    return null;
+  }
+  return hit.body;
 }
 
 export async function registerDemoRoutes(app: FastifyInstance): Promise<void> {
@@ -49,6 +84,20 @@ export async function registerDemoRoutes(app: FastifyInstance): Promise<void> {
 
   app.post('/v1/demo/judge', async (request, reply) => {
     const ip = clientIp(request);
+
+    const parsed = demoJudgeSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply
+        .status(400)
+        .send({ error: 'Invalid demo request', details: parsed.error.flatten() });
+    }
+
+    const cacheKey = verdictCacheKey(parsed.data.handle, parsed.data.message.trim());
+    const cached = getCachedVerdict(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const limit = demoIpLimiter.check(`demo:${ip || 'unknown'}`);
     if (!limit.ok) {
       await logAbuse({
@@ -59,16 +108,9 @@ export async function registerDemoRoutes(app: FastifyInstance): Promise<void> {
       });
       reply.header('retry-after', Math.ceil(limit.resetMs / 1000));
       return reply.status(429).send({
-        error: 'Demo rate limit exceeded — try again shortly',
+        error: 'Demo rate limit exceeded — try again tomorrow',
         retry_after_ms: limit.resetMs,
       });
-    }
-
-    const parsed = demoJudgeSchema.safeParse(request.body);
-    if (!parsed.success) {
-      return reply
-        .status(400)
-        .send({ error: 'Invalid demo request', details: parsed.error.flatten() });
     }
 
     let llm: Llm;
@@ -88,7 +130,7 @@ export async function registerDemoRoutes(app: FastifyInstance): Promise<void> {
     }
 
     // Never leak reason_private on the public demo endpoint.
-    return {
+    const body = {
       handle: result.handle,
       score: result.score,
       decision: result.decision,
@@ -96,5 +138,8 @@ export async function registerDemoRoutes(app: FastifyInstance): Promise<void> {
       suggested_rewrite: result.suggested_rewrite,
       similarity: result.similarity,
     };
+
+    verdictCache.set(cacheKey, { expiresAt: Date.now() + VERDICT_CACHE_TTL_MS, body });
+    return body;
   });
 }

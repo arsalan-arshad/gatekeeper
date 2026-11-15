@@ -39,7 +39,7 @@ Worldwide, starting with indie SaaS founders and remote tech hiring.
 | API | Node.js + TypeScript + Fastify |
 | Web | Next.js + Tailwind |
 | DB | Postgres + pgvector (Railway Hobby), Drizzle ORM |
-| LLM | Gemini Flash (default) + Gemini embeddings; Groq fallback; swappable `llm.ts` |
+| LLM | Gemini Flash → Groq failover + Gemini embeddings; swappable `llm.ts` |
 | Email | Resend |
 | Auth | Auth.js magic links (later) |
 | Payments | Lemon Squeezy / Paddle (later; Stripe not available in Pakistan) |
@@ -77,7 +77,15 @@ API health check: `GET http://localhost:4000/health`
 
 ### LLM layer (`apps/api`)
 
-Swappable providers via `LLM_PROVIDER` (`gemini` default, `groq`, `xai`). Embeddings always use Gemini (`gemini-embedding-001` at 768 dims) — set `GEMINI_API_KEY` even when chatting through Groq/xAI.
+Chat tries **Gemini first**, then **Groq**, for whichever of `GEMINI_API_KEY` / `GROQ_API_KEY` are set. Failover on 429 / `RESOURCE_EXHAUSTED` / 5xx / 8s timeout / invalid JSON; 429 starts a 10-minute in-memory cooldown. Embeddings always use Gemini (`gemini-embedding-001` at 768 dims); if embed fails, judging skips similarity and continues LLM-only (no 503). Both chat providers failing → `503` “AI busy”.
+
+Defaults: `GEMINI_MODEL=gemini-3.8-flash` (free-tier Flash), `GROQ_MODEL=llama-3.3-70b-versatile` with `response_format: json_object` for judge calls.
+
+Admin probe (requires `ADMIN_TOKEN`):
+
+```bash
+curl "http://localhost:4000/health/llm?token=$ADMIN_TOKEN"
+```
 
 ```bash
 pnpm --filter @gatekeeper/api test

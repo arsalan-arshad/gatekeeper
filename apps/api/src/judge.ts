@@ -176,11 +176,16 @@ export function enforceDecision(options: {
 export async function judgeRequest(input: JudgeRequestInput, llm: Llm): Promise<JudgeResult> {
   const embedText = [`Sender: ${input.senderName} (${input.senderType})`, input.message].join('\n');
 
-  const requestEmbedding = await llm.embed(embedText, { userId: input.userId });
-
-  const similarity = input.target.profileEmbedding
-    ? cosineSimilarity(requestEmbedding, input.target.profileEmbedding)
-    : 0.5;
+  // Embeddings are best-effort: on failure, skip similarity and judge LLM-only (no 503).
+  let similarity = 0.5;
+  try {
+    const requestEmbedding = await llm.embed(embedText, { userId: input.userId });
+    if (input.target.profileEmbedding) {
+      similarity = cosineSimilarity(requestEmbedding, input.target.profileEmbedding);
+    }
+  } catch {
+    similarity = 0.5;
+  }
 
   const raw = await llm.complete(
     [

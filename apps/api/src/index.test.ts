@@ -21,6 +21,32 @@ test('GET /health returns ok', async () => {
   await app.close();
 });
 
+test('GET /health/llm requires ADMIN_TOKEN', async () => {
+  const previous = process.env.ADMIN_TOKEN;
+  delete process.env.ADMIN_TOKEN;
+
+  const app = await buildServer();
+  app.log.level = 'silent';
+
+  const missing = await app.inject({ method: 'GET', url: '/health/llm' });
+  assert.equal(missing.statusCode, 503);
+
+  process.env.ADMIN_TOKEN = 'test-admin-token';
+  const unauthorized = await app.inject({
+    method: 'GET',
+    url: '/health/llm?token=wrong',
+  });
+  assert.equal(unauthorized.statusCode, 401);
+
+  if (previous === undefined) {
+    delete process.env.ADMIN_TOKEN;
+  } else {
+    process.env.ADMIN_TOKEN = previous;
+  }
+
+  await app.close();
+});
+
 test('GET /v1/onboarding/questions returns five prompts', async () => {
   const app = await buildServer();
   app.log.level = 'silent';

@@ -5,6 +5,7 @@ import Fastify from 'fastify';
 
 import { logAbuse } from './abuse-log.js';
 import { buildLlmsTxt } from './llms-txt.js';
+import { createLlm } from './llm.js';
 import { buildOpenApiDocument } from './openapi.js';
 import { FASTIFY_BODY_LIMIT } from './request-limits.js';
 import { registerAgentRoutes } from './routes/agent.js';
@@ -85,6 +86,34 @@ export async function buildServer() {
     ok: true,
     service: 'gatekeeper-api',
   }));
+
+  app.get('/health/llm', async (request, reply) => {
+    const adminToken = process.env.ADMIN_TOKEN?.trim();
+    if (!adminToken) {
+      return reply.status(503).send({
+        error: 'ADMIN_TOKEN not configured',
+        providers: [],
+      });
+    }
+
+    const query = request.query as { token?: string };
+    const provided = typeof query.token === 'string' ? query.token : '';
+    if (provided !== adminToken) {
+      return reply.status(401).send({ error: 'Unauthorized' });
+    }
+
+    try {
+      const llm = createLlm({ maxRetries: 0, timeoutMs: 8_000 });
+      const providers = await llm.healthCheck();
+      return { providers };
+    } catch (error) {
+      request.log.error({ err: error }, 'health/llm probe failed');
+      return reply.status(503).send({
+        error: error instanceof Error ? error.message : 'LLM health check failed',
+        providers: [],
+      });
+    }
+  });
 
   const apiBase = (process.env.API_URL ?? `http://localhost:${port}`).replace(/\/$/, '');
   const appBase = (process.env.APP_URL ?? 'http://localhost:3000').replace(/\/$/, '');

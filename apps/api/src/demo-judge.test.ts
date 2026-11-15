@@ -37,6 +37,9 @@ function mockLlm(options: {
     getDailyUsage() {
       return 0;
     },
+    async healthCheck() {
+      return [{ provider: 'gemini', ok: !options.fail, model: 'mock', error: null }];
+    },
   };
 }
 
@@ -133,7 +136,7 @@ test('demoJudgeRequest returns busy error on LLM failure — no fake verdict', a
   assert.equal('score' in result, false);
 });
 
-test('POST /v1/demo/judge is IP rate limited and omits private reasons', async () => {
+test('POST /v1/demo/judge is IP rate limited (5/day) and omits private reasons', async () => {
   resetDemoRateLimiterForTests();
   setDemoLlmForTests(
     mockLlm({
@@ -166,13 +169,24 @@ test('POST /v1/demo/judge is IP rate limited and omits private reasons', async (
     assert.ok(['accept', 'reject', 'spam'].includes(String(body.decision)));
     assert.equal(body.reason_private, undefined);
 
-    for (let i = 0; i < 12; i += 1) {
-      await app.inject({
+    // Cached replay does not consume more of the daily budget.
+    const cached = await app.inject({
+      method: 'POST',
+      url: '/v1/demo/judge',
+      headers: { 'x-forwarded-for': '203.0.113.50' },
+      payload: { handle: 'demo', message: STRONG_MESSAGE },
+    });
+    assert.equal(cached.statusCode, 200);
+
+    // 4 more unique messages → daily cap of 5.
+    for (let i = 0; i < 4; i += 1) {
+      const res = await app.inject({
         method: 'POST',
         url: '/v1/demo/judge',
         headers: { 'x-forwarded-for': '203.0.113.50' },
         payload: { handle: 'demo', message: `probe ${i} founder saas billing typescript peer` },
       });
+      assert.equal(res.statusCode, 200);
     }
 
     const limited = await app.inject({
