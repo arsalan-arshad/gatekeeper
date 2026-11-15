@@ -41,6 +41,12 @@ export async function synthesizeRules(answers: {
   dealbreakers: string;
   format: string;
 }) {
+  const session = await auth();
+  const email = session?.user?.email;
+  if (!email) {
+    throw new Error('You must be signed in');
+  }
+
   return apiFetch<{
     profile: {
       name: string;
@@ -53,6 +59,7 @@ export async function synthesizeRules(answers: {
     };
   }>('/v1/onboarding/synthesize', {
     method: 'POST',
+    email,
     body: JSON.stringify(answers),
   });
 }

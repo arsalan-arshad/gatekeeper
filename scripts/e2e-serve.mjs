@@ -9,6 +9,7 @@ const env = {
   ...process.env,
   AUTH_SECRET: process.env.AUTH_SECRET || 'e2e-auth-secret-for-tests-only',
   E2E_SECRET: process.env.E2E_SECRET || 'local-e2e-secret',
+  INTERNAL_API_SECRET: process.env.INTERNAL_API_SECRET || 'e2e-internal-api-secret-for-tests-only',
   APP_URL: process.env.APP_URL || 'http://127.0.0.1:3000',
   AUTH_URL: process.env.AUTH_URL || 'http://127.0.0.1:3000',
   API_URL: process.env.API_URL || 'http://127.0.0.1:4000',

@@ -24,11 +24,6 @@ import {
   type InterviewAnswers,
 } from '../interview.js';
 
-function requireUserEmail(header: string | string[] | undefined): string | null {
-  if (typeof header !== 'string' || !header.includes('@')) return null;
-  return header.trim().toLowerCase();
-}
-
 const filterSchema = z.enum(['all', 'accepted', 'rejected', 'spam']).default('all');
 
 const rulesUpdateSchema = z.object({
@@ -67,8 +62,8 @@ async function loadOwner(email: string) {
 
 export async function registerDashboardRoutes(app: FastifyInstance): Promise<void> {
   app.get('/v1/dashboard/inbox', async (request, reply) => {
-    const email = requireUserEmail(request.headers['x-user-email']);
-    if (!email) return reply.status(401).send({ error: 'Missing x-user-email' });
+    const email = request.gatekeeperEmail;
+    if (!email) return reply.status(401).send({ error: 'Unauthorized' });
 
     const query = request.query as { filter?: string };
     const filter = filterSchema.catch('all').parse(query.filter ?? 'all');
@@ -134,8 +129,8 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
   });
 
   app.post('/v1/dashboard/inbox/:id/approve', async (request, reply) => {
-    const email = requireUserEmail(request.headers['x-user-email']);
-    if (!email) return reply.status(401).send({ error: 'Missing x-user-email' });
+    const email = request.gatekeeperEmail;
+    if (!email) return reply.status(401).send({ error: 'Unauthorized' });
 
     const { id } = request.params as { id: string };
     const user = await loadOwner(email);
@@ -185,8 +180,8 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
   });
 
   app.post('/v1/dashboard/inbox/:id/decline', async (request, reply) => {
-    const email = requireUserEmail(request.headers['x-user-email']);
-    if (!email) return reply.status(401).send({ error: 'Missing x-user-email' });
+    const email = request.gatekeeperEmail;
+    if (!email) return reply.status(401).send({ error: 'Unauthorized' });
 
     const { id } = request.params as { id: string };
     const user = await loadOwner(email);
@@ -223,8 +218,8 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
   });
 
   app.post('/v1/dashboard/inbox/:id/override', async (request, reply) => {
-    const email = requireUserEmail(request.headers['x-user-email']);
-    if (!email) return reply.status(401).send({ error: 'Missing x-user-email' });
+    const email = request.gatekeeperEmail;
+    if (!email) return reply.status(401).send({ error: 'Unauthorized' });
 
     const { id } = request.params as { id: string };
     const parsed = overrideSchema.safeParse(request.body ?? {});
@@ -275,8 +270,8 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
   });
 
   app.post('/v1/dashboard/inbox/:id/spam', async (request, reply) => {
-    const email = requireUserEmail(request.headers['x-user-email']);
-    if (!email) return reply.status(401).send({ error: 'Missing x-user-email' });
+    const email = request.gatekeeperEmail;
+    if (!email) return reply.status(401).send({ error: 'Unauthorized' });
 
     const { id } = request.params as { id: string };
     const user = await loadOwner(email);
@@ -316,8 +311,8 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
   });
 
   app.get('/v1/dashboard/rules', async (request, reply) => {
-    const email = requireUserEmail(request.headers['x-user-email']);
-    if (!email) return reply.status(401).send({ error: 'Missing x-user-email' });
+    const email = request.gatekeeperEmail;
+    if (!email) return reply.status(401).send({ error: 'Unauthorized' });
 
     const user = await loadOwner(email);
     if (!user) return reply.status(404).send({ error: 'Complete onboarding first' });
@@ -343,8 +338,8 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
   });
 
   app.put('/v1/dashboard/rules', async (request, reply) => {
-    const email = requireUserEmail(request.headers['x-user-email']);
-    if (!email) return reply.status(401).send({ error: 'Missing x-user-email' });
+    const email = request.gatekeeperEmail;
+    if (!email) return reply.status(401).send({ error: 'Unauthorized' });
 
     const parsed = rulesUpdateSchema.safeParse(request.body ?? {});
     if (!parsed.success) {
@@ -413,8 +408,8 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
   });
 
   app.post('/v1/dashboard/rules/test', async (request, reply) => {
-    const email = requireUserEmail(request.headers['x-user-email']);
-    if (!email) return reply.status(401).send({ error: 'Missing x-user-email' });
+    const email = request.gatekeeperEmail;
+    if (!email) return reply.status(401).send({ error: 'Unauthorized' });
 
     const parsed = testMessageSchema.safeParse(request.body ?? {});
     if (!parsed.success) {
@@ -464,8 +459,8 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
 
   /** Draft rules with step progress metadata; client times out at ~15s. */
   app.post('/v1/dashboard/rules/draft', async (request, reply) => {
-    const email = requireUserEmail(request.headers['x-user-email']);
-    if (!email) return reply.status(401).send({ error: 'Missing x-user-email' });
+    const email = request.gatekeeperEmail;
+    if (!email) return reply.status(401).send({ error: 'Unauthorized' });
 
     const answersSchema = z.object({
       who: z.string().min(1),
@@ -504,8 +499,8 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
   });
 
   app.get('/v1/dashboard/settings', async (request, reply) => {
-    const email = requireUserEmail(request.headers['x-user-email']);
-    if (!email) return reply.status(401).send({ error: 'Missing x-user-email' });
+    const email = request.gatekeeperEmail;
+    if (!email) return reply.status(401).send({ error: 'Unauthorized' });
 
     const user = await loadOwner(email);
     if (!user) return reply.status(404).send({ error: 'Complete onboarding first' });
@@ -518,8 +513,8 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
   });
 
   app.put('/v1/dashboard/settings', async (request, reply) => {
-    const email = requireUserEmail(request.headers['x-user-email']);
-    if (!email) return reply.status(401).send({ error: 'Missing x-user-email' });
+    const email = request.gatekeeperEmail;
+    if (!email) return reply.status(401).send({ error: 'Unauthorized' });
 
     const parsed = settingsSchema.safeParse(request.body ?? {});
     if (!parsed.success) {
@@ -539,8 +534,8 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
   });
 
   app.get('/v1/dashboard/export', async (request, reply) => {
-    const email = requireUserEmail(request.headers['x-user-email']);
-    if (!email) return reply.status(401).send({ error: 'Missing x-user-email' });
+    const email = request.gatekeeperEmail;
+    if (!email) return reply.status(401).send({ error: 'Unauthorized' });
 
     const user = await loadOwner(email);
     if (!user) return reply.status(404).send({ error: 'Complete onboarding first' });
@@ -584,8 +579,8 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
   });
 
   app.delete('/v1/dashboard/account', async (request, reply) => {
-    const email = requireUserEmail(request.headers['x-user-email']);
-    if (!email) return reply.status(401).send({ error: 'Missing x-user-email' });
+    const email = request.gatekeeperEmail;
+    if (!email) return reply.status(401).send({ error: 'Unauthorized' });
 
     const user = await loadOwner(email);
     const db = getDb();

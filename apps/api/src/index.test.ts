@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { buildServer } from './index.ts';
+import { signInternalToken } from './internal-auth.ts';
 
 test('GET /health returns ok', async () => {
   const app = await buildServer();
@@ -59,18 +60,27 @@ test('GET /health/llm requires ADMIN_TOKEN', async () => {
 });
 
 test('GET /v1/onboarding/questions returns five prompts', async () => {
-  const app = await buildServer();
-  app.log.level = 'silent';
+  const previous = process.env.INTERNAL_API_SECRET;
+  process.env.INTERNAL_API_SECRET = 'index-test-internal-secret';
+  try {
+    const app = await buildServer();
+    app.log.level = 'silent';
 
-  const response = await app.inject({
-    method: 'GET',
-    url: '/v1/onboarding/questions',
-  });
+    const token = signInternalToken('ada@example.com', process.env.INTERNAL_API_SECRET);
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/onboarding/questions',
+      headers: { authorization: `Bearer ${token}` },
+    });
 
-  assert.equal(response.statusCode, 200);
-  const body = response.json() as { questions: Array<{ id: string; prompt: string }> };
-  assert.equal(body.questions.length, 5);
-  assert.equal(body.questions[0]?.id, 'who');
+    assert.equal(response.statusCode, 200);
+    const body = response.json() as { questions: Array<{ id: string; prompt: string }> };
+    assert.equal(body.questions.length, 5);
+    assert.equal(body.questions[0]?.id, 'who');
 
-  await app.close();
+    await app.close();
+  } finally {
+    if (previous === undefined) delete process.env.INTERNAL_API_SECRET;
+    else process.env.INTERNAL_API_SECRET = previous;
+  }
 });

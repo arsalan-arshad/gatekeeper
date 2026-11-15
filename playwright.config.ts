@@ -31,6 +31,8 @@ export default defineConfig({
           AUTH_URL: baseURL,
           E2E_SECRET: process.env.E2E_SECRET || 'local-e2e-secret',
           AUTH_SECRET: process.env.AUTH_SECRET || 'e2e-auth-secret-for-tests-only',
+          INTERNAL_API_SECRET:
+            process.env.INTERNAL_API_SECRET || 'e2e-internal-api-secret-for-tests-only',
           API_URL: process.env.API_URL || 'http://127.0.0.1:4000',
           NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000',
         },

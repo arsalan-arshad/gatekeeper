@@ -37,3 +37,4 @@ coverage
 .turbo
 .vercel
 .railway
+test-results/

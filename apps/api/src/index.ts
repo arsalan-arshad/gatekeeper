@@ -5,6 +5,7 @@ import Fastify from 'fastify';
 
 import { checkAdminToken } from './admin-auth.js';
 import { logAbuse } from './abuse-log.js';
+import { requireInternalAuth } from './internal-auth.js';
 import { buildLlmsTxt } from './llms-txt.js';
 import { createLlm } from './llm.js';
 import { buildOpenApiDocument } from './openapi.js';
@@ -22,6 +23,26 @@ import { registerPublicRoutes } from './routes/public.js';
 const port = Number(process.env.PORT ?? 4000);
 const host = process.env.HOST ?? '0.0.0.0';
 
+/**
+ * Browser CORS allowlist. Never reflect arbitrary Origin.
+ * Always includes production web. Also includes APP_URL origin when set so
+ * local/e2e (http://127.0.0.1:3000) and staging can call public form endpoints.
+ * Server→API (no Origin) is unaffected. Ambiguity note: user asked for
+ * production-only; APP_URL is required for browser public posts in non-prod.
+ */
+function corsAllowlist(): Set<string> {
+  const allowed = new Set<string>(['https://gatekeeper.arsalandev.studio']);
+  const appUrl = process.env.APP_URL?.trim();
+  if (appUrl) {
+    try {
+      allowed.add(new URL(appUrl).origin);
+    } catch {
+      /* ignore invalid APP_URL */
+    }
+  }
+  return allowed;
+}
+
 export async function buildServer() {
   const app = Fastify({
     logger: true,
@@ -29,16 +50,18 @@ export async function buildServer() {
   });
 
   await app.register(cors, {
-    origin: true,
-    allowedHeaders: [
-      'content-type',
-      'x-user-email',
-      'x-internal-secret',
-      'x-api-key',
-      'authorization',
-      'x-signature',
-    ],
+    origin: (origin, cb) => {
+      // Non-browser / same-origin server calls send no Origin — allow.
+      if (!origin) {
+        cb(null, true);
+        return;
+      }
+      cb(null, corsAllowlist().has(origin));
+    },
+    allowedHeaders: ['content-type', 'x-api-key', 'authorization', 'x-signature'],
   });
+
+  app.addHook('preHandler', requireInternalAuth);
 
   // Preserve raw JSON for Lemon Squeezy HMAC verification.
   app.addContentTypeParser('application/json', { parseAs: 'buffer' }, (request, body, done) => {

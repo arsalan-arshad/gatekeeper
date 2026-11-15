@@ -36,11 +36,6 @@ const completeSchema = z.object({
   minRelevance: z.number().int().min(0).max(100).optional(),
 });
 
-function requireUserEmail(header: string | string[] | undefined): string | null {
-  if (typeof header !== 'string' || !header.includes('@')) return null;
-  return header.trim().toLowerCase();
-}
-
 export async function registerOnboardingRoutes(app: FastifyInstance): Promise<void> {
   app.get('/v1/onboarding/questions', async () => ({
     questions: INTERVIEW_QUESTIONS,
@@ -67,9 +62,9 @@ export async function registerOnboardingRoutes(app: FastifyInstance): Promise<vo
   });
 
   app.get('/v1/onboarding/me', async (request, reply) => {
-    const email = requireUserEmail(request.headers['x-user-email']);
+    const email = request.gatekeeperEmail;
     if (!email) {
-      return reply.status(401).send({ error: 'Missing x-user-email' });
+      return reply.status(401).send({ error: 'Unauthorized' });
     }
 
     const db = getDb();
@@ -96,7 +91,7 @@ export async function registerOnboardingRoutes(app: FastifyInstance): Promise<vo
   });
 
   app.post('/v1/onboarding/complete', async (request, reply) => {
-    const emailHeader = requireUserEmail(request.headers['x-user-email']);
+    const emailHeader = request.gatekeeperEmail ?? null;
     const parsed = completeSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.status(400).send({ error: 'Invalid payload', details: parsed.error.flatten() });

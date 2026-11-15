@@ -12,11 +12,6 @@ import {
 } from '../lemon.js';
 import { addCredits, paymentsConfigPublic, paymentsEnabled, setUserProPlan } from '../payments.js';
 
-function requireUserEmail(header: string | string[] | undefined): string | null {
-  if (typeof header !== 'string' || !header.includes('@')) return null;
-  return header.trim().toLowerCase();
-}
-
 const checkoutSchema = z.object({
   kind: z.enum(['pro', 'credits']),
   creditCents: z.number().int().positive().optional(),
@@ -30,9 +25,9 @@ export async function registerPaymentRoutes(app: FastifyInstance): Promise<void>
   app.get('/v1/payments/config', async () => paymentsConfigPublic());
 
   app.get('/v1/payments/me', async (request, reply) => {
-    const email = requireUserEmail(request.headers['x-user-email']);
+    const email = request.gatekeeperEmail;
     if (!email) {
-      return reply.status(401).send({ error: 'Missing x-user-email' });
+      return reply.status(401).send({ error: 'Unauthorized' });
     }
 
     const db = getDb();
@@ -58,9 +53,9 @@ export async function registerPaymentRoutes(app: FastifyInstance): Promise<void>
   });
 
   app.post('/v1/payments/waitlist', async (request, reply) => {
-    const sessionEmail = requireUserEmail(request.headers['x-user-email']);
+    const sessionEmail = request.gatekeeperEmail;
     if (!sessionEmail) {
-      return reply.status(401).send({ error: 'Missing x-user-email' });
+      return reply.status(401).send({ error: 'Unauthorized' });
     }
 
     const parsed = waitlistSchema.safeParse(request.body ?? {});
@@ -86,9 +81,9 @@ export async function registerPaymentRoutes(app: FastifyInstance): Promise<void>
       });
     }
 
-    const email = requireUserEmail(request.headers['x-user-email']);
+    const email = request.gatekeeperEmail;
     if (!email) {
-      return reply.status(401).send({ error: 'Missing x-user-email' });
+      return reply.status(401).send({ error: 'Unauthorized' });
     }
 
     const parsed = checkoutSchema.safeParse(request.body ?? {});
