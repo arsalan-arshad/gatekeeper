@@ -16,31 +16,24 @@ test('checkAdminToken returns 503 when ADMIN_TOKEN unset', () => {
   }
 });
 
-test('checkAdminToken accepts query token and trims env newline', () => {
+test('checkAdminToken rejects query ?token= (Bearer only)', () => {
   const previous = process.env.ADMIN_TOKEN;
-  process.env.ADMIN_TOKEN = 'secret-token\n';
+  process.env.ADMIN_TOKEN = 'secret-token';
   try {
-    const ok = checkAdminToken({
+    const viaQuery = checkAdminToken({
       query: { token: 'secret-token' },
       headers: {},
     });
-    assert.equal(ok.ok, true);
-
-    const bad = checkAdminToken({
-      query: { token: 'wrong' },
-      headers: {},
-    });
-    assert.equal(bad.ok, false);
-    if (!bad.ok) assert.equal(bad.status, 401);
+    assert.equal(viaQuery.ok, false);
+    if (!viaQuery.ok) assert.equal(viaQuery.status, 401);
   } finally {
     if (previous === undefined) delete process.env.ADMIN_TOKEN;
     else process.env.ADMIN_TOKEN = previous;
   }
 });
 
-test('checkAdminToken accepts Authorization Bearer (avoids + query decoding)', () => {
+test('checkAdminToken accepts Authorization Bearer with timingSafeEqual', () => {
   const previous = process.env.ADMIN_TOKEN;
-  // Tokens with + are mangled by application/x-www-form-urlencoded query parsers.
   process.env.ADMIN_TOKEN = 'abc+def/ghi=';
   try {
     const viaBearer = checkAdminToken({
@@ -49,25 +42,19 @@ test('checkAdminToken accepts Authorization Bearer (avoids + query decoding)', (
     });
     assert.equal(viaBearer.ok, true);
 
-    const viaQueryBroken = checkAdminToken({
-      // Simulates Fastify/querystring turning + into space
-      query: { token: 'abc def/ghi=' },
-      headers: {},
+    const wrong = checkAdminToken({
+      query: {},
+      headers: { authorization: 'Bearer wrong-token!!' },
     });
-    assert.equal(viaQueryBroken.ok, false);
-
-    const viaQueryEncoded = checkAdminToken({
-      query: { token: 'abc+def/ghi=' },
-      headers: {},
-    });
-    assert.equal(viaQueryEncoded.ok, true);
+    assert.equal(wrong.ok, false);
+    if (!wrong.ok) assert.equal(wrong.status, 401);
   } finally {
     if (previous === undefined) delete process.env.ADMIN_TOKEN;
     else process.env.ADMIN_TOKEN = previous;
   }
 });
 
-test('checkAdminToken prefers Bearer over mismatched query token', () => {
+test('checkAdminToken ignores mismatched query when Bearer present', () => {
   const previous = process.env.ADMIN_TOKEN;
   process.env.ADMIN_TOKEN = 'real';
   try {
@@ -76,6 +63,12 @@ test('checkAdminToken prefers Bearer over mismatched query token', () => {
       headers: { authorization: 'Bearer real' },
     });
     assert.equal(result.ok, true);
+
+    const queryOnly = checkAdminToken({
+      query: { token: 'real' },
+      headers: {},
+    });
+    assert.equal(queryOnly.ok, false);
   } finally {
     if (previous === undefined) delete process.env.ADMIN_TOKEN;
     else process.env.ADMIN_TOKEN = previous;

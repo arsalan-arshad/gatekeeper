@@ -69,8 +69,9 @@ export async function registerOnboardingRoutes(app: FastifyInstance): Promise<vo
 
     const db = getDb();
     const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+    // Same response shape for unknown vs known (no enumeration via missing keys).
     if (!user) {
-      return { onboarded: false as const, user: null };
+      return { onboarded: false as const, user: null, gateRules: null };
     }
 
     const [rules] = await db.select().from(gateRules).where(eq(gateRules.userId, user.id)).limit(1);

@@ -19,7 +19,7 @@ test('statusAfterJudgment marks AI accepts as delivered', () => {
 test('buildOptInLinks includes signed accept and decline URLs', () => {
   const links = buildOptInLinks('11111111-1111-1111-1111-111111111111', {
     API_URL: 'http://localhost:4000',
-    AUTH_SECRET: 'test-secret',
+    AUTH_SECRET: 'test-secret-for-opt-in-links-32chars!!',
   });
   assert.match(links.acceptUrl, /action=accept/);
   assert.match(links.declineUrl, /action=decline/);
@@ -37,7 +37,10 @@ test('receiver opt-in email contains Accept/Decline links and summary', async ()
     message: 'Would love to compare billing notes.',
     score: 88,
     requestId: '22222222-2222-2222-2222-222222222222',
-    env: { API_URL: 'http://localhost:4000', AUTH_SECRET: 'test-secret' },
+    env: {
+      API_URL: 'http://localhost:4000',
+      AUTH_SECRET: 'test-secret-for-opt-in-links-32chars!!',
+    },
   });
 
   const [email] = getConsoleEmailLog();
@@ -83,7 +86,10 @@ test('intro email goes to both parties after receiver accept', async () => {
     senderName: 'Maya',
     message: 'Let’s swap billing notes.',
     requestId: '33333333-3333-3333-3333-333333333333',
-    env: { API_URL: 'http://localhost:4000', AUTH_SECRET: 'test-secret' },
+    env: {
+      API_URL: 'http://localhost:4000',
+      AUTH_SECRET: 'test-secret-for-opt-in-links-32chars!!',
+    },
   });
 
   const [email] = getConsoleEmailLog();

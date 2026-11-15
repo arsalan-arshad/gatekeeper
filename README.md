@@ -96,8 +96,7 @@ curl -X POST "https://api-production-5b5be52e.up.railway.app/admin/cache/clear" 
   -H "Authorization: Bearer $ADMIN_TOKEN"
 # expect: {"ok":true,"cleared":N}
 
-# Query alternative — URL-encode TOKEN (`+` → `%2B`); unencoded `+` becomes a space and 401s:
-curl -X POST "https://api-production-5b5be52e.up.railway.app/admin/cache/clear?token=TOKEN"
+# Query ?token= is rejected — Bearer only.
 ```
 
 `PROMPT_VERSION` in `apps/api/src/judge.ts` is part of the cache key — bump it whenever the system prompt, few-shots, or verdict rules change so stale verdicts are never served even before a manual clear.

@@ -14,13 +14,25 @@ export type HelpfulTokenPayload = {
   exp: number;
 };
 
-function getSecret(env: NodeJS.ProcessEnv = process.env): string {
-  const secret = env.AUTH_SECRET?.trim() || env.EMAIL_LINK_SECRET?.trim();
-  if (!secret) {
-    // Deterministic local fallback so signed links work in dev without secrets.
-    return 'gatekeeper-dev-email-link-secret';
+export const EMAIL_LINK_SECRET_MIN_LENGTH = 32;
+
+/**
+ * Resolve signing secret for opt-in / helpful links.
+ * Never falls back to a hardcoded default — missing or short secrets throw.
+ */
+export function resolveEmailLinkSecret(env: NodeJS.ProcessEnv = process.env): string {
+  const secret = env.EMAIL_LINK_SECRET?.trim() || env.AUTH_SECRET?.trim() || '';
+  if (!secret || secret.length < EMAIL_LINK_SECRET_MIN_LENGTH) {
+    throw new Error(
+      `EMAIL_LINK_SECRET or AUTH_SECRET must be set and at least ${EMAIL_LINK_SECRET_MIN_LENGTH} characters`,
+    );
   }
   return secret;
+}
+
+/** Fail process startup when email-link signing secret is missing/short. */
+export function assertEmailLinkSecretConfigured(env: NodeJS.ProcessEnv = process.env): void {
+  resolveEmailLinkSecret(env);
 }
 
 function encodeJson(payload: object): string {
@@ -50,7 +62,7 @@ export function createOptInToken(
     exp: payload.exp ?? now + ttlSeconds,
   };
   const body = encodeJson(full);
-  const signature = sign(body, getSecret(options?.env));
+  const signature = sign(body, resolveEmailLinkSecret(options?.env));
   return `${body}.${signature}`;
 }
 
@@ -64,7 +76,14 @@ export function verifyOptInToken(
     return { ok: false, error: 'Malformed token' };
   }
 
-  if (!verifySignature(body, signature, getSecret(options?.env))) {
+  let secret: string;
+  try {
+    secret = resolveEmailLinkSecret(options?.env);
+  } catch {
+    return { ok: false, error: 'Signing secret not configured' };
+  }
+
+  if (!verifySignature(body, signature, secret)) {
     return { ok: false, error: 'Invalid signature' };
   }
 
@@ -103,7 +122,7 @@ export function createHelpfulToken(
     exp: payload.exp ?? now + ttlSeconds,
   };
   const body = encodeJson(full);
-  return `${body}.${sign(body, getSecret(options?.env))}`;
+  return `${body}.${sign(body, resolveEmailLinkSecret(options?.env))}`;
 }
 
 export function verifyHelpfulToken(
@@ -116,7 +135,14 @@ export function verifyHelpfulToken(
     return { ok: false, error: 'Malformed token' };
   }
 
-  if (!verifySignature(body, signature, getSecret(options?.env))) {
+  let secret: string;
+  try {
+    secret = resolveEmailLinkSecret(options?.env);
+  } catch {
+    return { ok: false, error: 'Signing secret not configured' };
+  }
+
+  if (!verifySignature(body, signature, secret)) {
     return { ok: false, error: 'Invalid signature' };
   }
 

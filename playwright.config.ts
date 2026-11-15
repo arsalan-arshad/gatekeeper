@@ -31,7 +31,7 @@ export default defineConfig({
           AUTH_URL: baseURL,
           E2E_ENABLED: '1',
           E2E_SECRET: process.env.E2E_SECRET || 'local-e2e-secret',
-          AUTH_SECRET: process.env.AUTH_SECRET || 'e2e-auth-secret-for-tests-only',
+          AUTH_SECRET: process.env.AUTH_SECRET || 'e2e-auth-secret-for-tests-only-32ch',
           // Never production — e2e login hard-gates on NODE_ENV !== 'production'.
           NODE_ENV:
             process.env.NODE_ENV === 'production' ? 'test' : process.env.NODE_ENV || 'development',

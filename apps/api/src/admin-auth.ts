@@ -11,7 +11,7 @@ export type AdminAuthSuccess = { ok: true };
 export type AdminAuthResult = AdminAuthSuccess | AdminAuthFailure;
 
 type AdminAuthRequest = {
-  query: unknown;
+  query?: unknown;
   headers: { authorization?: string | string[] | undefined };
 };
 
@@ -26,17 +26,13 @@ function tokensEqual(provided: string, expected: string): boolean {
  * Admin gate for `/health/llm` and `/admin/cache/clear`.
  *
  * - Env: `ADMIN_TOKEN` (trimmed; missing → 503)
- * - Accepts query `?token=` **or** `Authorization: Bearer <token>` (Bearer wins if both set)
- * - Query tokens must be URL-encoded (`+`, `&`, `#`, spaces break unencoded query strings)
+ * - **Bearer only** — `Authorization: Bearer <token>` (never `?token=` query)
  */
 export function checkAdminToken(request: AdminAuthRequest): AdminAuthResult {
   const adminToken = process.env.ADMIN_TOKEN?.trim();
   if (!adminToken) {
     return { ok: false, status: 503, error: 'ADMIN_TOKEN not configured' };
   }
-
-  const query = request.query as { token?: string };
-  const fromQuery = typeof query.token === 'string' ? query.token.trim() : '';
 
   const rawAuth = request.headers.authorization;
   const authHeader = Array.isArray(rawAuth) ? rawAuth[0] : rawAuth;
@@ -46,8 +42,7 @@ export function checkAdminToken(request: AdminAuthRequest): AdminAuthResult {
     if (match?.[1]) fromBearer = match[1].trim();
   }
 
-  const provided = fromBearer || fromQuery;
-  if (!provided || !tokensEqual(provided, adminToken)) {
+  if (!fromBearer || !tokensEqual(fromBearer, adminToken)) {
     return { ok: false, status: 401, error: 'Unauthorized' };
   }
   return { ok: true };
