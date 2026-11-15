@@ -1,19 +1,20 @@
 import { notFound, redirect } from 'next/navigation';
 
 import { signIn } from '@/auth';
+import { e2eSecretsEqual, isE2eLoginEnabled } from '@/lib/e2e-gate';
 
 async function e2eLoginAction(formData: FormData) {
   'use server';
-  const expected = process.env.E2E_SECRET?.trim();
-  if (!expected) {
+  if (!isE2eLoginEnabled()) {
     notFound();
   }
+  const expected = process.env.E2E_SECRET!.trim();
   const email = String(formData.get('email') ?? '')
     .trim()
     .toLowerCase();
   const secret = String(formData.get('secret') ?? '');
   const redirectTo = String(formData.get('redirectTo') ?? '/start');
-  if (!email || secret !== expected) {
+  if (!email || !e2eSecretsEqual(secret, expected)) {
     redirect('/e2e/login?error=1');
   }
   await signIn('e2e', { email, secret, redirectTo });
@@ -24,7 +25,7 @@ export default async function E2ELoginPage({
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
-  if (!process.env.E2E_SECRET?.trim()) {
+  if (!isE2eLoginEnabled()) {
     notFound();
   }
   const params = await searchParams;
@@ -34,7 +35,9 @@ export default async function E2ELoginPage({
       <h1 className="text-2xl" style={{ fontFamily: 'var(--font-display), Georgia, serif' }}>
         E2E login
       </h1>
-      <p className="text-sm text-[var(--muted)]">Test-only magic login when E2E_SECRET is set.</p>
+      <p className="text-sm text-[var(--muted)]">
+        Staging/CI-only magic login. Disabled in production.
+      </p>
       {params.error ? <p className="text-sm text-red-300">Invalid credentials</p> : null}
       <form action={e2eLoginAction} className="flex flex-col gap-3">
         <label className="text-sm">

@@ -219,6 +219,8 @@ Each app has a `railway.toml`:
 
 Set env vars from `.env.example` in Railway for both services (and attach a Postgres + pgvector plugin for `DATABASE_URL`). Full checklist: [docs/LAUNCH.md](./docs/LAUNCH.md).
 
+**Never** set `E2E_SECRET` or `E2E_ENABLED` on Railway production. Playwright e2e is CI/preview/staging only (`E2E_ENABLED=1` + non-production `NODE_ENV`). After the internal-auth fix: invalidate all API keys and rotate `AUTH_SECRET`.
+
 ## Built by
 
 **Built by Arsalan** · [arsalandev.studio](https://arsalandev.studio?utm_source=gatekeeper&utm_medium=readme)
