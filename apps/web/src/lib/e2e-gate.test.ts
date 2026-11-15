@@ -8,10 +8,7 @@ test('isE2eLoginEnabled requires non-prod + E2E_ENABLED=1 + secret', () => {
     isE2eLoginEnabled({ NODE_ENV: 'development', E2E_ENABLED: '1', E2E_SECRET: 'x' }),
     true,
   );
-  assert.equal(
-    isE2eLoginEnabled({ NODE_ENV: 'test', E2E_ENABLED: '1', E2E_SECRET: 'x' }),
-    true,
-  );
+  assert.equal(isE2eLoginEnabled({ NODE_ENV: 'test', E2E_ENABLED: '1', E2E_SECRET: 'x' }), true);
   assert.equal(
     isE2eLoginEnabled({ NODE_ENV: 'production', E2E_ENABLED: '1', E2E_SECRET: 'x' }),
     false,
