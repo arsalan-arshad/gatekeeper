@@ -4,8 +4,13 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
 import { logAbuse } from '../abuse-log.js';
+import { clientIp } from '../client-ip.js';
 import { getDb } from '../db.js';
-import { checkPublicFormIpRateLimit, checkPublicFormSenderOwnerRateLimit } from '../rate-limit.js';
+import {
+  checkPublicFormIpRateLimit,
+  checkPublicFormSenderOwnerRateLimit,
+  retryAfterSeconds,
+} from '../rate-limit.js';
 import { MESSAGE_MAX_CHARS, NAME_MAX_CHARS } from '../request-limits.js';
 import { submitIntroRequest } from '../submit-request.js';
 
@@ -15,14 +20,6 @@ const publicIntroSchema = z.object({
   senderContact: z.string().min(1).max(320),
   message: z.string().min(1).max(MESSAGE_MAX_CHARS),
 });
-
-function clientIp(request: { ip: string; headers: Record<string, unknown> }): string {
-  const forwarded = request.headers['x-forwarded-for'];
-  if (typeof forwarded === 'string' && forwarded.length > 0) {
-    return forwarded.split(',')[0]?.trim() || request.ip;
-  }
-  return request.ip;
-}
 
 export async function registerPublicRoutes(app: FastifyInstance): Promise<void> {
   app.get('/v1/users/:handle', async (request, reply) => {
@@ -50,7 +47,7 @@ export async function registerPublicRoutes(app: FastifyInstance): Promise<void> 
 
   app.post('/v1/users/:handle/requests', async (request, reply) => {
     const ip = clientIp(request);
-    const ipLimit = checkPublicFormIpRateLimit(ip);
+    const ipLimit = await checkPublicFormIpRateLimit(ip);
     if (!ipLimit.ok) {
       await logAbuse({
         kind: 'rate_limit_ip',
@@ -58,7 +55,7 @@ export async function registerPublicRoutes(app: FastifyInstance): Promise<void> 
         detail: `public_form_ip reset_ms=${ipLimit.resetMs}`,
         log: request.log,
       });
-      reply.header('retry-after', Math.ceil(ipLimit.resetMs / 1000));
+      reply.header('retry-after', retryAfterSeconds(ipLimit.resetMs));
       return reply
         .status(429)
         .send({ error: 'IP rate limit exceeded', retry_after_ms: ipLimit.resetMs });
@@ -79,7 +76,10 @@ export async function registerPublicRoutes(app: FastifyInstance): Promise<void> 
       .where(eq(users.handle, handle.toLowerCase()))
       .limit(1);
     if (owner) {
-      const senderLimit = checkPublicFormSenderOwnerRateLimit(parsed.data.senderContact, owner.id);
+      const senderLimit = await checkPublicFormSenderOwnerRateLimit(
+        parsed.data.senderContact,
+        owner.id,
+      );
       if (!senderLimit.ok) {
         await logAbuse({
           kind: 'rate_limit_ip',
@@ -87,7 +87,7 @@ export async function registerPublicRoutes(app: FastifyInstance): Promise<void> 
           detail: `public_form_sender reset_ms=${senderLimit.resetMs}`,
           log: request.log,
         });
-        reply.header('retry-after', Math.ceil(senderLimit.resetMs / 1000));
+        reply.header('retry-after', retryAfterSeconds(senderLimit.resetMs));
         return reply.status(429).send({
           error: 'Sender rate limit exceeded for this Gatekeeper',
           retry_after_ms: senderLimit.resetMs,

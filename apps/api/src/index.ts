@@ -50,6 +50,9 @@ export async function buildServer() {
   const app = Fastify({
     logger: true,
     bodyLimit: FASTIFY_BODY_LIMIT,
+    // Railway terminates TLS and forwards one hop — derive request.ip from that.
+    // Never manually trust client-supplied X-Forwarded-For (see client-ip.ts).
+    trustProxy: 1,
   });
 
   await app.register(cors, {

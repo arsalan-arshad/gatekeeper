@@ -31,10 +31,10 @@ test('sender verify token expires after 24h', () => {
   assert.equal(expired.ok, false);
 });
 
-test('outbound mails to sender capped at 3/day', () => {
+test('outbound mails to sender capped at 3/day', async () => {
   resetSenderOutboundLimiterForTests();
   for (let i = 0; i < SENDER_OUTBOUND_DAILY_LIMIT; i++) {
-    assert.equal(consumeSenderOutboundSlot('sender@example.com').ok, true);
+    assert.equal((await consumeSenderOutboundSlot('sender@example.com')).ok, true);
   }
-  assert.equal(consumeSenderOutboundSlot('sender@example.com').ok, false);
+  assert.equal((await consumeSenderOutboundSlot('sender@example.com')).ok, false);
 });

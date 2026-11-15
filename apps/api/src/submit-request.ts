@@ -269,7 +269,7 @@ export async function submitIntroRequest(options: {
     // Never email unverified senderContact (reject/etc). On-screen only until verify.
     const senderGate = await canEmailSenderContact(options.body.senderContact);
     if (judgment.decision !== 'accept' && senderGate.ok) {
-      const slot = consumeSenderOutboundSlot(options.body.senderContact);
+      const slot = await consumeSenderOutboundSlot(options.body.senderContact);
       if (slot.ok) {
         const result = await sendRejectEmailToSender(send, {
           senderEmail: options.body.senderContact,

@@ -2,21 +2,14 @@ import type { FastifyInstance } from 'fastify';
 
 import { logAbuse } from '../abuse-log.js';
 import { extractBearerOrApiKey, findApiKeyByRaw } from '../api-keys.js';
-import { checkApiKeyRateLimit, checkIpRateLimit } from '../rate-limit.js';
+import { clientIp } from '../client-ip.js';
+import { checkApiKeyRateLimit, checkIpRateLimit, retryAfterSeconds } from '../rate-limit.js';
 import { introBodySchema, submitIntroRequest } from '../submit-request.js';
-
-function clientIp(request: { ip: string; headers: Record<string, unknown> }): string {
-  const forwarded = request.headers['x-forwarded-for'];
-  if (typeof forwarded === 'string' && forwarded.length > 0) {
-    return forwarded.split(',')[0]?.trim() || request.ip;
-  }
-  return request.ip;
-}
 
 export async function registerAgentRoutes(app: FastifyInstance): Promise<void> {
   app.post('/v1/requests', async (request, reply) => {
     const ip = clientIp(request);
-    const ipLimit = checkIpRateLimit(ip);
+    const ipLimit = await checkIpRateLimit(ip);
     if (!ipLimit.ok) {
       await logAbuse({
         kind: 'rate_limit_ip',
@@ -24,7 +17,7 @@ export async function registerAgentRoutes(app: FastifyInstance): Promise<void> {
         detail: `reset_ms=${ipLimit.resetMs}`,
         log: request.log,
       });
-      reply.header('retry-after', Math.ceil(ipLimit.resetMs / 1000));
+      reply.header('retry-after', retryAfterSeconds(ipLimit.resetMs));
       return reply
         .status(429)
         .send({ error: 'IP rate limit exceeded', retry_after_ms: ipLimit.resetMs });
@@ -44,7 +37,7 @@ export async function registerAgentRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(401).send({ error: 'Invalid API key' });
     }
 
-    const keyLimit = checkApiKeyRateLimit(apiKey.id, apiKey.rateLimit);
+    const keyLimit = await checkApiKeyRateLimit(apiKey.id, apiKey.rateLimit);
     reply.header('x-ratelimit-limit', String(apiKey.rateLimit));
     reply.header('x-ratelimit-remaining', String(keyLimit.remaining));
     if (!keyLimit.ok) {
@@ -55,7 +48,7 @@ export async function registerAgentRoutes(app: FastifyInstance): Promise<void> {
         detail: `limit_per_hour=${apiKey.rateLimit}`,
         log: request.log,
       });
-      reply.header('retry-after', Math.ceil(keyLimit.resetMs / 1000));
+      reply.header('retry-after', retryAfterSeconds(keyLimit.resetMs));
       return reply.status(429).send({
         error: 'API key rate limit exceeded',
         limit_per_hour: apiKey.rateLimit,

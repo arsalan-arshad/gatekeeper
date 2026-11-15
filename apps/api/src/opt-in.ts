@@ -137,7 +137,7 @@ export async function sendDeclineAutoReply(
     }
     return { id: 'skipped-unverified-sender', mode: 'console' as const };
   }
-  const slot = consumeSenderOutboundSlot(input.senderEmail);
+  const slot = await consumeSenderOutboundSlot(input.senderEmail);
   if (!slot.ok) {
     return { id: 'skipped-outbound-cap', mode: 'console' as const };
   }
@@ -198,7 +198,7 @@ export async function sendIntroEmailToBoth(
     // Owner/receiver still gets the intro; never CC unverified senderContact.
     return send({ to: [input.receiverEmail], ...content });
   }
-  const slot = consumeSenderOutboundSlot(input.senderEmail);
+  const slot = await consumeSenderOutboundSlot(input.senderEmail);
   if (!slot.ok) {
     return send({ to: [input.receiverEmail], ...content });
   }
