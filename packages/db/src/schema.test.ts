@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { getTableName } from 'drizzle-orm';
 
 import { DEFAULT_EMBEDDING_DIMENSIONS, PGVECTOR_EXTENSION_SQL } from './pgvector.ts';
-import { abuseEvents, apiKeys, gateRules, requests, users } from './schema.ts';
+import { abuseEvents, apiKeys, gateRules, proWaitlist, requests, users } from './schema.ts';
 
 test('core tables are defined', () => {
   assert.equal(getTableName(users), 'users');
@@ -11,6 +11,7 @@ test('core tables are defined', () => {
   assert.equal(getTableName(requests), 'requests');
   assert.equal(getTableName(apiKeys), 'api_keys');
   assert.equal(getTableName(abuseEvents), 'abuse_events');
+  assert.equal(getTableName(proWaitlist), 'pro_waitlist');
 });
 
 test('pgvector scaffolding exports extension SQL and dimensions', () => {

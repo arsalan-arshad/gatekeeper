@@ -22,16 +22,20 @@ export function LedgerView({
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-8 px-6 py-16">
       <SiteNav compact />
 
+      {demoData ? (
+        <p
+          data-testid="demo-data-badge"
+          className="w-fit rounded-md border border-[var(--accent)]/35 bg-[var(--accent)]/10 px-2.5 py-1 text-sm font-semibold tracking-wide text-[var(--accent)] uppercase"
+        >
+          Demo data
+        </p>
+      ) : null}
+
       <div>
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-4xl" style={{ fontFamily: 'var(--font-display), Georgia, serif' }}>
             {title}
           </h1>
-          {demoData ? (
-            <span className="rounded-md border border-[var(--accent)]/35 bg-[var(--accent)]/10 px-2.5 py-1 text-sm font-semibold tracking-wide text-[var(--accent)] uppercase">
-              Demo data
-            </span>
-          ) : null}
         </div>
         <p className="mt-3 max-w-2xl text-[var(--muted)]">
           Public reputation: requests, delivered intros, receiver accepts, spam blocked, and trust
@@ -68,7 +72,9 @@ export function LedgerView({
             Monthly chart
           </h2>
           {demoData ? (
-            <span className="text-sm tracking-wide text-[var(--accent)] uppercase">Demo data</span>
+            <span className="text-sm tracking-wide text-[var(--accent)] uppercase" aria-hidden>
+              Demo data
+            </span>
           ) : null}
         </div>
         {months.length === 0 ? (
