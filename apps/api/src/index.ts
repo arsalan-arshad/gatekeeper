@@ -3,6 +3,7 @@ import { pathToFileURL } from 'node:url';
 import cors from '@fastify/cors';
 import Fastify from 'fastify';
 
+import { checkAdminToken } from './admin-auth.js';
 import { logAbuse } from './abuse-log.js';
 import { buildLlmsTxt } from './llms-txt.js';
 import { createLlm } from './llm.js';
@@ -88,18 +89,12 @@ export async function buildServer() {
   }));
 
   app.get('/health/llm', async (request, reply) => {
-    const adminToken = process.env.ADMIN_TOKEN?.trim();
-    if (!adminToken) {
-      return reply.status(503).send({
-        error: 'ADMIN_TOKEN not configured',
-        providers: [],
+    const auth = checkAdminToken(request);
+    if (!auth.ok) {
+      return reply.status(auth.status).send({
+        error: auth.error,
+        ...(auth.status === 503 ? { providers: [] } : {}),
       });
-    }
-
-    const query = request.query as { token?: string };
-    const provided = typeof query.token === 'string' ? query.token : '';
-    if (provided !== adminToken) {
-      return reply.status(401).send({ error: 'Unauthorized' });
     }
 
     try {

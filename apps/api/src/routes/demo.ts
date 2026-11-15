@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
+import { checkAdminToken } from '../admin-auth.js';
 import { logAbuse } from '../abuse-log.js';
 import { DEMO_BUSY_ERROR, demoJudgeRequest, isBusyFailure } from '../demo-judge.js';
 import { getDemoProfile, listDemoProfilesPublic } from '../demo-profiles.js';
@@ -117,21 +118,16 @@ function demoLimitKey(ip: string): string {
 }
 
 function requireAdminToken(
-  request: { query: unknown },
+  request: {
+    query: unknown;
+    headers: { authorization?: string | string[] | undefined };
+  },
   reply: { status: (code: number) => { send: (body: unknown) => unknown } },
 ): boolean {
-  const adminToken = process.env.ADMIN_TOKEN?.trim();
-  if (!adminToken) {
-    reply.status(503).send({ error: 'ADMIN_TOKEN not configured' });
-    return false;
-  }
-  const query = request.query as { token?: string };
-  const provided = typeof query.token === 'string' ? query.token : '';
-  if (provided !== adminToken) {
-    reply.status(401).send({ error: 'Unauthorized' });
-    return false;
-  }
-  return true;
+  const result = checkAdminToken(request);
+  if (result.ok) return true;
+  reply.status(result.status).send({ error: result.error });
+  return false;
 }
 
 export async function registerDemoRoutes(app: FastifyInstance): Promise<void> {
