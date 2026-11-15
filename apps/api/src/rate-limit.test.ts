@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { FixedWindowRateLimiter } from './rate-limit.ts';
+import {
+  FixedWindowRateLimiter,
+  checkPublicFormIpRateLimit,
+  checkPublicFormSenderOwnerRateLimit,
+  resetRateLimitersForTests,
+} from './rate-limit.ts';
 
 test('FixedWindowRateLimiter enforces the limit inside a window', () => {
   let now = 1_000;
@@ -31,4 +36,18 @@ test('peek reports remaining without consuming quota', () => {
   assert.equal(limiter.peek('a').remaining, 2);
   assert.equal(limiter.check('a').remaining, 1);
   assert.equal(limiter.peek('a').remaining, 1);
+});
+
+test('public form limits: 5/IP/hour and 3/sender/owner/day', () => {
+  resetRateLimitersForTests();
+  for (let i = 0; i < 5; i += 1) {
+    assert.equal(checkPublicFormIpRateLimit('1.2.3.4').ok, true, `ip hit ${i}`);
+  }
+  assert.equal(checkPublicFormIpRateLimit('1.2.3.4').ok, false);
+
+  for (let i = 0; i < 3; i += 1) {
+    assert.equal(checkPublicFormSenderOwnerRateLimit('a@b.co', 'owner-1').ok, true, `sender ${i}`);
+  }
+  assert.equal(checkPublicFormSenderOwnerRateLimit('a@b.co', 'owner-1').ok, false);
+  assert.equal(checkPublicFormSenderOwnerRateLimit('other@b.co', 'owner-1').ok, true);
 });

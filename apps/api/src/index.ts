@@ -1,6 +1,7 @@
 import { pathToFileURL } from 'node:url';
 
 import cors from '@fastify/cors';
+import helmet from '@fastify/helmet';
 import Fastify from 'fastify';
 
 import { checkAdminToken } from './admin-auth.js';
@@ -59,6 +60,26 @@ export async function buildServer() {
       cb(null, corsAllowlist().has(origin));
     },
     allowedHeaders: ['content-type', 'x-api-key', 'authorization', 'x-signature'],
+  });
+
+  await app.register(helmet, {
+    global: true,
+    // API serves JSON; keep CSP basic and frame denial strict.
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+        baseUri: ["'none'"],
+        formAction: ["'none'"],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    hsts: { maxAge: 31536000, includeSubDomains: true, preload: false },
+    noSniff: true,
+    frameguard: { action: 'deny' },
+    referrerPolicy: { policy: 'no-referrer' },
+    hidePoweredBy: true,
   });
 
   app.addHook('preHandler', requireInternalAuth);

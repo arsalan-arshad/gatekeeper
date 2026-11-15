@@ -1,11 +1,18 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { SiteFooter } from '@/components/site-footer';
 import { SiteNav } from '@/components/site-nav';
 
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+  title: 'Not found · Gatekeeper',
+};
+
 export default function NotFound() {
   return (
     <main className="relative min-h-screen overflow-hidden">
+      <meta name="robots" content="noindex, nofollow" />
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0"

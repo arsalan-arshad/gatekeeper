@@ -67,8 +67,14 @@ export class FixedWindowRateLimiter {
   }
 }
 
-/** Per-IP: 30 requests / minute (abuse protection). */
+/** Per-IP: 30 requests / minute (abuse protection — agent + general). */
 export const ipRateLimiter = new FixedWindowRateLimiter(30, 60_000);
+
+/** Public form: 5 requests / IP / hour. */
+export const publicFormIpLimiter = new FixedWindowRateLimiter(5, 60 * 60 * 1000);
+
+/** Public form: 3 requests / sender+owner / day. */
+export const publicFormSenderOwnerLimiter = new FixedWindowRateLimiter(3, 24 * 60 * 60 * 1000);
 
 /** Per API key: uses the key's configured hourly limit. */
 const keyLimiters = new Map<number, FixedWindowRateLimiter>();
@@ -87,7 +93,21 @@ export function checkIpRateLimit(ip: string): RateLimitResult {
   return ipRateLimiter.check(`ip:${ip || 'unknown'}`);
 }
 
+export function checkPublicFormIpRateLimit(ip: string): RateLimitResult {
+  return publicFormIpLimiter.check(`public-ip:${ip || 'unknown'}`);
+}
+
+export function checkPublicFormSenderOwnerRateLimit(
+  senderEmail: string,
+  ownerUserId: string,
+): RateLimitResult {
+  const sender = senderEmail.trim().toLowerCase();
+  return publicFormSenderOwnerLimiter.check(`public-sender:${ownerUserId}:${sender}`);
+}
+
 export function resetRateLimitersForTests(): void {
   ipRateLimiter.clear();
+  publicFormIpLimiter.clear();
+  publicFormSenderOwnerLimiter.clear();
   keyLimiters.clear();
 }

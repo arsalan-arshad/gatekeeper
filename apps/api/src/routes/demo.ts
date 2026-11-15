@@ -42,7 +42,7 @@ const verdictCache = new Map<string, CachedVerdict>();
 const demoJudgeSchema = z.object({
   handle: z.string().min(1).max(64),
   message: z.string().max(MESSAGE_MAX_CHARS),
-  senderName: z.string().min(1).max(120).optional(),
+  senderName: z.string().min(1).max(100).optional(),
   senderContact: z.string().min(1).max(320).optional(),
   /** Landing example chips — judged without consuming the daily IP quota. */
   example: z.boolean().optional(),

@@ -23,6 +23,7 @@ import {
   synthesizeProfile,
   type InterviewAnswers,
 } from '../interview.js';
+import { countInboxFilters, matchesInboxFilter, type InboxFilter } from '../inbox-status.js';
 
 const filterSchema = z.enum(['all', 'accepted', 'rejected', 'spam']).default('all');
 
@@ -42,8 +43,8 @@ const rulesUpdateSchema = z.object({
 });
 
 const testMessageSchema = z.object({
-  message: z.string().min(1).max(4000),
-  senderName: z.string().min(1).max(120).optional(),
+  message: z.string().min(1).max(2000),
+  senderName: z.string().min(1).max(100).optional(),
 });
 
 const settingsSchema = z.object({
@@ -91,27 +92,13 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
       .orderBy(desc(requests.createdAt))
       .limit(200);
 
-    const filtered = rows.filter((row) => {
-      if (filter === 'all') return true;
-      if (filter === 'accepted') {
-        return (
-          row.ownerDecision === 'accept' ||
-          row.decision === 'accept' ||
-          row.status === 'accepted' ||
-          row.status === 'delivered'
-        );
-      }
-      if (filter === 'rejected') {
-        return row.ownerDecision === 'reject' || row.decision === 'reject';
-      }
-      if (filter === 'spam') {
-        return row.ownerDecision === 'spam' || row.decision === 'spam';
-      }
-      return true;
-    });
+    const inboxFilter = filter as InboxFilter;
+    const filtered = rows.filter((row) => matchesInboxFilter(row, inboxFilter));
+    const counts = countInboxFilters(rows);
 
     return {
       filter,
+      counts,
       items: filtered.map((row) => ({
         id: row.id,
         senderName: row.senderName,

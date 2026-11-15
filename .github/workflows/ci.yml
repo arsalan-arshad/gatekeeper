@@ -46,6 +46,21 @@ jobs:
       - name: Test
         run: pnpm test
 
+      - name: Prod OG must not use localhost
+        env:
+          NEXT_PUBLIC_SITE_URL: https://gatekeeper.arsalandev.studio
+          APP_URL: https://gatekeeper.arsalandev.studio
+          API_URL: https://api.gatekeeper.arsalandev.studio
+          NEXT_PUBLIC_API_URL: https://api.gatekeeper.arsalandev.studio
+          AUTH_SECRET: ci-auth-secret-for-og-grep-only
+        run: |
+          pnpm --filter @gatekeeper/web build
+          if grep -RInE 'localhost|127\.0\.0\.1' apps/web/.next/server/app --include='*.html' --include='*.rsc' 2>/dev/null; then
+            echo "Found localhost in production build output" >&2
+            exit 1
+          fi
+          echo "No localhost in prod HTML/RSC output."
+
       - name: Judge eval
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}

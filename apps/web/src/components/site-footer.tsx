@@ -43,22 +43,26 @@ export function SiteFooter() {
           >
             GitHub
           </a>
-          <a
-            href={BRAND.xUrl}
-            className="hover:text-[var(--fg)]"
-            rel="noopener noreferrer"
-            target="_blank"
-          >
-            X
-          </a>
-          <a
-            href={BRAND.linkedinUrl}
-            className="hover:text-[var(--fg)]"
-            rel="noopener noreferrer"
-            target="_blank"
-          >
-            LinkedIn
-          </a>
+          {BRAND.xUrl ? (
+            <a
+              href={BRAND.xUrl}
+              className="hover:text-[var(--fg)]"
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              X
+            </a>
+          ) : null}
+          {BRAND.linkedinUrl ? (
+            <a
+              href={BRAND.linkedinUrl}
+              className="hover:text-[var(--fg)]"
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              LinkedIn
+            </a>
+          ) : null}
         </div>
       </div>
       <div className="mx-auto mt-10 flex max-w-6xl flex-col gap-2 px-6 text-sm sm:px-10">

@@ -1,9 +1,11 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { SiteFooter } from '@/components/site-footer';
 import { SiteNav } from '@/components/site-nav';
 import { API_URL } from '@/lib/api';
+import { BRAND } from '@/lib/brand';
 import { DEMO_USER_FALLBACK } from '@/lib/demo';
 
 import { DemoIntroForm } from './demo-intro-form';
@@ -40,6 +42,41 @@ async function getPublicUser(
     }
   }
   return null;
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ handle: string }>;
+}): Promise<Metadata> {
+  const { handle } = await params;
+  const data = await getPublicUser(handle);
+  if (!data) {
+    return { title: 'Not found · Gatekeeper' };
+  }
+  const { user } = data;
+  const title = `${user.name} (@${user.handle}) · Gatekeeper`;
+  const description =
+    user.bio?.trim() ||
+    `Request an intro with ${user.name} through Gatekeeper — AI principal with a public ledger.`;
+  const url = `${BRAND.siteUrl}/@${user.handle}`;
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      url,
+      type: 'profile',
+      images: [{ url: '/og.png', width: 1200, height: 630, alt: title }],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: ['/og.png'],
+    },
+  };
 }
 
 export default async function PublicHandlePage({
