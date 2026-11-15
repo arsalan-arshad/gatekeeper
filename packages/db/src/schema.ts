@@ -126,7 +126,13 @@ export const requests = pgTable('requests', {
   aiReason: text('ai_reason'),
   /** Public judge reason safe for owner inbox + sender replies. */
   aiReasonPublic: text('ai_reason_public'),
+  /** AI verdict — never overwritten by owner approve/decline/override. */
   decision: decisionEnum('decision'),
+  /**
+   * Owner's explicit decision when it differs from (or confirms) the AI verdict.
+   * Null until the owner acts. Does not replace `decision` / AI score / reason.
+   */
+  ownerDecision: decisionEnum('owner_decision'),
   status: requestStatusEnum('status').notNull().default('pending'),
   stakeCents: integer('stake_cents').notNull().default(0),
   /** Receiver 1-click helpful rating from the intro email; null = not rated. */

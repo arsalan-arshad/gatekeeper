@@ -69,14 +69,14 @@ export async function registerOptInRoutes(app: FastifyInstance): Promise<void> {
     }
 
     // Owner may Approve/Decline from notification links even when AI rejected —
-    // Approve overrides the verdict to accept and completes the intro.
+    // keep AI verdict/score/reason; record owner_decision separately.
     if (action === 'decline') {
       if (row.stakeCents > 0) {
         await refundStake(row.senderContact, row.stakeCents);
       }
       await db
         .update(requests)
-        .set({ status: 'declined', stakeCents: 0 })
+        .set({ ownerDecision: 'reject', status: 'declined', stakeCents: 0 })
         .where(eq(requests.id, id));
 
       const send = createEmailSender();
@@ -100,17 +100,10 @@ export async function registerOptInRoutes(app: FastifyInstance): Promise<void> {
         );
     }
 
-    if (row.decision !== 'accept') {
-      await db
-        .update(requests)
-        .set({ decision: 'accept', status: 'delivered' })
-        .where(eq(requests.id, id));
-    } else if (row.status !== 'delivered' && row.status !== 'pending') {
-      return reply
-        .status(409)
-        .type('text/html')
-        .send(htmlPage('Unavailable', '<p>This request is not ready for Accept/Decline.</p>'));
-    }
+    await db
+      .update(requests)
+      .set({ ownerDecision: 'accept', status: 'delivered' })
+      .where(eq(requests.id, id));
 
     const settlement = await settleAcceptedIntro({
       senderEmail: row.senderContact,
@@ -138,7 +131,10 @@ export async function registerOptInRoutes(app: FastifyInstance): Promise<void> {
       requestId: id,
     });
 
-    await db.update(requests).set({ status: 'accepted', stakeCents: 0 }).where(eq(requests.id, id));
+    await db
+      .update(requests)
+      .set({ ownerDecision: 'accept', status: 'accepted', stakeCents: 0 })
+      .where(eq(requests.id, id));
 
     return reply
       .type('text/html')

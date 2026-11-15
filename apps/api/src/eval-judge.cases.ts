@@ -189,4 +189,16 @@ export const JUDGE_EVAL_CASES: JudgeEvalCase[] = [
       reasonPersonalVoice: true,
     },
   },
+  {
+    id: 'reject-offprofile-investor-northzone',
+    senderName: 'Northzone Partner',
+    expected: 'reject',
+    message:
+      "Hi Sam — I'm a partner at Northzone in London. We're looking at pre-seed investment in usage-based billing tools and would love 20 min next week if you're open to it. More at northzone.com.",
+    checks: {
+      rewriteIsCoachingTip: true,
+      rewriteNoPlaceholders: true,
+      reasonPersonalVoice: true,
+    },
+  },
 ];

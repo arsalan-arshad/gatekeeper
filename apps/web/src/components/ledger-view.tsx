@@ -12,7 +12,7 @@ export function LedgerView({
   data: LedgerPayload;
   title: string;
   notice?: string;
-  /** Marks charts/stats as seeded demo data (e.g. /@demo/ledger). */
+  /** Marks charts/stats as seeded demo data (e.g. /@demo/ledger or seeded global). */
   demoData?: boolean;
 }) {
   const { totals, months } = data;
@@ -21,15 +21,6 @@ export function LedgerView({
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-8 px-6 py-16">
       <SiteNav compact />
-
-      {demoData ? (
-        <p
-          data-testid="demo-data-badge"
-          className="w-fit rounded-md border border-[var(--accent)]/35 bg-[var(--accent)]/10 px-2.5 py-1 text-sm font-semibold tracking-wide text-[var(--accent)] uppercase"
-        >
-          Demo data
-        </p>
-      ) : null}
 
       <div>
         <div className="flex flex-wrap items-center gap-3">
@@ -57,13 +48,23 @@ export function LedgerView({
         </div>
       </div>
 
-      <section className="grid gap-4 sm:grid-cols-2">
-        <Stat label="Requests" value={String(totals.requestCount)} />
-        <Stat label="Delivered" value={String(totals.deliveredCount)} />
-        <Stat label="Accepted" value={String(totals.acceptedCount)} />
-        <Stat label="Spam blocked" value={String(totals.spamCount)} />
-        <Stat label="Accept rate" value={formatPercent(totals.acceptRate)} />
-        <Stat label="Trust score" value={formatPercent(totals.trustScore)} />
+      <section className="flex flex-col gap-4">
+        {demoData ? (
+          <p
+            data-testid="demo-data-badge"
+            className="w-fit rounded-full border border-[var(--accent)]/35 bg-[var(--accent)]/10 px-3 py-1 text-sm font-medium tracking-wide text-[var(--accent)]"
+          >
+            Demo data — sample stats
+          </p>
+        ) : null}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Stat label="Requests" value={String(totals.requestCount)} />
+          <Stat label="Delivered" value={String(totals.deliveredCount)} />
+          <Stat label="Accepted" value={String(totals.acceptedCount)} />
+          <Stat label="Spam blocked" value={String(totals.spamCount)} />
+          <Stat label="Accept rate" value={formatPercent(totals.acceptRate)} />
+          <Stat label="Trust score" value={formatPercent(totals.trustScore)} />
+        </div>
       </section>
 
       <section className="flex flex-col gap-4">
@@ -72,8 +73,8 @@ export function LedgerView({
             Monthly chart
           </h2>
           {demoData ? (
-            <span className="text-sm tracking-wide text-[var(--accent)] uppercase" aria-hidden>
-              Demo data
+            <span className="text-sm tracking-wide text-[var(--accent)]" aria-hidden>
+              Sample stats
             </span>
           ) : null}
         </div>

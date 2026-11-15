@@ -46,7 +46,8 @@ export default async function DashboardPage({
           Inbox
         </h1>
         <p className="mt-3 text-[var(--muted)]">
-          Intro requests with AI verdict, score, and reason. Approve to send a double-opt-in intro.
+          Intro requests with AI verdict, score, and reason. Owner approve/decline keeps the AI
+          verdict and shows a separate Owner badge.
         </p>
       </div>
       {'error' in inbox && inbox.error ? (

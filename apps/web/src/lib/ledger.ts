@@ -23,6 +23,8 @@ export type LedgerPayload = {
   user?: { handle: string; name: string };
   totals: LedgerTotals;
   months: LedgerMonth[];
+  /** True when aggregates include seeded demo traffic (or empty ledger). */
+  includesDemoData?: boolean;
 };
 
 const EMPTY_TOTALS: LedgerTotals = {

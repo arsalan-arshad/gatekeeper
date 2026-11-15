@@ -31,6 +31,46 @@ function statusBadgeClass(status: string): string {
   }
 }
 
+function formatDecisionLabel(decision: 'accept' | 'reject' | 'spam'): string {
+  switch (decision) {
+    case 'accept':
+      return 'Approved';
+    case 'reject':
+      return 'Declined';
+    case 'spam':
+      return 'SPAM';
+  }
+}
+
+function formatAiVerdict(item: InboxItem): string {
+  const label = (item.decision ?? 'pending').toUpperCase();
+  if (item.score == null) return `AI: ${label}`;
+  return `AI: ${label} ${item.score}`;
+}
+
+function VerdictBadge({ item }: { item: InboxItem }) {
+  const ai = formatAiVerdict(item);
+  if (!item.ownerDecision) {
+    return (
+      <p
+        data-testid="inbox-verdict-badge"
+        className="font-semibold tracking-wide text-[var(--accent)] uppercase"
+      >
+        {ai}
+      </p>
+    );
+  }
+  const owner = formatDecisionLabel(item.ownerDecision);
+  return (
+    <p
+      data-testid="inbox-verdict-badge"
+      className="max-w-[16rem] text-right text-sm font-semibold tracking-wide text-[var(--accent)]"
+    >
+      {ai} · Owner: {owner}
+    </p>
+  );
+}
+
 export function InboxClient({
   initialItems,
   initialFilter,
@@ -75,6 +115,7 @@ export function InboxClient({
   ) {
     setError(null);
     // Optimistic status badge before the server round-trip finishes.
+    // Never overwrite AI decision/score/reason — only status + ownerDecision.
     patchItem(item.id, next);
     setToast(message);
     startTransition(async () => {
@@ -82,7 +123,13 @@ export function InboxClient({
       if (result.error) {
         setError(result.error);
         setToast(null);
-        patchItem(item.id, { status: item.status, decision: item.decision });
+        patchItem(item.id, {
+          status: item.status,
+          decision: item.decision,
+          ownerDecision: item.ownerDecision,
+          score: item.score,
+          reason: item.reason,
+        });
         return;
       }
       router.refresh();
@@ -145,9 +192,7 @@ export function InboxClient({
                   </p>
                 </div>
                 <div className="text-right text-sm">
-                  <p className="font-semibold tracking-wide text-[var(--accent)] uppercase">
-                    {item.decision ?? 'pending'}
-                  </p>
+                  <VerdictBadge item={item} />
                   <p className="text-[var(--muted)]">
                     Score {item.score == null ? '—' : `${item.score}/100`}
                   </p>
@@ -165,7 +210,7 @@ export function InboxClient({
                     run(
                       item,
                       () => approveRequest(item.id),
-                      { status: 'accepted', decision: 'accept' },
+                      { status: 'accepted', ownerDecision: 'accept' },
                       `Intro sent to ${item.senderName}`,
                     )
                   }
@@ -180,10 +225,7 @@ export function InboxClient({
                     run(
                       item,
                       () => declineRequest(item.id),
-                      {
-                        status: 'declined',
-                        decision: item.decision === 'accept' ? 'reject' : item.decision,
-                      },
+                      { status: 'declined', ownerDecision: 'reject' },
                       `Declined ${item.senderName}`,
                     )
                   }
@@ -197,7 +239,7 @@ export function InboxClient({
                   onClick={() => {
                     const next = window.prompt(
                       'Override verdict to (accept / reject / spam):',
-                      item.decision ?? 'accept',
+                      item.ownerDecision ?? item.decision ?? 'accept',
                     );
                     if (!next) return;
                     const decision = next.trim().toLowerCase();
@@ -214,7 +256,7 @@ export function InboxClient({
                     run(
                       item,
                       () => overrideRequest(item.id, decision),
-                      { decision, status: nextStatus },
+                      { ownerDecision: decision, status: nextStatus },
                       `Overrode ${item.senderName} → ${decision}`,
                     );
                   }}
@@ -229,7 +271,7 @@ export function InboxClient({
                     run(
                       item,
                       () => markSpam(item.id),
-                      { status: 'declined', decision: 'spam' },
+                      { status: 'declined', ownerDecision: 'spam' },
                       `Marked ${item.senderName} as spam`,
                     )
                   }

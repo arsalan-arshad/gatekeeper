@@ -1,13 +1,20 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { computeTrustScore, summarizeLedgerMonths } from './ledger.ts';
+import { computeTrustScore, isDemoLedgerHandle, summarizeLedgerMonths } from './ledger.ts';
 import { createHelpfulToken, verifyHelpfulToken } from './tokens.ts';
 
 test('computeTrustScore is helpful / delivered', () => {
   assert.equal(computeTrustScore(0, 0), null);
   assert.equal(computeTrustScore(3, 4), 0.75);
   assert.equal(computeTrustScore(0, 5), 0);
+});
+
+test('isDemoLedgerHandle matches seeded demo profiles', () => {
+  assert.equal(isDemoLedgerHandle('demo'), true);
+  assert.equal(isDemoLedgerHandle('ADA'), true);
+  assert.equal(isDemoLedgerHandle('real-user'), false);
+  assert.equal(isDemoLedgerHandle(null), false);
 });
 
 test('summarizeLedgerMonths aggregates months and trust', () => {

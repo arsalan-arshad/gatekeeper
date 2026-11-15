@@ -7,6 +7,15 @@ export function computeTrustScore(helpfulCount: number, deliveredCount: number):
   return Number((helpfulCount / deliveredCount).toFixed(4));
 }
 
+/** Seeded demo profile handles from `packages/db/src/seed.ts`. */
+export const DEMO_LEDGER_HANDLES = ['demo', 'ada', 'jonas', 'mira'] as const;
+
+/** True when ledger traffic includes seeded demo profiles (or is empty / unavailable on the client). */
+export function isDemoLedgerHandle(handle: string | null | undefined): boolean {
+  if (!handle) return false;
+  return (DEMO_LEDGER_HANDLES as readonly string[]).includes(handle.toLowerCase());
+}
+
 export type LedgerMonthRow = {
   month: string;
   requestCount: number;

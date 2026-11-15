@@ -1,10 +1,26 @@
 import { ledgerStats, requests, users } from '@gatekeeper/db';
-import { desc, eq, sql } from 'drizzle-orm';
+import { desc, eq, inArray, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 
 import { getDb } from '../db.js';
-import { formatMonthLabel, summarizeLedgerMonths, type LedgerMonthRow } from '../ledger.js';
+import {
+  DEMO_LEDGER_HANDLES,
+  formatMonthLabel,
+  isDemoLedgerHandle,
+  summarizeLedgerMonths,
+  type LedgerMonthRow,
+} from '../ledger.js';
 import { verifyHelpfulToken } from '../tokens.js';
+
+async function globalIncludesDemoData(): Promise<boolean> {
+  const db = getDb();
+  const [row] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(requests)
+    .innerJoin(users, eq(requests.targetUserId, users.id))
+    .where(inArray(users.handle, [...DEMO_LEDGER_HANDLES]));
+  return (row?.count ?? 0) > 0;
+}
 
 function htmlPage(title: string, body: string): string {
   return `<!doctype html>
@@ -62,8 +78,9 @@ export async function registerLedgerRoutes(app: FastifyInstance): Promise<void> 
 
     const months = mapMonthRows(monthRows);
     const totals = summarizeLedgerMonths(months);
+    const includesDemoData = totals.requestCount === 0 || (await globalIncludesDemoData());
 
-    return { scope: 'global' as const, totals, months };
+    return { scope: 'global' as const, totals, months, includesDemoData };
   });
 
   app.get('/v1/users/:handle/ledger', async (request, reply) => {
@@ -96,12 +113,14 @@ export async function registerLedgerRoutes(app: FastifyInstance): Promise<void> 
 
     const months = mapMonthRows(monthRows);
     const totals = summarizeLedgerMonths(months);
+    const includesDemoData = isDemoLedgerHandle(user.handle) || totals.requestCount === 0;
 
     return {
       scope: 'user' as const,
       user: { handle: user.handle, name: user.name },
       totals,
       months,
+      includesDemoData,
     };
   });
 
