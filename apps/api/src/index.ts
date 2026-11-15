@@ -21,6 +21,7 @@ import { registerOnboardingRoutes } from './routes/onboarding.js';
 import { registerOptInRoutes } from './routes/opt-in.js';
 import { registerPaymentRoutes } from './routes/payments.js';
 import { registerPublicRoutes } from './routes/public.js';
+import { registerResendWebhookRoutes } from './routes/resend-webhooks.js';
 import { registerSenderVerifyRoutes } from './routes/sender-verify.js';
 
 const port = Number(process.env.PORT ?? 4000);
@@ -176,6 +177,7 @@ export async function buildServer() {
   await registerDashboardRoutes(app);
   await registerPublicRoutes(app);
   await registerSenderVerifyRoutes(app);
+  await registerResendWebhookRoutes(app);
   await registerDemoRoutes(app);
   await registerOptInRoutes(app);
   await registerAgentRoutes(app);

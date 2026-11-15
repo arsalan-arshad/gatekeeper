@@ -2,11 +2,14 @@ import { requests, users } from '@gatekeeper/db';
 import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 
+import {
+  ALREADY_DECIDED_ERROR,
+  approveInboxRequest,
+  declineInboxRequest,
+} from '../approve-request.js';
 import { getDb } from '../db.js';
 import { createEmailSender } from '../email.js';
 import { escapeHtml } from '../email-templates.js';
-import { sendDeclineAutoReply, sendIntroEmailToBoth } from '../opt-in.js';
-import { refundStake, settleAcceptedIntro } from '../payments.js';
 import { verifyOptInToken, type OptInAction } from '../tokens.js';
 
 function htmlPage(title: string, body: string): string {
@@ -50,17 +53,6 @@ export async function registerOptInRoutes(app: FastifyInstance): Promise<void> {
         .send(htmlPage('Not found', '<p>Request not found.</p>'));
     }
 
-    if (row.status === 'accepted' || row.status === 'declined') {
-      return reply
-        .type('text/html')
-        .send(
-          htmlPage(
-            'Already handled',
-            `<p>This intro was already marked <strong>${row.status}</strong>.</p>`,
-          ),
-        );
-    }
-
     const [receiver] = await db.select().from(users).where(eq(users.id, row.targetUserId)).limit(1);
     if (!receiver) {
       return reply
@@ -69,28 +61,19 @@ export async function registerOptInRoutes(app: FastifyInstance): Promise<void> {
         .send(htmlPage('Not found', '<p>Receiver profile missing.</p>'));
     }
 
+    const owner = { id: receiver.id, email: receiver.email, name: receiver.name };
+    const send = createEmailSender();
+
     // Owner may Approve/Decline from notification links even when AI rejected —
-    // keep AI verdict/score/reason; record owner_decision separately.
+    // keep AI verdict/score/reason; claim owner_decision atomically.
     if (action === 'decline') {
-      if (row.stakeCents > 0) {
-        await refundStake(row.senderContact, row.stakeCents);
+      const result = await declineInboxRequest({ requestId: id, owner, send });
+      if (!result.ok) {
+        return reply
+          .status(409)
+          .type('text/html')
+          .send(htmlPage('Already decided', `<p>${ALREADY_DECIDED_ERROR}.</p>`));
       }
-      await db
-        .update(requests)
-        .set({ ownerDecision: 'reject', decidedAt: new Date(), status: 'declined', stakeCents: 0 })
-        .where(eq(requests.id, id));
-
-      const send = createEmailSender();
-      try {
-        await sendDeclineAutoReply(send, {
-          senderEmail: row.senderContact,
-          senderName: row.senderName,
-          receiverName: receiver.name,
-        });
-      } catch (error) {
-        request.log.error({ err: error }, 'decline auto-reply failed');
-      }
-
       return reply
         .type('text/html')
         .send(
@@ -101,41 +84,24 @@ export async function registerOptInRoutes(app: FastifyInstance): Promise<void> {
         );
     }
 
-    await db
-      .update(requests)
-      .set({ ownerDecision: 'accept', decidedAt: new Date(), status: 'delivered' })
-      .where(eq(requests.id, id));
-
-    const settlement = await settleAcceptedIntro({
-      senderEmail: row.senderContact,
-      stakeCents: row.stakeCents,
-    });
-    if (!settlement.ok) {
+    const result = await approveInboxRequest({ requestId: id, owner, send });
+    if (!result.ok) {
+      if (result.status === 402) {
+        return reply
+          .status(402)
+          .type('text/html')
+          .send(
+            htmlPage(
+              'Payment required',
+              `<p>Could not complete the intro: ${escapeHtml(result.error)}. Ask the sender to buy credits, then try Accept again.</p>`,
+            ),
+          );
+      }
       return reply
-        .status(402)
+        .status(409)
         .type('text/html')
-        .send(
-          htmlPage(
-            'Payment required',
-            `<p>Could not complete the intro: ${settlement.error}. Ask the sender to buy credits, then try Accept again.</p>`,
-          ),
-        );
+        .send(htmlPage('Already decided', `<p>${ALREADY_DECIDED_ERROR}.</p>`));
     }
-
-    const send = createEmailSender();
-    await sendIntroEmailToBoth(send, {
-      receiverEmail: receiver.email,
-      receiverName: receiver.name,
-      senderEmail: row.senderContact,
-      senderName: row.senderName,
-      message: row.message,
-      requestId: id,
-    });
-
-    await db
-      .update(requests)
-      .set({ ownerDecision: 'accept', decidedAt: new Date(), status: 'accepted', stakeCents: 0 })
-      .where(eq(requests.id, id));
 
     return reply
       .type('text/html')

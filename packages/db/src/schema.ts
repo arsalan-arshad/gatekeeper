@@ -6,6 +6,7 @@ import {
   pgEnum,
   pgTable,
   pgView,
+  primaryKey,
   text,
   timestamp,
   uuid,
@@ -156,6 +157,33 @@ export const requests = pgTable('requests', {
   stakeCents: integer('stake_cents').notNull().default(0),
   /** Receiver 1-click helpful rating from the intro email; null = not rated. */
   helpful: boolean('helpful'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+/**
+ * Idempotent outbound email ledger — unique per (request, type).
+ * Claim a slot with INSERT … ON CONFLICT DO NOTHING RETURNING before send.
+ */
+export const outboundEmails = pgTable(
+  'outbound_emails',
+  {
+    requestId: uuid('request_id')
+      .notNull()
+      .references(() => requests.id, { onDelete: 'cascade' }),
+    emailType: text('email_type').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.requestId, table.emailType] })],
+);
+
+/**
+ * Addresses that must not receive mail (Resend bounce / complaint webhooks).
+ */
+export const emailSuppressions = pgTable('email_suppressions', {
+  email: text('email').primaryKey(),
+  reason: text('reason').notNull(),
+  source: text('source').notNull().default('resend'),
+  payload: text('payload'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 

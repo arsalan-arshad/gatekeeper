@@ -13,7 +13,7 @@ const PROTECTED_PREFIXES = [
   '/v1/payments',
 ] as const;
 
-const UNPROTECTED_EXACT = new Set(['/v1/payments/webhooks/lemon']);
+const UNPROTECTED_EXACT = new Set(['/v1/payments/webhooks/lemon', '/v1/webhooks/resend']);
 
 export type InternalTokenPayload = {
   sub: string;

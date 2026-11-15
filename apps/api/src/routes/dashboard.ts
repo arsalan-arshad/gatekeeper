@@ -11,12 +11,17 @@ import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
+import {
+  ALREADY_DECIDED_ERROR,
+  approveInboxRequest,
+  declineInboxRequest,
+  markSpamInboxRequest,
+  overrideInboxRequest,
+} from '../approve-request.js';
 import { getDb } from '../db.js';
 import { createEmailSender } from '../email.js';
 import { judgeRequest } from '../judge.js';
 import { createLlm } from '../llm.js';
-import { sendDeclineAutoReply, sendIntroEmailToBoth, statusAfterJudgment } from '../opt-in.js';
-import { forfeitStakeToReceiver, refundStake, settleAcceptedIntro } from '../payments.js';
 import {
   INTERVIEW_QUESTIONS,
   buildProfileEmbeddingText,
@@ -125,45 +130,22 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
 
     const db = getDb();
     const [row] = await db
-      .select()
+      .select({ id: requests.id })
       .from(requests)
       .where(and(eq(requests.id, id), eq(requests.targetUserId, user.id)))
       .limit(1);
     if (!row) return reply.status(404).send({ error: 'Request not found' });
-    if (row.status === 'accepted') return { ok: true, status: 'accepted', already: true };
-    if (row.status === 'declined') {
-      return reply.status(409).send({ error: 'Request already declined' });
-    }
 
-    // Owner approve keeps AI decision/score/reason intact; record owner_decision separately.
-    await db
-      .update(requests)
-      .set({ ownerDecision: 'accept', decidedAt: new Date(), status: 'delivered' })
-      .where(eq(requests.id, id));
-
-    const settlement = await settleAcceptedIntro({
-      senderEmail: row.senderContact,
-      stakeCents: row.stakeCents,
-    });
-    if (!settlement.ok) {
-      return reply.status(402).send({ error: settlement.error });
-    }
-
-    const send = createEmailSender();
-    await sendIntroEmailToBoth(send, {
-      receiverEmail: user.email,
-      receiverName: user.name,
-      senderEmail: row.senderContact,
-      senderName: row.senderName,
-      message: row.message,
+    // Conditional UPDATE … WHERE owner_decision IS NULL; email only if claim wins.
+    const result = await approveInboxRequest({
       requestId: id,
+      owner: { id: user.id, email: user.email, name: user.name },
+      send: createEmailSender(),
     });
-
-    await db
-      .update(requests)
-      .set({ ownerDecision: 'accept', decidedAt: new Date(), status: 'accepted', stakeCents: 0 })
-      .where(eq(requests.id, id));
-    return { ok: true, status: 'accepted' };
+    if (!result.ok) {
+      return reply.status(result.status).send({ error: result.error });
+    }
+    return { ok: true, status: result.status };
   });
 
   app.post('/v1/dashboard/inbox/:id/decline', async (request, reply) => {
@@ -176,32 +158,21 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
 
     const db = getDb();
     const [row] = await db
-      .select()
+      .select({ id: requests.id })
       .from(requests)
       .where(and(eq(requests.id, id), eq(requests.targetUserId, user.id)))
       .limit(1);
     if (!row) return reply.status(404).send({ error: 'Request not found' });
-    if (row.status === 'accepted') {
-      return reply.status(409).send({ error: 'Request already accepted' });
-    }
-    if (row.status === 'declined') return { ok: true, status: 'declined', already: true };
 
-    if (row.stakeCents > 0) {
-      await refundStake(row.senderContact, row.stakeCents);
-    }
-    await db
-      .update(requests)
-      .set({ ownerDecision: 'reject', decidedAt: new Date(), status: 'declined', stakeCents: 0 })
-      .where(eq(requests.id, id));
-
-    const send = createEmailSender();
-    await sendDeclineAutoReply(send, {
-      senderEmail: row.senderContact,
-      senderName: row.senderName,
-      receiverName: user.name,
+    const result = await declineInboxRequest({
+      requestId: id,
+      owner: { id: user.id, email: user.email, name: user.name },
+      send: createEmailSender(),
     });
-
-    return { ok: true, status: 'declined' };
+    if (!result.ok) {
+      return reply.status(result.status).send({ error: result.error ?? ALREADY_DECIDED_ERROR });
+    }
+    return { ok: true, status: result.status };
   });
 
   app.post('/v1/dashboard/inbox/:id/override', async (request, reply) => {
@@ -219,42 +190,22 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
 
     const db = getDb();
     const [row] = await db
-      .select()
+      .select({ id: requests.id, decision: requests.decision })
       .from(requests)
       .where(and(eq(requests.id, id), eq(requests.targetUserId, user.id)))
       .limit(1);
     if (!row) return reply.status(404).send({ error: 'Request not found' });
-    if (row.status === 'accepted' || row.status === 'declined') {
-      return reply.status(409).send({ error: 'Request already finalized' });
+
+    const result = await overrideInboxRequest({
+      requestId: id,
+      owner: { id: user.id, email: user.email, name: user.name },
+      decision: parsed.data.decision,
+      priorAiDecision: row.decision,
+    });
+    if (!result.ok) {
+      return reply.status(result.status).send({ error: result.error });
     }
-
-    const decision = parsed.data.decision;
-    const nextStatus = statusAfterJudgment(decision);
-
-    if (decision === 'spam' && row.stakeCents > 0) {
-      await forfeitStakeToReceiver({ receiverEmail: user.email, stakeCents: row.stakeCents });
-    } else if (decision !== 'accept' && row.stakeCents > 0 && row.decision === 'accept') {
-      await refundStake(row.senderContact, row.stakeCents);
-    }
-
-    // Override stores owner_decision only — AI verdict/score/reason stay unchanged.
-    const [updated] = await db
-      .update(requests)
-      .set({
-        ownerDecision: decision,
-        decidedAt: new Date(),
-        status: nextStatus,
-        stakeCents: decision === 'accept' ? row.stakeCents : 0,
-      })
-      .where(eq(requests.id, id))
-      .returning({
-        id: requests.id,
-        decision: requests.decision,
-        ownerDecision: requests.ownerDecision,
-        status: requests.status,
-      });
-
-    return { ok: true, request: updated };
+    return { ok: true, request: result.request };
   });
 
   app.post('/v1/dashboard/inbox/:id/spam', async (request, reply) => {
@@ -267,7 +218,7 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
 
     const db = getDb();
     const [row] = await db
-      .select()
+      .select({ id: requests.id, status: requests.status })
       .from(requests)
       .where(and(eq(requests.id, id), eq(requests.targetUserId, user.id)))
       .limit(1);
@@ -276,27 +227,14 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
       return reply.status(409).send({ error: 'Cannot mark an accepted intro as spam' });
     }
 
-    if (row.stakeCents > 0) {
-      await forfeitStakeToReceiver({ receiverEmail: user.email, stakeCents: row.stakeCents });
+    const result = await markSpamInboxRequest({
+      requestId: id,
+      owner: { id: user.id, email: user.email, name: user.name },
+    });
+    if (!result.ok) {
+      return reply.status(result.status).send({ error: result.error });
     }
-
-    const [updated] = await db
-      .update(requests)
-      .set({
-        ownerDecision: 'spam',
-        decidedAt: new Date(),
-        status: 'declined',
-        stakeCents: 0,
-      })
-      .where(eq(requests.id, id))
-      .returning({
-        id: requests.id,
-        decision: requests.decision,
-        ownerDecision: requests.ownerDecision,
-        status: requests.status,
-      });
-
-    return { ok: true, request: updated };
+    return { ok: true, request: result.request };
   });
 
   app.get('/v1/dashboard/rules', async (request, reply) => {

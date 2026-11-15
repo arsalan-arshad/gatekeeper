@@ -223,6 +223,8 @@ export const MAGIC_IP_WINDOW_MS = 60 * 60 * 1000;
 /** Sender verification emails: 1 / address / day + 20 / IP / day. */
 export const SENDER_VERIFY_EMAIL_LIMIT = 1;
 export const SENDER_VERIFY_IP_LIMIT = 20;
+/** Global sender-verification emails across all owners per rolling day. */
+export const SENDER_VERIFY_GLOBAL_LIMIT = 200;
 export const SENDER_VERIFY_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 export async function checkIpRateLimit(ip: string): Promise<RateLimitResult> {
@@ -293,10 +295,30 @@ export async function checkSenderVerifyEmailRateLimit(email: string): Promise<Ra
   );
 }
 
+/** Max 1 verification email per (owner, address) per 24h. */
+export async function checkSenderVerifyOwnerEmailRateLimit(
+  ownerId: string,
+  email: string,
+): Promise<RateLimitResult> {
+  return consumePostgresRateLimit(
+    `sender-verify-owner-email:${ownerId}:${normalizeEmailForRateLimit(email)}`,
+    SENDER_VERIFY_EMAIL_LIMIT,
+    SENDER_VERIFY_WINDOW_MS,
+  );
+}
+
 export async function checkSenderVerifyIpRateLimit(ip: string): Promise<RateLimitResult> {
   return consumePostgresRateLimit(
     `sender-verify-ip:${ip || 'unknown'}`,
     SENDER_VERIFY_IP_LIMIT,
+    SENDER_VERIFY_WINDOW_MS,
+  );
+}
+
+export async function checkSenderVerifyGlobalRateLimit(): Promise<RateLimitResult> {
+  return consumePostgresRateLimit(
+    'sender-verify-global',
+    SENDER_VERIFY_GLOBAL_LIMIT,
     SENDER_VERIFY_WINDOW_MS,
   );
 }
