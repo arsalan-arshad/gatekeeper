@@ -318,6 +318,22 @@ test('POST /admin/cache/clear requires ADMIN_TOKEN and clears demo cache', async
     });
     assert.equal(denied.statusCode, 401);
 
+    const viaBearer = await app.inject({
+      method: 'POST',
+      url: '/admin/cache/clear',
+      headers: { authorization: 'Bearer test-admin-token' },
+    });
+    assert.equal(viaBearer.statusCode, 200);
+    assert.equal((viaBearer.json() as { ok?: boolean }).ok, true);
+
+    // Re-seed one cached verdict, then clear via query token.
+    await app.inject({
+      method: 'POST',
+      url: '/v1/demo/judge',
+      headers: { 'x-forwarded-for': '198.51.100.9' },
+      payload: { handle: 'demo', message: STRONG_MESSAGE },
+    });
+
     const cleared = await app.inject({
       method: 'POST',
       url: '/admin/cache/clear?token=test-admin-token',

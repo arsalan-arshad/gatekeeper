@@ -81,17 +81,23 @@ Chat tries **Gemini first**, then **Groq**, for whichever of `GEMINI_API_KEY` / 
 
 Defaults: `GEMINI_MODEL=gemini-3.8-flash` (free-tier Flash), `GROQ_MODEL=openai/gpt-oss-120b` (Groq’s free/dev replacement for retired `llama-3.3-70b-versatile`) with `response_format: json_object` for judge calls.
 
-Admin probe (requires `ADMIN_TOKEN`):
+Admin probe (requires `ADMIN_TOKEN` on the **api** Railway service — not web):
 
 ```bash
-curl "http://localhost:4000/health/llm?token=$ADMIN_TOKEN"
+# Prefer Bearer (avoids querystring mangling of +, &, #, spaces):
+curl "http://localhost:4000/health/llm" -H "Authorization: Bearer $ADMIN_TOKEN"
 ```
 
 Clear the in-memory demo verdict cache after a prompt/rules deploy (same token; never commit or print it):
 
 ```bash
-# After Railway api redeploys a judge prompt change:
-curl -X POST "https://api-production-5b5be52e.up.railway.app/admin/cache/clear?token=$ADMIN_TOKEN"
+# After Railway api redeploys a judge prompt change (api host, POST — not the web site):
+curl -X POST "https://api-production-5b5be52e.up.railway.app/admin/cache/clear" \
+  -H "Authorization: Bearer $ADMIN_TOKEN"
+# expect: {"ok":true,"cleared":N}
+
+# Query alternative — URL-encode TOKEN (`+` → `%2B`); unencoded `+` becomes a space and 401s:
+curl -X POST "https://api-production-5b5be52e.up.railway.app/admin/cache/clear?token=TOKEN"
 ```
 
 `PROMPT_VERSION` in `apps/api/src/judge.ts` is part of the cache key — bump it whenever the system prompt, few-shots, or verdict rules change so stale verdicts are never served even before a manual clear.

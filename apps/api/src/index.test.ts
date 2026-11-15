@@ -38,6 +38,17 @@ test('GET /health/llm requires ADMIN_TOKEN', async () => {
   });
   assert.equal(unauthorized.statusCode, 401);
 
+  const viaBearer = await app.inject({
+    method: 'GET',
+    url: '/health/llm',
+    headers: { authorization: 'Bearer test-admin-token' },
+  });
+  // Auth passes; may be 200 or 503 depending on LLM keys in the test env.
+  assert.ok([200, 503].includes(viaBearer.statusCode));
+  if (viaBearer.statusCode === 401) {
+    assert.fail('Bearer ADMIN_TOKEN should authorize /health/llm');
+  }
+
   if (previous === undefined) {
     delete process.env.ADMIN_TOKEN;
   } else {
