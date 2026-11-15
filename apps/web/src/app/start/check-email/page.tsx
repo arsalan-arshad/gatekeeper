@@ -1,8 +1,7 @@
 import Link from 'next/link';
 
 export default function CheckEmailPage() {
-  const showDevConsoleHint =
-    process.env.NODE_ENV !== 'production' && !process.env.RESEND_API_KEY;
+  const showDevConsoleHint = process.env.NODE_ENV !== 'production' && !process.env.RESEND_API_KEY;
 
   return (
     <main className="mx-auto flex min-h-screen max-w-lg flex-col justify-center gap-4 px-6 py-16">
