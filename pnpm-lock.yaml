@@ -74,7 +74,7 @@ importers:
         specifier: workspace:^
         version: link:../../packages/db
       drizzle-orm:
-        specifier: ^0.45.2
+        specifier: '>=0.45.2'
         version: 0.45.4(gel@2.2.1)(postgres@3.4.9)
       next:
         specifier: ^15.2.2
