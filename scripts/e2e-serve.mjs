@@ -14,6 +14,8 @@ const env = {
   AUTH_URL: process.env.AUTH_URL || 'http://127.0.0.1:3000',
   API_URL: process.env.API_URL || 'http://127.0.0.1:4000',
   NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000',
+  NEXT_PUBLIC_SITE_URL:
+    process.env.NEXT_PUBLIC_SITE_URL || process.env.APP_URL || 'http://127.0.0.1:3000',
   PORT: process.env.PORT || '3000',
 };
 
