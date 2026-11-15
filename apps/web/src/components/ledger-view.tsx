@@ -59,10 +59,22 @@ export function LedgerView({
         ) : null}
         <div className="grid gap-4 sm:grid-cols-2">
           <Stat label="Requests" value={String(totals.requestCount)} />
-          <Stat label="Delivered" value={String(totals.deliveredCount)} />
-          <Stat label="Accepted" value={String(totals.acceptedCount)} />
+          <Stat
+            label="Delivered"
+            value={String(totals.deliveredCount)}
+            title="AI accepted and forwarded for opt-in (not the same as Accepted)"
+          />
+          <Stat
+            label="Accepted"
+            value={String(totals.acceptedCount)}
+            title="Receiver opted in to the intro"
+          />
           <Stat label="Spam blocked" value={String(totals.spamCount)} />
-          <Stat label="Accept rate" value={formatPercent(totals.acceptRate)} />
+          <Stat
+            label="Accept rate"
+            value={formatPercent(totals.acceptRate)}
+            title="Accepted ÷ total requests (delivered is AI-forwarded, not this rate)"
+          />
           <Stat label="Trust score" value={formatPercent(totals.trustScore)} />
         </div>
       </section>
@@ -145,9 +157,9 @@ export function LedgerView({
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, title }: { label: string; value: string; title?: string }) {
   return (
-    <div className="border-b border-white/10 pb-3">
+    <div className="border-b border-white/10 pb-3" title={title}>
       <p className="text-sm text-[var(--muted)]">{label}</p>
       <p className="mt-1 text-2xl" style={{ fontFamily: 'var(--font-display), Georgia, serif' }}>
         {value}

@@ -76,7 +76,7 @@ export async function registerOptInRoutes(app: FastifyInstance): Promise<void> {
       }
       await db
         .update(requests)
-        .set({ ownerDecision: 'reject', status: 'declined', stakeCents: 0 })
+        .set({ ownerDecision: 'reject', decidedAt: new Date(), status: 'declined', stakeCents: 0 })
         .where(eq(requests.id, id));
 
       const send = createEmailSender();
@@ -102,7 +102,7 @@ export async function registerOptInRoutes(app: FastifyInstance): Promise<void> {
 
     await db
       .update(requests)
-      .set({ ownerDecision: 'accept', status: 'delivered' })
+      .set({ ownerDecision: 'accept', decidedAt: new Date(), status: 'delivered' })
       .where(eq(requests.id, id));
 
     const settlement = await settleAcceptedIntro({
@@ -133,7 +133,7 @@ export async function registerOptInRoutes(app: FastifyInstance): Promise<void> {
 
     await db
       .update(requests)
-      .set({ ownerDecision: 'accept', status: 'accepted', stakeCents: 0 })
+      .set({ ownerDecision: 'accept', decidedAt: new Date(), status: 'accepted', stakeCents: 0 })
       .where(eq(requests.id, id));
 
     return reply

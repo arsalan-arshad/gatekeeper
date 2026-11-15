@@ -7,6 +7,15 @@ export function computeTrustScore(helpfulCount: number, deliveredCount: number):
   return Number((helpfulCount / deliveredCount).toFixed(4));
 }
 
+/**
+ * Accept rate = receiver-accepted intros / total requests (0 when total is 0).
+ * Distinct from delivered (AI-accepted / forwarded for opt-in).
+ */
+export function computeAcceptRate(acceptedCount: number, totalRequests: number): number {
+  if (totalRequests <= 0) return 0;
+  return Number((acceptedCount / totalRequests).toFixed(4));
+}
+
 /** Seeded demo profile handles from `packages/db/src/seed.ts`. */
 export const DEMO_LEDGER_HANDLES = ['demo', 'ada', 'jonas', 'mira'] as const;
 
@@ -57,10 +66,7 @@ export function summarizeLedgerMonths(months: LedgerMonthRow[]): LedgerSummary {
 
   return {
     ...summary,
-    acceptRate:
-      summary.requestCount === 0
-        ? 0
-        : Number((summary.deliveredCount / summary.requestCount).toFixed(4)),
+    acceptRate: computeAcceptRate(summary.acceptedCount, summary.requestCount),
     trustScore: computeTrustScore(summary.helpfulCount, summary.deliveredCount),
   };
 }

@@ -68,7 +68,7 @@ export async function registerLedgerRoutes(app: FastifyInstance): Promise<void> 
         helpfulCount: sql<number>`sum(${ledgerStats.helpfulCount})::int`,
         acceptRate: sql<number>`
           CASE WHEN sum(${ledgerStats.requestCount}) = 0 THEN 0
-          ELSE sum(${ledgerStats.deliveredCount})::float8 / sum(${ledgerStats.requestCount})::float8
+          ELSE sum(${ledgerStats.acceptedCount})::float8 / sum(${ledgerStats.requestCount})::float8
           END
         `,
       })

@@ -45,6 +45,7 @@ function formatDecisionLabel(decision: 'accept' | 'reject' | 'spam'): string {
 function formatAiVerdict(item: InboxItem): string {
   const label = (item.decision ?? 'pending').toUpperCase();
   if (item.score == null) return `AI: ${label}`;
+  // Spec example: "AI: REJECT 44"
   return `AI: ${label} ${item.score}`;
 }
 
