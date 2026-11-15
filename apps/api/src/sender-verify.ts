@@ -6,16 +6,22 @@ import { getDb } from './db.js';
 import type { EmailSender } from './email.js';
 import { buildSenderVerifyEmail } from './email-templates.js';
 import {
+  checkSenderVerifyEmailRateLimit,
+  checkSenderVerifyIpRateLimit,
   consumePostgresRateLimit,
   peekPostgresRateLimit,
   resetRateLimitersForTests,
+  SENDER_VERIFY_EMAIL_LIMIT,
+  SENDER_VERIFY_IP_LIMIT,
 } from './rate-limit.js';
 import { normalizeSenderEmail } from './request-dedupe.js';
 import { resolveEmailLinkSecret } from './tokens.js';
 
-/** Max outbound emails to a given senderContact per rolling day. */
+/** Max outbound emails to a given senderContact per rolling day (post-verify mail). */
 export const SENDER_OUTBOUND_DAILY_LIMIT = 3;
 const SENDER_OUTBOUND_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+export { SENDER_VERIFY_EMAIL_LIMIT, SENDER_VERIFY_IP_LIMIT };
 
 export function resetSenderOutboundLimiterForTests(): void {
   resetRateLimitersForTests();
@@ -23,9 +29,12 @@ export function resetSenderOutboundLimiterForTests(): void {
 
 /** In-memory override for unit tests (avoids holding DB connections open). */
 const verifiedOverride = new Set<string>();
+/** When true, misses are unverified without querying Postgres. */
+let verificationTestMode = false;
 
 export function setSenderVerifiedForTests(email: string | null): void {
   verifiedOverride.clear();
+  verificationTestMode = true;
   if (email) verifiedOverride.add(normalizeSenderEmail(email));
 }
 
@@ -33,6 +42,7 @@ export async function isSenderContactVerified(email: string): Promise<boolean> {
   const normalized = normalizeSenderEmail(email);
   if (!normalized) return false;
   if (verifiedOverride.has(normalized)) return true;
+  if (verificationTestMode) return false;
   const db = getDb();
   const [row] = await db
     .select({ email: verifiedSenders.email })
@@ -108,7 +118,7 @@ export async function markSenderContactVerified(email: string): Promise<void> {
 
 /**
  * Consume one outbound slot for this sender. Returns false if daily cap hit.
- * Verification emails and any other mail TO the sender share this budget.
+ * Reject / decline / intro mail TO the sender share this budget (not verify mail).
  */
 export async function consumeSenderOutboundSlot(email: string): Promise<{
   ok: boolean;
@@ -126,14 +136,25 @@ export async function consumeSenderOutboundSlot(email: string): Promise<{
 
 export async function maybeSendSenderVerificationEmail(
   send: EmailSender,
-  input: { senderEmail: string; senderName: string; env?: NodeJS.ProcessEnv },
+  input: {
+    senderEmail: string;
+    senderName: string;
+    clientIp?: string | null;
+    env?: NodeJS.ProcessEnv;
+  },
 ): Promise<{ sent: boolean; reason?: string; id?: string; mode?: string }> {
   if (await isSenderContactVerified(input.senderEmail)) {
     return { sent: false, reason: 'already_verified' };
   }
-  const slot = await consumeSenderOutboundSlot(input.senderEmail);
-  if (!slot.ok) {
-    return { sent: false, reason: 'outbound_cap' };
+
+  const emailLimit = await checkSenderVerifyEmailRateLimit(input.senderEmail);
+  if (!emailLimit.ok) {
+    return { sent: false, reason: 'verify_email_cap' };
+  }
+
+  const ipLimit = await checkSenderVerifyIpRateLimit(input.clientIp || 'unknown');
+  if (!ipLimit.ok) {
+    return { sent: false, reason: 'verify_ip_cap' };
   }
 
   const token = createSenderVerifyToken(input.senderEmail, { env: input.env });

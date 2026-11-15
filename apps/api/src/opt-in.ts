@@ -132,6 +132,7 @@ export async function sendDeclineAutoReply(
       await maybeSendSenderVerificationEmail(send, {
         senderEmail: input.senderEmail,
         senderName: input.senderName,
+        clientIp: null,
         env: input.env,
       });
     }
@@ -192,6 +193,7 @@ export async function sendIntroEmailToBoth(
       await maybeSendSenderVerificationEmail(send, {
         senderEmail: input.senderEmail,
         senderName: input.senderName,
+        clientIp: null,
         env: input.env,
       });
     }

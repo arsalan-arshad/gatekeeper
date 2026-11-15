@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import { clientIp } from './client-ip.ts';
 import {
@@ -8,6 +10,7 @@ import {
   checkIpRateLimit,
   checkPublicFormIpRateLimit,
   checkPublicFormSenderOwnerRateLimit,
+  rateLimitResultFromCount,
   resetRateLimitersForTests,
   retryAfterSeconds,
   useMemoryRateLimitersForTests,
@@ -96,4 +99,40 @@ test('spoofed XFF does not reset rate limit key', async () => {
   // Spoofed client XFF must not open a fresh bucket for the same peer.
   const stillBlocked = await checkIpRateLimit(clientIp({ ip: '10.0.0.5' }));
   assert.equal(stillBlocked.ok, false);
+});
+
+test('rateLimitResultFromCount treats post-increment over limit as denied', () => {
+  const now = 10_000;
+  const ok = rateLimitResultFromCount(3, 3, now, now, 60_000);
+  assert.equal(ok.ok, true);
+  assert.equal(ok.remaining, 0);
+
+  const denied = rateLimitResultFromCount(4, 3, now, now, 60_000);
+  assert.equal(denied.ok, false);
+  assert.equal(denied.remaining, 0);
+});
+
+test('email aliases share public-form sender+owner quota', async () => {
+  resetRateLimitersForTests();
+  assert.equal((await checkPublicFormSenderOwnerRateLimit('a+1@example.com', 'owner-1')).ok, true);
+  assert.equal((await checkPublicFormSenderOwnerRateLimit('a+2@example.com', 'owner-1')).ok, true);
+  assert.equal((await checkPublicFormSenderOwnerRateLimit('A+3@Example.com', 'owner-1')).ok, true);
+  assert.equal((await checkPublicFormSenderOwnerRateLimit('a+9@example.com', 'owner-1')).ok, false);
+  assert.equal((await checkPublicFormSenderOwnerRateLimit('a.b+1@gmail.com', 'owner-1')).ok, true);
+  assert.equal((await checkPublicFormSenderOwnerRateLimit('ab+2@gmail.com', 'owner-1')).ok, true);
+  assert.equal((await checkPublicFormSenderOwnerRateLimit('a.b+3@gmail.com', 'owner-1')).ok, true);
+  assert.equal((await checkPublicFormSenderOwnerRateLimit('ab@gmail.com', 'owner-1')).ok, false);
+});
+
+test('postgres consume path is a single INSERT ON CONFLICT RETURNING', async () => {
+  const src = await readFile(fileURLToPath(new URL('./rate-limit.ts', import.meta.url)), 'utf8');
+  const consumeFn = src.slice(
+    src.indexOf('export async function consumePostgresRateLimit'),
+    src.indexOf('export async function peekPostgresRateLimit'),
+  );
+  assert.match(consumeFn, /INSERT INTO rate_limit_buckets/);
+  assert.match(consumeFn, /ON CONFLICT \(bucket_key\) DO UPDATE/);
+  assert.match(consumeFn, /RETURNING count/);
+  assert.doesNotMatch(consumeFn, /\.select\(/);
+  assert.doesNotMatch(consumeFn, /\.update\(/);
 });
