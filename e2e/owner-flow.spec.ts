@@ -12,9 +12,10 @@ test('owner flow: login, interview, publish, inbox approve, sign out', async ({ 
   await page.getByTestId('e2e-email').fill(email);
   await page.getByTestId('e2e-secret').fill(E2E_SECRET);
   await page.getByTestId('e2e-submit').click();
-  await expect(page.getByText(/Set up your front door|Signed in as/i)).toBeVisible({
+  await expect(page.getByRole('heading', { name: 'Set up your front door' })).toBeVisible({
     timeout: 20_000,
   });
+  await expect(page.getByText(new RegExp(`Signed in as ${email}`, 'i'))).toBeVisible();
 
   // 2. Interview
   const answers = [
@@ -34,7 +35,9 @@ test('owner flow: login, interview, publish, inbox approve, sign out', async ({ 
     }
   }
 
-  await expect(page.getByText('Edit your gate rules')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('heading', { name: 'Edit your gate rules' })).toBeVisible({
+    timeout: 20_000,
+  });
   await page.locator('label:has-text("Public handle") input').fill(handle);
   await page.getByRole('button', { name: 'Publish my Gatekeeper' }).click();
 
@@ -61,11 +64,11 @@ test('owner flow: login, interview, publish, inbox approve, sign out', async ({ 
 
   // 6. Approve
   await page.getByRole('button', { name: 'Approve intro' }).first().click();
-  await expect(page.getByText(/Casey Sender/i)).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText('Casey Sender')).toBeVisible({ timeout: 15_000 });
 
   // 7. Sign out
   await page.getByRole('button', { name: 'Sign out' }).first().click();
-  await expect(page.getByText(/magic link|Set up your front door|Gatekeeper/i)).toBeVisible({
+  await expect(page.getByRole('button', { name: 'Email me a magic link' })).toBeVisible({
     timeout: 15_000,
   });
 });
