@@ -1,3 +1,5 @@
+import { sanitizeEmailSubject } from './email-subject.js';
+
 export type EmailBrandLinks = {
   appUrl: string;
   settingsUrl: string;
@@ -68,7 +70,7 @@ export function buildMagicLinkEmail(input: { url: string; env?: NodeJS.ProcessEn
   text: string;
 } {
   const links = getEmailBrandLinks(input.env);
-  const subject = 'Sign in to Gatekeeper';
+  const subject = sanitizeEmailSubject('Sign in to Gatekeeper');
   const text = [
     'Sign in to Gatekeeper with this magic link:',
     input.url,
@@ -103,7 +105,9 @@ export function buildOwnerNotificationEmail(input: {
 }): { subject: string; html: string; text: string } {
   const links = getEmailBrandLinks(input.env);
   const preview = input.message.trim().slice(0, 600);
-  const subject = `Gatekeeper: ${input.decision} · ${input.senderName} (${input.score}/100)`;
+  const subject = sanitizeEmailSubject(
+    `Gatekeeper: ${input.decision} · ${input.senderName} (${input.score}/100)`,
+  );
   const text = [
     `Hi ${input.receiverName},`,
     '',
@@ -151,7 +155,7 @@ export function buildReceiverOptInEmail(input: {
 }): { subject: string; html: string; text: string } {
   const links = getEmailBrandLinks(input.env);
   const preview = input.message.trim().slice(0, 600);
-  const subject = `Gatekeeper: intro request from ${input.senderName}`;
+  const subject = sanitizeEmailSubject(`Gatekeeper: intro request from ${input.senderName}`);
   const text = [
     `Hi ${input.receiverName},`,
     '',
@@ -193,7 +197,7 @@ export function buildRejectEmail(input: {
 }): { subject: string; html: string; text: string } {
   const links = getEmailBrandLinks(input.env);
   const rewrite = input.suggestedRewrite?.trim() || null;
-  const subject = `Gatekeeper update: your intro to ${input.receiverName}`;
+  const subject = sanitizeEmailSubject(`Gatekeeper update: your intro to ${input.receiverName}`);
   const text = [
     `Hi ${input.senderName},`,
     '',
@@ -235,7 +239,7 @@ export function buildDeclineAutoReplyEmail(input: {
   env?: NodeJS.ProcessEnv;
 }): { subject: string; html: string; text: string } {
   const links = getEmailBrandLinks(input.env);
-  const subject = `Thanks for reaching out to ${input.receiverName}`;
+  const subject = sanitizeEmailSubject(`Thanks for reaching out to ${input.receiverName}`);
   const text = [
     `Hi ${input.senderName},`,
     '',
@@ -268,7 +272,7 @@ export function buildIntroEmail(input: {
   env?: NodeJS.ProcessEnv;
 }): { subject: string; html: string; text: string } {
   const links = getEmailBrandLinks(input.env);
-  const subject = `Intro: ${input.senderName} ↔ ${input.receiverName}`;
+  const subject = sanitizeEmailSubject(`Intro: ${input.senderName} ↔ ${input.receiverName}`);
   const text = [
     `You're connected via Gatekeeper.`,
     '',

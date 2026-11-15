@@ -11,6 +11,7 @@ import { buildLlmsTxt } from './llms-txt.js';
 import { createLlm } from './llm.js';
 import { buildOpenApiDocument } from './openapi.js';
 import { FASTIFY_BODY_LIMIT } from './request-limits.js';
+import { assertEmailLinkSecretConfigured } from './tokens.js';
 import { registerAgentRoutes } from './routes/agent.js';
 import { registerDashboardRoutes } from './routes/dashboard.js';
 import { registerDemoRoutes } from './routes/demo.js';
@@ -179,6 +180,7 @@ export async function buildServer() {
 }
 
 async function main() {
+  assertEmailLinkSecretConfigured();
   const app = await buildServer();
   await app.listen({ port, host });
 }

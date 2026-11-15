@@ -65,7 +65,7 @@ test('summarizeLedgerMonths aggregates months and trust', () => {
 });
 
 test('helpful tokens verify for yes/no ratings', () => {
-  const env = { AUTH_SECRET: 'ledger-test-secret' };
+  const env = { AUTH_SECRET: 'ledger-test-secret-at-least-32-chars!' };
   const yes = createHelpfulToken({ requestId: 'r1', helpful: true }, { env });
   const no = createHelpfulToken({ requestId: 'r1', helpful: false }, { env });
 

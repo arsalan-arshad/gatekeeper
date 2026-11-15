@@ -52,7 +52,7 @@ jobs:
           APP_URL: https://gatekeeper.arsalandev.studio
           API_URL: https://api.gatekeeper.arsalandev.studio
           NEXT_PUBLIC_API_URL: https://api.gatekeeper.arsalandev.studio
-          AUTH_SECRET: ci-auth-secret-for-og-grep-only
+          AUTH_SECRET: ci-auth-secret-for-og-grep-only!
         run: |
           # next/font Google fetch can flake on runners — retry the build a few times.
           for i in 1 2 3; do
@@ -109,7 +109,7 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/gatekeeper
-      AUTH_SECRET: e2e-auth-secret-for-ci-only
+      AUTH_SECRET: e2e-auth-secret-for-ci-only-32ch
       E2E_ENABLED: '1'
       E2E_SECRET: e2e-ci-secret
       INTERNAL_API_SECRET: e2e-internal-api-secret-for-ci-only

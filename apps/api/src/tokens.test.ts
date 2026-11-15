@@ -1,9 +1,14 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { createOptInToken, verifyOptInToken } from './tokens.ts';
+import {
+  assertEmailLinkSecretConfigured,
+  createOptInToken,
+  resolveEmailLinkSecret,
+  verifyOptInToken,
+} from './tokens.ts';
 
-const env = { AUTH_SECRET: 'test-secret-for-opt-in' };
+const env = { AUTH_SECRET: 'test-secret-for-opt-in-links-32chars!!' };
 
 test('opt-in tokens verify for the matching request and action', () => {
   const token = createOptInToken({ requestId: 'req-1', action: 'accept' }, { env });
@@ -29,4 +34,15 @@ test('opt-in tokens reject wrong action, request, or expiry', () => {
     verifyOptInToken(token, { requestId: 'req-1', action: 'accept' }, { env, now: 2_000 }).ok,
     false,
   );
+});
+
+test('resolveEmailLinkSecret rejects missing or short secrets', () => {
+  assert.throws(() => resolveEmailLinkSecret({}), /at least 32/);
+  assert.throws(() => resolveEmailLinkSecret({ AUTH_SECRET: 'short' }), /at least 32/);
+  assert.equal(resolveEmailLinkSecret(env), env.AUTH_SECRET);
+});
+
+test('assertEmailLinkSecretConfigured fails startup on short secret', () => {
+  assert.throws(() => assertEmailLinkSecretConfigured({ AUTH_SECRET: 'tiny' }), /at least 32/);
+  assert.doesNotThrow(() => assertEmailLinkSecretConfigured(env));
 });

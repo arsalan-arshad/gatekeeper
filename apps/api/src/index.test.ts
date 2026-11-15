@@ -33,9 +33,16 @@ test('GET /health/llm requires ADMIN_TOKEN', async () => {
   assert.equal(missing.statusCode, 503);
 
   process.env.ADMIN_TOKEN = 'test-admin-token';
+  const viaQuery = await app.inject({
+    method: 'GET',
+    url: '/health/llm?token=test-admin-token',
+  });
+  assert.equal(viaQuery.statusCode, 401, 'query ?token= must not authorize');
+
   const unauthorized = await app.inject({
     method: 'GET',
-    url: '/health/llm?token=wrong',
+    url: '/health/llm',
+    headers: { authorization: 'Bearer wrong' },
   });
   assert.equal(unauthorized.statusCode, 401);
 
