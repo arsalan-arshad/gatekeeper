@@ -9,8 +9,13 @@
 import { pathToFileURL } from 'node:url';
 
 import { DEMO_ACCEPT_THRESHOLD, demoJudgeRequest } from './demo-judge.js';
-import { JUDGE_EVAL_CASES } from './eval-judge.cases.js';
-import { decisionMatchesScore } from './judge.js';
+import { JUDGE_EVAL_CASES, type JudgeEvalCase } from './eval-judge.cases.js';
+import {
+  decisionMatchesScore,
+  hasCompanyVoice,
+  hasRewritePlaceholders,
+  isCoachingTip,
+} from './judge.js';
 import { createLlm } from './llm.js';
 
 const ACCURACY_THRESHOLD = 0.9;
@@ -24,6 +29,48 @@ export type EvalRow = {
   error?: string;
   bandOk: boolean;
 };
+
+function evaluateChecks(
+  testCase: JudgeEvalCase,
+  result: {
+    decision: string;
+    reason_public: string;
+    suggested_rewrite: string | null;
+  },
+): string | undefined {
+  const checks = testCase.checks;
+  if (!checks) return undefined;
+
+  if (checks.rewriteNoPlaceholders) {
+    const rewrite = result.suggested_rewrite ?? '';
+    if (rewrite && hasRewritePlaceholders(rewrite)) {
+      return `rewrite has placeholders: ${rewrite.slice(0, 80)}`;
+    }
+  }
+
+  if (checks.rewriteIsCoachingTip) {
+    const rewrite = result.suggested_rewrite ?? '';
+    if (!rewrite || !isCoachingTip(rewrite)) {
+      return `expected coaching-tip rewrite, got: ${rewrite.slice(0, 100) || 'null'}`;
+    }
+  }
+
+  if (checks.reasonPersonalVoice) {
+    const reason = result.reason_public ?? '';
+    if (hasCompanyVoice(reason)) {
+      return `reason uses company voice: ${reason.slice(0, 100)}`;
+    }
+    // Prefer first-person / owner-named personal gatekeeper phrasing.
+    const personal =
+      /\b(I'|I |Sam|I'll|I will|I won't|I cannot|I can't)\b/i.test(reason) ||
+      /\bSam\b/.test(reason);
+    if (!personal) {
+      return `reason lacks personal gatekeeper voice: ${reason.slice(0, 100)}`;
+    }
+  }
+
+  return undefined;
+}
 
 export async function runJudgeEval(options?: {
   cases?: typeof JUDGE_EVAL_CASES;
@@ -58,16 +105,24 @@ export async function runJudgeEval(options?: {
         continue;
       }
 
-      const ok = result.decision === testCase.expected;
+      const labelOk = result.decision === testCase.expected;
       const bandOk = decisionMatchesScore(result.decision, result.score);
+      const checkError = evaluateChecks(testCase, result);
+      const ok = labelOk && bandOk && !checkError;
       rows.push({
         id: testCase.id,
         expected: testCase.expected,
         actual: result.decision,
         score: result.score,
-        ok: ok && bandOk,
+        ok,
         bandOk,
-        error: bandOk ? undefined : `score ${result.score} outside ${result.decision} band`,
+        error: checkError
+          ? checkError
+          : bandOk
+            ? labelOk
+              ? undefined
+              : `expected=${testCase.expected} actual=${result.decision}`
+            : `score ${result.score} outside ${result.decision} band`,
       });
     } catch (error) {
       rows.push({

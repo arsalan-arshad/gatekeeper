@@ -5,8 +5,12 @@ import {
   clampScoreToDecision,
   cosineSimilarity,
   decisionMatchesScore,
+  defaultCoachingTip,
   enforceDecision,
+  hasCompanyVoice,
   hasRewritePlaceholders,
+  inventsFactsInRewrite,
+  isCoachingTip,
   judgeRequest,
   llmJudgePayloadSchema,
   sanitizePublicReason,
@@ -80,7 +84,24 @@ test('score bands match verdicts and placeholders are detected', () => {
   assert.equal(clampScoreToDecision('reject', 88), 59);
   assert.equal(hasRewritePlaceholders('Hi from <YourCompany>'), true);
   assert.equal(hasRewritePlaceholders('Looking for a [role] intro'), true);
+  assert.equal(hasRewritePlaceholders('I am building X for Y'), true);
   assert.equal(hasRewritePlaceholders('Hi — I ship billing tools for indie SaaS.'), false);
+  assert.equal(hasCompanyVoice('Please forward this to the appropriate team.'), true);
+  assert.equal(hasCompanyVoice("I'll pass this to Sam."), false);
+  assert.equal(isCoachingTip(defaultCoachingTip('Sam')), true);
+  assert.equal(
+    inventsFactsInRewrite(
+      'Hi — I’m Nova from AcmeCorp shipping WidgetOS.',
+      'Quick sync sometime?',
+      'Vague',
+      'Ada Chen',
+    ),
+    true,
+  );
+  assert.equal(
+    inventsFactsInRewrite(defaultCoachingTip('Sam'), 'Quick sync?', 'Vague', 'Sam'),
+    false,
+  );
 
   const bad = llmJudgePayloadSchema.safeParse({
     score: 80,
@@ -91,6 +112,16 @@ test('score bands match verdicts and placeholders are detected', () => {
     deal_breaker_hit: true,
   });
   assert.equal(bad.success, false);
+
+  const companyReason = llmJudgePayloadSchema.safeParse({
+    score: 34,
+    decision: 'reject',
+    reason_public: 'We will forward this to the appropriate team.',
+    reason_private: 'x',
+    suggested_rewrite: defaultCoachingTip('Ada'),
+    deal_breaker_hit: false,
+  });
+  assert.equal(companyReason.success, false);
 });
 
 test('judgeRequest retries once when score/verdict disagree then accepts correction', async () => {
@@ -108,10 +139,9 @@ test('judgeRequest retries once when score/verdict disagree then accepts correct
       JSON.stringify({
         score: 34,
         decision: 'reject',
-        reason_public: 'A vague ask is not a strong fit right now.',
+        reason_public: "I'll pass on vague asks — Ada wants a concrete written intro.",
         reason_private: 'corrected',
-        suggested_rewrite:
-          'Hi Ada — I run a B2B invoicing SaaS and wanted a short intro about billing edge cases.',
+        suggested_rewrite: defaultCoachingTip('Ada'),
         deal_breaker_hit: false,
       }),
     ],
@@ -132,6 +162,48 @@ test('judgeRequest retries once when score/verdict disagree then accepts correct
   assert.ok(result.score >= 26 && result.score <= 59);
   assert.ok(result.suggested_rewrite);
   assert.equal(hasRewritePlaceholders(result.suggested_rewrite!), false);
+  assert.equal(isCoachingTip(result.suggested_rewrite!), true);
+});
+
+test('judgeRequest post-checks invented rewrite facts and retries once', async () => {
+  const llm = mockLlm({
+    embedding: [1, 0, 0, 0],
+    completion: [
+      JSON.stringify({
+        score: 36,
+        decision: 'reject',
+        reason_public: 'We will forward this to the appropriate team.',
+        reason_private: 'bad voice + invent',
+        suggested_rewrite:
+          'Hi — I’m Casey from NovaLabs shipping OrbitPay and wanted a Stripe deep-dive.',
+        deal_breaker_hit: false,
+      }),
+      JSON.stringify({
+        score: 36,
+        decision: 'reject',
+        reason_public: "I'll pass on this for now — Ada needs a specific written ask.",
+        reason_private: 'fixed',
+        suggested_rewrite: defaultCoachingTip('Ada'),
+        deal_breaker_hit: false,
+      }),
+    ],
+  });
+
+  const result = await judgeRequest(
+    {
+      message: 'Hi want to chat sometime?',
+      senderName: 'Anon',
+      senderType: 'human',
+      target: SAMPLE_TARGET,
+    },
+    llm,
+  );
+
+  assert.equal(llm.calls, 2);
+  assert.equal(result.decision, 'reject');
+  assert.equal(isCoachingTip(result.suggested_rewrite!), true);
+  assert.equal(hasCompanyVoice(result.reason_public), false);
+  assert.match(result.reason_public, /Ada|I'|I'll|I /i);
 });
 
 test('judgeRequest drops rewrite for spam even if the model invents one', async () => {

@@ -216,8 +216,7 @@ export const JUDGE_SAMPLES: JudgeSample[] = [
       decision: 'accept', // below min_relevance 70 — must become reject; score clamped to reject band
       reason_public: 'Maybe interesting later.',
       reason_private: 'Too vague; score under threshold.',
-      suggested_rewrite:
-        'Hi Ada — I angel-invest in B2B infra and would love a short written intro about your billing roadmap.',
+      suggested_rewrite: 'Say who you are, what specific thing you want from Ada, and why Ada.',
       deal_breaker_hit: false,
     },
     expectedDecision: 'reject',

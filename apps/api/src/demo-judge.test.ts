@@ -95,15 +95,14 @@ test('demoJudgeRequest marks crypto pitches as spam with request-specific reason
   assert.match(result.reason_public, /crypto|nft|spam|deal-breaker|promo/i);
 });
 
-test('demoJudgeRequest rejects vague coffee chats for @demo', async () => {
+test('demoJudgeRequest rejects vague coffee chats for @demo with coaching tip', async () => {
   const llm = mockLlm({
     completion: JSON.stringify({
       score: 34,
       decision: 'reject',
-      reason_public: 'A vague coffee chat without a written ask is not a strong fit right now.',
+      reason_public: "Sam isn't taking vague coffee chats right now — send a specific written ask.",
       reason_private: 'vague',
-      suggested_rewrite:
-        'Hi Sam — I’m Alex, a founder shipping usage-based invoicing. I’d love a short written intro about Stripe metered billing.',
+      suggested_rewrite: 'Say who you are, what specific thing you want from Sam, and why Sam.',
       deal_breaker_hit: false,
     }),
   });
@@ -117,6 +116,8 @@ test('demoJudgeRequest rejects vague coffee chats for @demo', async () => {
   assert.equal(result.decision, 'reject');
   assert.ok(result.score >= 26 && result.score <= 59);
   assert.ok(result.suggested_rewrite);
+  assert.match(result.suggested_rewrite!, /Say who you are/i);
+  assert.match(result.reason_public, /Sam|I'|I'll/i);
 });
 
 test('strong request scores higher than spam', async () => {

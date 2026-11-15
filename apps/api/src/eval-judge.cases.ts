@@ -2,13 +2,23 @@ import type { JudgeDecision } from './judge.js';
 
 /**
  * Labeled cases for `pnpm eval:judge` — judged against the @demo profile (Sam Rivera).
- * Keep ~12 cases balanced across accept / reject / spam.
+ * Optional `checks` enforce rewrite/reason polish beyond the verdict label.
  */
+export type JudgeEvalChecks = {
+  /** Rewrite must be a short coaching tip (sparse message), not an invented bio. */
+  rewriteIsCoachingTip?: boolean;
+  /** Rewrite must not contain placeholder patterns (X, Y, <...>, [...]). */
+  rewriteNoPlaceholders?: boolean;
+  /** reason_public must sound like Sam's personal gatekeeper, not a company desk. */
+  reasonPersonalVoice?: boolean;
+};
+
 export type JudgeEvalCase = {
   id: string;
   message: string;
   senderName: string;
   expected: JudgeDecision;
+  checks?: JudgeEvalChecks;
 };
 
 export const JUDGE_EVAL_CASES: JudgeEvalCase[] = [
@@ -46,6 +56,11 @@ export const JUDGE_EVAL_CASES: JudgeEvalCase[] = [
     expected: 'reject',
     message:
       'Hey — would love to pick your brain over coffee sometime and hear your founder journey. No specific ask yet, just a quick sync!',
+    checks: {
+      rewriteIsCoachingTip: true,
+      rewriteNoPlaceholders: true,
+      reasonPersonalVoice: true,
+    },
   },
   {
     id: 'reject-vague-partnership',
@@ -53,6 +68,10 @@ export const JUDGE_EVAL_CASES: JudgeEvalCase[] = [
     expected: 'reject',
     message:
       'Excited about potential synergies and partnership opportunities. Let’s connect when you have a moment!',
+    checks: {
+      rewriteIsCoachingTip: true,
+      rewriteNoPlaceholders: true,
+    },
   },
   {
     id: 'reject-mentorship',
@@ -60,6 +79,10 @@ export const JUDGE_EVAL_CASES: JudgeEvalCase[] = [
     expected: 'reject',
     message:
       'Hi Sam — I’m a student exploring startups. Any chance of a casual chat about your journey and advice for beginners?',
+    checks: {
+      rewriteNoPlaceholders: true,
+      reasonPersonalVoice: true,
+    },
   },
   {
     id: 'reject-wrong-audience',
@@ -67,6 +90,9 @@ export const JUDGE_EVAL_CASES: JudgeEvalCase[] = [
     expected: 'reject',
     message:
       'I built a consumer meditation app and wanted feedback from any founder. Can we hop on a call this week?',
+    checks: {
+      rewriteNoPlaceholders: true,
+    },
   },
   {
     id: 'spam-crypto',
@@ -95,5 +121,38 @@ export const JUDGE_EVAL_CASES: JudgeEvalCase[] = [
     expected: 'spam',
     message:
       'GM! Launching an NFT membership pass + token. Want me to blast it to your audience for a rev share???',
+  },
+  {
+    id: 'reject-sparse-coaching-tip',
+    senderName: 'Anon',
+    expected: 'reject',
+    message: 'Hi want to chat sometime?',
+    checks: {
+      rewriteIsCoachingTip: true,
+      rewriteNoPlaceholders: true,
+      reasonPersonalVoice: true,
+    },
+  },
+  {
+    id: 'reject-no-invented-placeholders',
+    senderName: 'Jordan',
+    expected: 'reject',
+    message: 'Quick sync to explore opportunities?',
+    checks: {
+      rewriteIsCoachingTip: true,
+      rewriteNoPlaceholders: true,
+    },
+  },
+  {
+    id: 'reject-personal-gatekeeper-voice',
+    senderName: 'Casey Lee',
+    expected: 'reject',
+    message:
+      'Would love to pick your brain over coffee and hear how you built everything — no agenda yet.',
+    checks: {
+      reasonPersonalVoice: true,
+      rewriteNoPlaceholders: true,
+      rewriteIsCoachingTip: true,
+    },
   },
 ];
