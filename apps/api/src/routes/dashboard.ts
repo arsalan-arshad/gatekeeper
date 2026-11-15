@@ -85,6 +85,7 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
         senderType: requests.senderType,
         message: requests.message,
         decision: requests.decision,
+        ownerDecision: requests.ownerDecision,
         status: requests.status,
         aiScore: requests.aiScore,
         aiReasonPublic: requests.aiReasonPublic,
@@ -98,10 +99,19 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
     const filtered = rows.filter((row) => {
       if (filter === 'all') return true;
       if (filter === 'accepted') {
-        return row.decision === 'accept' || row.status === 'accepted' || row.status === 'delivered';
+        return (
+          row.ownerDecision === 'accept' ||
+          row.decision === 'accept' ||
+          row.status === 'accepted' ||
+          row.status === 'delivered'
+        );
       }
-      if (filter === 'rejected') return row.decision === 'reject';
-      if (filter === 'spam') return row.decision === 'spam';
+      if (filter === 'rejected') {
+        return row.ownerDecision === 'reject' || row.decision === 'reject';
+      }
+      if (filter === 'spam') {
+        return row.ownerDecision === 'spam' || row.decision === 'spam';
+      }
       return true;
     });
 
@@ -114,6 +124,7 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
         senderType: row.senderType,
         message: row.message,
         decision: row.decision,
+        ownerDecision: row.ownerDecision,
         status: row.status,
         score: row.aiScore,
         reason: row.aiReasonPublic,
@@ -142,12 +153,11 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
       return reply.status(409).send({ error: 'Request already declined' });
     }
 
-    if (row.decision !== 'accept') {
-      await db
-        .update(requests)
-        .set({ decision: 'accept', status: 'delivered' })
-        .where(eq(requests.id, id));
-    }
+    // Owner approve keeps AI decision/score/reason intact; record owner_decision separately.
+    await db
+      .update(requests)
+      .set({ ownerDecision: 'accept', status: 'delivered' })
+      .where(eq(requests.id, id));
 
     const settlement = await settleAcceptedIntro({
       senderEmail: row.senderContact,
@@ -167,7 +177,10 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
       requestId: id,
     });
 
-    await db.update(requests).set({ status: 'accepted', stakeCents: 0 }).where(eq(requests.id, id));
+    await db
+      .update(requests)
+      .set({ ownerDecision: 'accept', status: 'accepted', stakeCents: 0 })
+      .where(eq(requests.id, id));
     return { ok: true, status: 'accepted' };
   });
 
@@ -194,7 +207,10 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
     if (row.stakeCents > 0) {
       await refundStake(row.senderContact, row.stakeCents);
     }
-    await db.update(requests).set({ status: 'declined', stakeCents: 0 }).where(eq(requests.id, id));
+    await db
+      .update(requests)
+      .set({ ownerDecision: 'reject', status: 'declined', stakeCents: 0 })
+      .where(eq(requests.id, id));
 
     const send = createEmailSender();
     await sendDeclineAutoReply(send, {
@@ -239,18 +255,19 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
       await refundStake(row.senderContact, row.stakeCents);
     }
 
+    // Override stores owner_decision only — AI verdict/score/reason stay unchanged.
     const [updated] = await db
       .update(requests)
       .set({
-        decision,
+        ownerDecision: decision,
         status: nextStatus,
         stakeCents: decision === 'accept' ? row.stakeCents : 0,
-        aiReasonPublic: `Owner override → ${decision}`,
       })
       .where(eq(requests.id, id))
       .returning({
         id: requests.id,
         decision: requests.decision,
+        ownerDecision: requests.ownerDecision,
         status: requests.status,
       });
 
@@ -283,15 +300,15 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
     const [updated] = await db
       .update(requests)
       .set({
-        decision: 'spam',
+        ownerDecision: 'spam',
         status: 'declined',
         stakeCents: 0,
-        aiReasonPublic: row.aiReasonPublic ?? 'Marked spam by owner',
       })
       .where(eq(requests.id, id))
       .returning({
         id: requests.id,
         decision: requests.decision,
+        ownerDecision: requests.ownerDecision,
         status: requests.status,
       });
 
@@ -538,6 +555,7 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
         senderType: requests.senderType,
         message: requests.message,
         decision: requests.decision,
+        ownerDecision: requests.ownerDecision,
         status: requests.status,
         aiScore: requests.aiScore,
         aiReasonPublic: requests.aiReasonPublic,

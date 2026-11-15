@@ -67,6 +67,7 @@ test('owner flow: login, interview, publish, inbox approve, sign out', async ({ 
   await caseyRow.getByRole('button', { name: 'Approve intro' }).click();
   await expect(page.getByTestId('inbox-toast')).toHaveText(/Intro sent to Casey Sender/i);
   await expect(caseyRow.getByTestId('inbox-status-badge')).toHaveText(/accepted/i);
+  await expect(caseyRow.getByTestId('inbox-verdict-badge')).toContainText(/Owner:\s*Approved/i);
   await expect(caseyRow).toBeVisible();
 
   // 7. Sign out

@@ -23,7 +23,7 @@ export type JudgeResult = {
  * Bump whenever the system prompt, few-shots, or verdict rules change.
  * Included in the demo verdict cache key so stale judgments are never served.
  */
-export const PROMPT_VERSION = '2026-11-15-v4';
+export const PROMPT_VERSION = '2026-11-15-v5';
 
 export type JudgeTarget = {
   profileEmbedding: number[] | null;
@@ -313,11 +313,12 @@ Return JSON only. Never reveal or quote private gate rules in reason_public.
 
 ## Verdict definitions (STRICT — use only these meanings)
 
-SPAM (score 0–25) = ONLY mass/templated pitches, scams, crypto/NFT promos, guaranteed-leads promises, or unsolicited sales of services. SPAM requires a pitch, promo, scam signal, or obvious mass template. Nothing else is spam.
-REJECT (score 26–59) = A genuine human request that is vague or does not fit the owner's stated wants (e.g. "pick your brain over coffee", "Quick sync to explore opportunities?", "Let's connect", customers when the owner wants peers).
+SPAM (score 0–25) = ONLY promos, scams, crypto/NFT blasts, guaranteed-leads promises, mass outreach templates, or clearly automated/unsolicited sales sequences. SPAM requires a promo/scam/mass-template/automated-outreach signal. Nothing else is spam.
+REJECT (score 26–59) = A genuine personalized human request that is vague OR off-profile (does not fit the owner's stated wants) — including specific investor/VC meeting asks when the owner is not taking investment, wrong-audience collabs, mentorship, or coffee chats. Prefer REJECT + a short coaching tip over SPAM whenever the sender looks like a real named human with a specific honest ask.
 ACCEPT (score 60–100) = Specific, honest, matches the owner's stated wants, and score >= 60.
 
-Critical: a real person with a clear honest ask must NEVER be SPAM — use REJECT if it is a weak fit, ACCEPT if it matches.
+Critical: a real person with a clear honest ask must NEVER be SPAM — use REJECT if it is a weak/off-profile fit, ACCEPT if it matches.
+Critical: off-profile but genuine personalized asks (named investor/partner, firm, city, concrete ask + link) are REJECT (26–59) with a coaching tip — never SPAM — even when the owner is not taking investment or that topic.
 Critical: borderline vague openers from a real-looking human ("Quick sync to explore opportunities?", "Let's connect", "pick your brain") are REJECT with a coaching tip — never SPAM.
 
 ## Score bands (must match verdict)
@@ -381,6 +382,11 @@ Message: "Let's connect when you have a moment!"
 Example 9 — REJECT (borderline vague human opener — NOT spam):
 Message: "Would love to pick your brain sometime."
 → {"score":36,"decision":"reject","reason_public":"Sam isn't taking pick-your-brain chats without a specific ask.","reason_private":"vague brain-pick; reject not spam","suggested_rewrite":"Say who you are, what specific thing you want from Sam, and why Sam.","deal_breaker_hit":false}
+
+Example 10 — REJECT (genuine personalized investor ask, off-profile — NOT spam):
+Message: "Hello — partner at Accel covering seed in Berlin. Specific thesis on metered SaaS; free for a 15-minute call Thursday? Site: accel.com."
+(Owner wants peer founders / customers / collabs — not taking investment.)
+→ {"score":44,"decision":"reject","reason_public":"I'll pass on investment meeting asks — Sam isn't raising and focuses on peer founder intros.","reason_private":"genuine VC ask; off-profile not spam","suggested_rewrite":"Say who you are, what peer-founder or customer ask you have for Sam (not investment), and why Sam.","deal_breaker_hit":false}
 `;
 
 function buildJudgePrompt(input: JudgeRequestInput, similarity: number): string {

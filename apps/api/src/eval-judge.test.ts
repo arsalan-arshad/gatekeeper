@@ -15,6 +15,7 @@ test('judge eval suite covers verdicts plus rewrite/reason polish cases', () => 
   assert.ok(JUDGE_EVAL_CASES.some((c) => c.checks?.reasonPersonalVoice));
   assert.ok(JUDGE_EVAL_CASES.some((c) => c.checks?.rewriteNoPlaceholders));
   assert.ok(JUDGE_EVAL_CASES.some((c) => c.id.startsWith('reject-borderline-')));
+  assert.ok(JUDGE_EVAL_CASES.some((c) => c.id === 'reject-offprofile-investor-northzone'));
 });
 
 test('runJudgeEval scores mock LLM labels, bands, and polish checks', async () => {

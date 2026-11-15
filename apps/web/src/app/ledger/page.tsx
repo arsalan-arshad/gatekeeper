@@ -17,16 +17,20 @@ async function getGlobalLedger(): Promise<{ data: LedgerPayload; unavailable: bo
 
 export default async function GlobalLedgerPage() {
   const { data, unavailable } = await getGlobalLedger();
+  // Pill whenever seeded demo rows contribute, ledger is empty/unavailable, or the API
+  // omits the flag (treat as sample until real non-demo volume sets includesDemoData=false).
+  const demoData = unavailable || data.totals.requestCount === 0 || data.includesDemoData !== false;
+
   return (
     <LedgerView
       data={data}
       title="Public ledger"
-      demoData={unavailable || data.totals.requestCount === 0}
+      demoData={demoData}
       notice={
         unavailable
-          ? 'Live totals are temporarily unavailable. Showing Demo data placeholder until the API is back.'
-          : data.totals.requestCount === 0
-            ? 'No live traffic yet — Demo data badge marks empty public ledgers.'
+          ? 'Live totals are temporarily unavailable. Showing Demo data — sample stats until the API is back.'
+          : demoData
+            ? 'Includes seeded demo traffic — Demo data — sample stats marks sample ledger rows.'
             : undefined
       }
     />

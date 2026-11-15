@@ -5,6 +5,33 @@ import { useEffect, useId, useRef, useState } from 'react';
 
 import { BRAND } from '@/lib/brand';
 
+function MenuIcon({ open }: { open: boolean }) {
+  if (open) {
+    return (
+      <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+        <path
+          d="M5 5l10 10M15 5L5 15"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.75"
+          strokeLinecap="round"
+        />
+      </svg>
+    );
+  }
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+      <path
+        d="M4 6h12M4 10h12M4 14h12"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 export function SiteNav({ compact = false }: { compact?: boolean } = {}) {
   const [open, setOpen] = useState(false);
   const menuId = useId();
@@ -69,13 +96,14 @@ export function SiteNav({ compact = false }: { compact?: boolean } = {}) {
 
         <button
           type="button"
-          className="inline-flex items-center justify-center rounded-md border border-white/15 px-3 py-2 text-sm text-[var(--fg)] sm:hidden"
+          className="inline-flex items-center justify-center rounded-md border border-white/15 p-2 text-[var(--fg)] sm:hidden"
+          aria-label={open ? 'Close menu' : 'Open menu'}
           aria-expanded={open}
           aria-controls={menuId}
           data-testid="mobile-nav-toggle"
           onClick={() => setOpen((v) => !v)}
         >
-          {open ? 'Close' : 'Menu'}
+          <MenuIcon open={open} />
         </button>
       </div>
 

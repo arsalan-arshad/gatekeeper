@@ -14,7 +14,10 @@ export type InboxItem = {
   senderContact: string;
   senderType: string;
   message: string;
+  /** AI verdict — never overwritten by owner actions. */
   decision: 'accept' | 'reject' | 'spam' | null;
+  /** Owner's explicit decision when they approve/decline/override/mark spam. */
+  ownerDecision: 'accept' | 'reject' | 'spam' | null;
   status: string;
   score: number | null;
   reason: string | null;

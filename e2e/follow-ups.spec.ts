@@ -5,9 +5,11 @@ const E2E_SECRET = process.env.E2E_SECRET || 'local-e2e-secret';
 async function openMobileMenu(page: Page) {
   const toggle = page.getByTestId('mobile-nav-toggle');
   await expect(toggle).toBeVisible();
+  await expect(toggle).toHaveAttribute('aria-label', 'Open menu');
   await expect(toggle).toHaveAttribute('aria-expanded', 'false');
   await toggle.click();
   await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(toggle).toHaveAttribute('aria-label', 'Close menu');
   await expect(page.getByTestId('mobile-nav-menu')).toBeVisible();
 }
 
@@ -20,10 +22,19 @@ test.describe('E2E follow-ups: ledger demo badge + mobile nav', () => {
       await page.goto('/');
 
       await expect(page.getByTestId('desktop-nav-links')).toBeHidden();
+      await expect(page.getByTestId('mobile-nav-toggle')).toHaveAttribute(
+        'aria-label',
+        'Open menu',
+      );
+      await expect(page.getByTestId('mobile-nav-toggle')).not.toHaveText(/Menu/i);
       await openMobileMenu(page);
 
       await page.keyboard.press('Escape');
       await expect(page.getByTestId('mobile-nav-toggle')).toHaveAttribute('aria-expanded', 'false');
+      await expect(page.getByTestId('mobile-nav-toggle')).toHaveAttribute(
+        'aria-label',
+        'Open menu',
+      );
       await expect(page.getByTestId('mobile-nav-menu')).toBeHidden();
 
       await openMobileMenu(page);
@@ -38,14 +49,14 @@ test.describe('E2E follow-ups: ledger demo badge + mobile nav', () => {
     await page.setViewportSize({ width: 375, height: 812 });
     await page.goto('/ledger');
     await expect(page.getByTestId('demo-data-badge')).toBeVisible();
-    await expect(page.getByTestId('demo-data-badge')).toHaveText(/Demo data/i);
+    await expect(page.getByTestId('demo-data-badge')).toHaveText('Demo data — sample stats');
   });
 
   test('Demo data badge visible on /@demo/ledger', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await page.goto('/@demo/ledger');
     await expect(page.getByTestId('demo-data-badge')).toBeVisible();
-    await expect(page.getByTestId('demo-data-badge')).toHaveText(/Demo data/i);
+    await expect(page.getByTestId('demo-data-badge')).toHaveText('Demo data — sample stats');
   });
 });
 
@@ -108,5 +119,6 @@ test.describe('E2E follow-ups: inbox toast + status badge', () => {
     await row.getByRole('button', { name: 'Approve intro' }).click();
     await expect(page.getByTestId('inbox-toast')).toHaveText(/Intro sent to Lena Hoffmann/i);
     await expect(row.getByTestId('inbox-status-badge')).toHaveText(/accepted/i);
+    await expect(row.getByTestId('inbox-verdict-badge')).toContainText(/Owner:\s*Approved/i);
   });
 });

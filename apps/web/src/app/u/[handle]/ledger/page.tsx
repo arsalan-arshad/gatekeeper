@@ -39,7 +39,10 @@ async function getUserLedger(handle: string): Promise<{
     return {
       data: payload,
       unavailable: false,
-      demoData: normalized === 'demo',
+      demoData:
+        normalized === 'demo' ||
+        payload.includesDemoData === true ||
+        payload.totals.requestCount === 0,
     };
   } catch {
     if (normalized === 'demo') {
