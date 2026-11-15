@@ -5,20 +5,20 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import { getDb } from './db.js';
 import type { EmailSender } from './email.js';
 import { buildSenderVerifyEmail } from './email-templates.js';
-import { FixedWindowRateLimiter } from './rate-limit.js';
+import {
+  consumePostgresRateLimit,
+  peekPostgresRateLimit,
+  resetRateLimitersForTests,
+} from './rate-limit.js';
 import { normalizeSenderEmail } from './request-dedupe.js';
 import { resolveEmailLinkSecret } from './tokens.js';
 
 /** Max outbound emails to a given senderContact per rolling day. */
 export const SENDER_OUTBOUND_DAILY_LIMIT = 3;
-
-const senderOutboundLimiter = new FixedWindowRateLimiter(
-  SENDER_OUTBOUND_DAILY_LIMIT,
-  24 * 60 * 60 * 1000,
-);
+const SENDER_OUTBOUND_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 export function resetSenderOutboundLimiterForTests(): void {
-  senderOutboundLimiter.clear();
+  resetRateLimitersForTests();
 }
 
 /** In-memory override for unit tests (avoids holding DB connections open). */
@@ -110,13 +110,17 @@ export async function markSenderContactVerified(email: string): Promise<void> {
  * Consume one outbound slot for this sender. Returns false if daily cap hit.
  * Verification emails and any other mail TO the sender share this budget.
  */
-export function consumeSenderOutboundSlot(email: string): {
+export async function consumeSenderOutboundSlot(email: string): Promise<{
   ok: boolean;
   remaining: number;
   resetMs: number;
-} {
+}> {
   const key = `sender-out:${normalizeSenderEmail(email)}`;
-  const result = senderOutboundLimiter.check(key);
+  const result = await consumePostgresRateLimit(
+    key,
+    SENDER_OUTBOUND_DAILY_LIMIT,
+    SENDER_OUTBOUND_WINDOW_MS,
+  );
   return { ok: result.ok, remaining: result.remaining, resetMs: result.resetMs };
 }
 
@@ -127,7 +131,7 @@ export async function maybeSendSenderVerificationEmail(
   if (await isSenderContactVerified(input.senderEmail)) {
     return { sent: false, reason: 'already_verified' };
   }
-  const slot = consumeSenderOutboundSlot(input.senderEmail);
+  const slot = await consumeSenderOutboundSlot(input.senderEmail);
   if (!slot.ok) {
     return { sent: false, reason: 'outbound_cap' };
   }
@@ -162,7 +166,11 @@ export async function canEmailSenderContact(email: string): Promise<{
     return { ok: false, reason: 'unverified' };
   }
   const key = `sender-out:${normalizeSenderEmail(email)}`;
-  const peek = senderOutboundLimiter.peek(key);
+  const peek = await peekPostgresRateLimit(
+    key,
+    SENDER_OUTBOUND_DAILY_LIMIT,
+    SENDER_OUTBOUND_WINDOW_MS,
+  );
   if (!peek.ok) return { ok: false, reason: 'outbound_cap' };
   return { ok: true };
 }

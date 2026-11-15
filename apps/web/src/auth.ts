@@ -6,11 +6,13 @@ import {
   authVerificationTokens,
   createDb,
 } from '@gatekeeper/db';
+import { headers } from 'next/headers';
 import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import Resend from 'next-auth/providers/resend';
 
 import { e2eSecretsEqual, isE2eLoginEnabled } from '@/lib/e2e-gate';
+import { allowMagicLinkSend } from '@/lib/magic-rate-limit';
 
 function getDb() {
   const url =
@@ -54,6 +56,14 @@ const resendProvider = Resend({
   apiKey: process.env.RESEND_API_KEY || 're_missing_for_local_dev',
   from: process.env.EMAIL_FROM || 'Gatekeeper <onboarding@resend.dev>',
   async sendVerificationRequest({ identifier, url, provider }) {
+    // Prefer platform Real-IP; do not trust raw client X-Forwarded-For.
+    const hdrs = await headers();
+    const ip = hdrs.get('x-real-ip')?.trim() || 'unknown';
+    const allowed = await allowMagicLinkSend(identifier, ip).catch(() => true);
+    if (!allowed) {
+      throw new Error('Too many sign-in emails. Try again later.');
+    }
+
     const content = buildMagicLinkEmail(url);
     if (!process.env.RESEND_API_KEY) {
       console.info(`\n[gatekeeper] Magic link for ${identifier}:\n${url}\n`);

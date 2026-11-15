@@ -120,6 +120,14 @@ export const verifiedSenders = pgTable('verified_senders', {
   verifiedAt: timestamp('verified_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+/** Durable fixed-window rate limit counters (Postgres; shared across instances). */
+export const rateLimitBuckets = pgTable('rate_limit_buckets', {
+  bucketKey: text('bucket_key').primaryKey(),
+  windowStart: timestamp('window_start', { withTimezone: true }).notNull(),
+  count: integer('count').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 export const requests = pgTable('requests', {
   id: uuid('id').defaultRandom().primaryKey(),
   senderType: senderTypeEnum('sender_type').notNull(),

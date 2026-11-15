@@ -1,3 +1,8 @@
+import { rateLimitBuckets } from '@gatekeeper/db';
+import { eq, sql } from 'drizzle-orm';
+
+import { getDb } from './db.js';
+
 export type RateLimitResult =
   { ok: true; remaining: number; resetMs: number } | { ok: false; remaining: 0; resetMs: number };
 
@@ -7,8 +12,7 @@ type Bucket = {
 };
 
 /**
- * Simple fixed-window rate limiter (in-memory).
- * Suitable for a single API instance on Railway Hobby.
+ * In-memory fixed-window limiter (tests / fallback when DB unavailable).
  */
 export class FixedWindowRateLimiter {
   private readonly buckets = new Map<string, Bucket>();
@@ -19,7 +23,6 @@ export class FixedWindowRateLimiter {
     private readonly now: () => number = () => Date.now(),
   ) {}
 
-  /** Read remaining quota without consuming a unit. */
   peek(key: string): RateLimitResult {
     const now = this.now();
     const existing = this.buckets.get(key);
@@ -67,47 +70,213 @@ export class FixedWindowRateLimiter {
   }
 }
 
+/** Force in-memory limiters (unit tests). Production uses Postgres. */
+let forceMemory = false;
+const memoryLimiters = new Map<string, FixedWindowRateLimiter>();
+
+export function useMemoryRateLimitersForTests(enabled = true): void {
+  forceMemory = enabled;
+  memoryLimiters.clear();
+}
+
+function memoryLimiter(limit: number, windowMs: number): FixedWindowRateLimiter {
+  const id = `${limit}:${windowMs}`;
+  let limiter = memoryLimiters.get(id);
+  if (!limiter) {
+    limiter = new FixedWindowRateLimiter(limit, windowMs);
+    memoryLimiters.set(id, limiter);
+  }
+  return limiter;
+}
+
+/**
+ * Durable fixed-window consume against Postgres `rate_limit_buckets`.
+ */
+export async function consumePostgresRateLimit(
+  key: string,
+  limit: number,
+  windowMs: number,
+  nowMs: number = Date.now(),
+): Promise<RateLimitResult> {
+  if (forceMemory || !process.env.DATABASE_URL) {
+    return memoryLimiter(limit, windowMs).check(key);
+  }
+
+  const db = getDb();
+  const windowStart = new Date(nowMs);
+  const [existing] = await db
+    .select()
+    .from(rateLimitBuckets)
+    .where(eq(rateLimitBuckets.bucketKey, key))
+    .limit(1);
+
+  if (!existing || nowMs - existing.windowStart.getTime() >= windowMs) {
+    await db
+      .insert(rateLimitBuckets)
+      .values({
+        bucketKey: key,
+        windowStart,
+        count: 1,
+        updatedAt: windowStart,
+      })
+      .onConflictDoUpdate({
+        target: rateLimitBuckets.bucketKey,
+        set: {
+          windowStart,
+          count: 1,
+          updatedAt: windowStart,
+        },
+      });
+    return { ok: true, remaining: Math.max(0, limit - 1), resetMs: windowMs };
+  }
+
+  if (existing.count >= limit) {
+    return {
+      ok: false,
+      remaining: 0,
+      resetMs: windowMs - (nowMs - existing.windowStart.getTime()),
+    };
+  }
+
+  const nextCount = existing.count + 1;
+  await db
+    .update(rateLimitBuckets)
+    .set({ count: nextCount, updatedAt: new Date(nowMs) })
+    .where(eq(rateLimitBuckets.bucketKey, key));
+
+  return {
+    ok: true,
+    remaining: Math.max(0, limit - nextCount),
+    resetMs: windowMs - (nowMs - existing.windowStart.getTime()),
+  };
+}
+
+export async function peekPostgresRateLimit(
+  key: string,
+  limit: number,
+  windowMs: number,
+  nowMs: number = Date.now(),
+): Promise<RateLimitResult> {
+  if (forceMemory || !process.env.DATABASE_URL) {
+    return memoryLimiter(limit, windowMs).peek(key);
+  }
+
+  const db = getDb();
+  const [existing] = await db
+    .select()
+    .from(rateLimitBuckets)
+    .where(eq(rateLimitBuckets.bucketKey, key))
+    .limit(1);
+
+  if (!existing || nowMs - existing.windowStart.getTime() >= windowMs) {
+    return { ok: true, remaining: limit, resetMs: windowMs };
+  }
+
+  const resetMs = windowMs - (nowMs - existing.windowStart.getTime());
+  if (existing.count >= limit) {
+    return { ok: false, remaining: 0, resetMs };
+  }
+  return {
+    ok: true,
+    remaining: Math.max(0, limit - existing.count),
+    resetMs,
+  };
+}
+
 /** Per-IP: 30 requests / minute (abuse protection — agent + general). */
-export const ipRateLimiter = new FixedWindowRateLimiter(30, 60_000);
+export const IP_LIMIT = 30;
+export const IP_WINDOW_MS = 60_000;
 
 /** Public form: 5 requests / IP / hour. */
-export const publicFormIpLimiter = new FixedWindowRateLimiter(5, 60 * 60 * 1000);
+export const PUBLIC_FORM_IP_LIMIT = 5;
+export const PUBLIC_FORM_IP_WINDOW_MS = 60 * 60 * 1000;
 
 /** Public form: 3 requests / sender+owner / day. */
-export const publicFormSenderOwnerLimiter = new FixedWindowRateLimiter(3, 24 * 60 * 60 * 1000);
+export const PUBLIC_FORM_SENDER_LIMIT = 3;
+export const PUBLIC_FORM_SENDER_WINDOW_MS = 24 * 60 * 60 * 1000;
 
-/** Per API key: uses the key's configured hourly limit. */
-const keyLimiters = new Map<number, FixedWindowRateLimiter>();
+/** Demo: 20 / IP / day — see demo routes. */
+export const DEMO_IP_DAILY_LIMIT = 20;
+export const DEMO_IP_WINDOW_MS = 24 * 60 * 60 * 1000;
 
-export function checkApiKeyRateLimit(keyId: string, limitPerHour: number): RateLimitResult {
-  const limit = Math.max(1, limitPerHour);
-  let limiter = keyLimiters.get(limit);
-  if (!limiter) {
-    limiter = new FixedWindowRateLimiter(limit, 60 * 60 * 1000);
-    keyLimiters.set(limit, limiter);
-  }
-  return limiter.check(`key:${keyId}`);
+/** Magic link: 3 / email / hour + 10 / IP / hour. */
+export const MAGIC_EMAIL_LIMIT = 3;
+export const MAGIC_EMAIL_WINDOW_MS = 60 * 60 * 1000;
+export const MAGIC_IP_LIMIT = 10;
+export const MAGIC_IP_WINDOW_MS = 60 * 60 * 1000;
+
+export async function checkIpRateLimit(ip: string): Promise<RateLimitResult> {
+  return consumePostgresRateLimit(`ip:${ip || 'unknown'}`, IP_LIMIT, IP_WINDOW_MS);
 }
 
-export function checkIpRateLimit(ip: string): RateLimitResult {
-  return ipRateLimiter.check(`ip:${ip || 'unknown'}`);
+export async function checkPublicFormIpRateLimit(ip: string): Promise<RateLimitResult> {
+  return consumePostgresRateLimit(
+    `public-ip:${ip || 'unknown'}`,
+    PUBLIC_FORM_IP_LIMIT,
+    PUBLIC_FORM_IP_WINDOW_MS,
+  );
 }
 
-export function checkPublicFormIpRateLimit(ip: string): RateLimitResult {
-  return publicFormIpLimiter.check(`public-ip:${ip || 'unknown'}`);
-}
-
-export function checkPublicFormSenderOwnerRateLimit(
+export async function checkPublicFormSenderOwnerRateLimit(
   senderEmail: string,
   ownerUserId: string,
-): RateLimitResult {
+): Promise<RateLimitResult> {
   const sender = senderEmail.trim().toLowerCase();
-  return publicFormSenderOwnerLimiter.check(`public-sender:${ownerUserId}:${sender}`);
+  return consumePostgresRateLimit(
+    `public-sender:${ownerUserId}:${sender}`,
+    PUBLIC_FORM_SENDER_LIMIT,
+    PUBLIC_FORM_SENDER_WINDOW_MS,
+  );
+}
+
+export async function checkApiKeyRateLimit(
+  keyId: string,
+  limitPerHour: number,
+): Promise<RateLimitResult> {
+  const limit = Math.max(1, limitPerHour);
+  return consumePostgresRateLimit(`key:${keyId}`, limit, 60 * 60 * 1000);
+}
+
+export async function checkDemoIpRateLimit(ip: string): Promise<RateLimitResult> {
+  return consumePostgresRateLimit(
+    `demo:${ip || 'unknown'}`,
+    DEMO_IP_DAILY_LIMIT,
+    DEMO_IP_WINDOW_MS,
+  );
+}
+
+export async function peekDemoIpRateLimit(ip: string): Promise<RateLimitResult> {
+  return peekPostgresRateLimit(`demo:${ip || 'unknown'}`, DEMO_IP_DAILY_LIMIT, DEMO_IP_WINDOW_MS);
+}
+
+export async function checkMagicEmailRateLimit(email: string): Promise<RateLimitResult> {
+  return consumePostgresRateLimit(
+    `magic-email:${email.trim().toLowerCase()}`,
+    MAGIC_EMAIL_LIMIT,
+    MAGIC_EMAIL_WINDOW_MS,
+  );
+}
+
+export async function checkMagicIpRateLimit(ip: string): Promise<RateLimitResult> {
+  return consumePostgresRateLimit(
+    `magic-ip:${ip || 'unknown'}`,
+    MAGIC_IP_LIMIT,
+    MAGIC_IP_WINDOW_MS,
+  );
+}
+
+export function retryAfterSeconds(resetMs: number): number {
+  return Math.max(1, Math.ceil(resetMs / 1000));
 }
 
 export function resetRateLimitersForTests(): void {
-  ipRateLimiter.clear();
-  publicFormIpLimiter.clear();
-  publicFormSenderOwnerLimiter.clear();
-  keyLimiters.clear();
+  useMemoryRateLimitersForTests(true);
+  memoryLimiters.clear();
+}
+
+/** Clear durable buckets for a key prefix (integration tests). */
+export async function clearPostgresRateLimitKeys(prefix: string): Promise<void> {
+  if (!process.env.DATABASE_URL) return;
+  const db = getDb();
+  await db.execute(sql`DELETE FROM rate_limit_buckets WHERE bucket_key LIKE ${prefix + '%'}`);
 }

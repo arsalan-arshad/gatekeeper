@@ -9,16 +9,20 @@ import { DEMO_BUSY_ERROR, demoJudgeRequest, isBusyFailure } from '../demo-judge.
 import { getDemoProfile, listDemoProfilesPublic } from '../demo-profiles.js';
 import { PROMPT_VERSION } from '../judge.js';
 import { createLlm, type Llm } from '../llm.js';
-import { FixedWindowRateLimiter } from '../rate-limit.js';
+import { clientIp } from '../client-ip.js';
+import {
+  checkDemoIpRateLimit,
+  DEMO_IP_DAILY_LIMIT,
+  peekDemoIpRateLimit,
+  retryAfterSeconds,
+  resetRateLimitersForTests,
+} from '../rate-limit.js';
 import { MESSAGE_MAX_CHARS } from '../request-limits.js';
 
-/** Custom (uncached) demo requests: 20 / IP / UTC day. Cached chip responses do not count. */
-export const DEMO_IP_DAILY_LIMIT = 20;
+export { DEMO_IP_DAILY_LIMIT };
 
 /** Demo verdict cache TTL — 24h. */
 export const CACHE_TTL = 24 * 60 * 60 * 1000;
-
-const demoIpLimiter = new FixedWindowRateLimiter(DEMO_IP_DAILY_LIMIT, CACHE_TTL);
 
 type DemoJudgeBody = {
   handle: string;
@@ -55,16 +59,8 @@ export function setDemoLlmForTests(llm: Llm | undefined): void {
   demoLlmOverride = llm;
 }
 
-function clientIp(request: { ip: string; headers: Record<string, unknown> }): string {
-  const forwarded = request.headers['x-forwarded-for'];
-  if (typeof forwarded === 'string' && forwarded.length > 0) {
-    return forwarded.split(',')[0]?.trim() || request.ip;
-  }
-  return request.ip;
-}
-
 export function resetDemoRateLimiterForTests(): void {
-  demoIpLimiter.clear();
+  resetRateLimitersForTests();
   clearDemoVerdictCache();
 }
 
@@ -115,10 +111,6 @@ function getCachedVerdict(key: string): CachedVerdict['body'] | null {
   return hit.body;
 }
 
-function demoLimitKey(ip: string): string {
-  return `demo:${ip || 'unknown'}`;
-}
-
 function requireAdminToken(
   request: {
     query: unknown;
@@ -139,7 +131,7 @@ export async function registerDemoRoutes(app: FastifyInstance): Promise<void> {
 
   app.get('/v1/demo/quota', async (request) => {
     const ip = clientIp(request);
-    const peek = demoIpLimiter.peek(demoLimitKey(ip));
+    const peek = await peekDemoIpRateLimit(ip);
     return {
       remaining: peek.remaining,
       limit: DEMO_IP_DAILY_LIMIT,
@@ -155,7 +147,6 @@ export async function registerDemoRoutes(app: FastifyInstance): Promise<void> {
 
   app.post('/v1/demo/judge', async (request, reply) => {
     const ip = clientIp(request);
-    const limitKey = demoLimitKey(ip);
 
     const parsed = demoJudgeSchema.safeParse(request.body);
     if (!parsed.success) {
@@ -167,7 +158,7 @@ export async function registerDemoRoutes(app: FastifyInstance): Promise<void> {
     const message = parsed.data.message?.trim() ?? '';
     if (!message) {
       // Empty / whitespace: 400 and do not consume quota.
-      const peek = demoIpLimiter.peek(limitKey);
+      const peek = await peekDemoIpRateLimit(ip);
       return reply.status(400).send({
         error: 'Message is required',
         remaining: peek.remaining,
@@ -197,7 +188,7 @@ export async function registerDemoRoutes(app: FastifyInstance): Promise<void> {
     const cached = getCachedVerdict(cacheKey);
     if (cached) {
       // Example chips / repeat messages served from cache do not consume quota.
-      const peek = demoIpLimiter.peek(limitKey);
+      const peek = await peekDemoIpRateLimit(ip);
       return {
         ...cached,
         remaining: peek.remaining,
@@ -207,9 +198,9 @@ export async function registerDemoRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const isExample = parsed.data.example === true;
-    let remaining = demoIpLimiter.peek(limitKey).remaining;
+    let remaining = (await peekDemoIpRateLimit(ip)).remaining;
     if (!isExample) {
-      const limit = demoIpLimiter.check(limitKey);
+      const limit = await checkDemoIpRateLimit(ip);
       if (!limit.ok) {
         await logAbuse({
           kind: 'rate_limit_ip',
@@ -217,7 +208,7 @@ export async function registerDemoRoutes(app: FastifyInstance): Promise<void> {
           detail: `demo_judge reset_ms=${limit.resetMs}`,
           log: request.log,
         });
-        reply.header('retry-after', Math.ceil(limit.resetMs / 1000));
+        reply.header('retry-after', retryAfterSeconds(limit.resetMs));
         return reply.status(429).send({
           error: 'Demo rate limit exceeded — try again tomorrow',
           retry_after_ms: limit.resetMs,
