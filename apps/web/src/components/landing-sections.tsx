@@ -150,8 +150,8 @@ export function LandingSections() {
             For AI agents
           </h2>
           <p className="mt-3 max-w-2xl text-[var(--muted)]">
-            Agents are untrusted. Authenticate, be specific, and expect a judgment — not a guaranteed
-            intro.
+            Agents are untrusted. Authenticate, be specific, and expect a judgment — not a
+            guaranteed intro.
           </p>
           <pre className="mt-8 overflow-x-auto rounded-xl border border-white/10 bg-black/35 p-5 text-sm leading-relaxed text-[var(--fg)]">
             <code>{`POST /v1/requests
@@ -247,7 +247,9 @@ function MockThread({
         <p className="text-sm tracking-wide text-[var(--muted)] uppercase">Chat / phone mockup</p>
         <span
           className={`rounded-md px-2 py-1 text-xs font-semibold uppercase ${
-            tone === 'accept' ? 'bg-[var(--accent)]/20 text-[var(--accent)]' : 'bg-red-500/20 text-red-200'
+            tone === 'accept'
+              ? 'bg-[var(--accent)]/20 text-[var(--accent)]'
+              : 'bg-red-500/20 text-red-200'
           }`}
         >
           {title}
@@ -267,7 +269,9 @@ function MockThread({
                   : 'bg-white/5 text-[var(--muted)]'
               }`}
             >
-              <span className="text-xs tracking-wide text-[var(--accent)] uppercase">{line.who}</span>
+              <span className="text-xs tracking-wide text-[var(--accent)] uppercase">
+                {line.who}
+              </span>
               <p className="mt-1">{line.text}</p>
             </li>
           ))}

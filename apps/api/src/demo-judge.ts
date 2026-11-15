@@ -1,4 +1,9 @@
-import { enforceDecision, sanitizePublicReason, type JudgeDecision, type JudgeResult } from './judge.js';
+import {
+  enforceDecision,
+  sanitizePublicReason,
+  type JudgeDecision,
+  type JudgeResult,
+} from './judge.js';
 import { getDemoProfile, type DemoProfile } from './demo-profiles.js';
 
 function countHits(haystack: string, needles: string[]): number {
@@ -36,7 +41,8 @@ function scoreAgainstProfile(profile: DemoProfile, message: string): JudgeResult
   const spamHits = countHits(lower, profile.spamSignals);
   const acceptHits = countHits(lower, profile.acceptSignals);
   const rejectHits = countHits(lower, profile.rejectSignals);
-  const lengthBonus = message.length >= 80 && message.length <= 600 ? 8 : message.length < 40 ? -12 : 0;
+  const lengthBonus =
+    message.length >= 80 && message.length <= 600 ? 8 : message.length < 40 ? -12 : 0;
 
   let score = 42 + acceptHits * 14 - rejectHits * 10 - spamHits * 28 + lengthBonus;
   score = Math.min(100, Math.max(0, Math.round(score)));
@@ -59,11 +65,11 @@ function scoreAgainstProfile(profile: DemoProfile, message: string): JudgeResult
     minRelevance: profile.minRelevance,
   });
 
-  const reasonPublic = sanitizePublicReason(buildPublicReason(decision, acceptHits), profile.ruleText);
-  const suggested =
-    decision === 'accept'
-      ? null
-      : buildSuggestedRewrite(profile, decision);
+  const reasonPublic = sanitizePublicReason(
+    buildPublicReason(decision, acceptHits),
+    profile.ruleText,
+  );
+  const suggested = decision === 'accept' ? null : buildSuggestedRewrite(profile, decision);
 
   return {
     score,

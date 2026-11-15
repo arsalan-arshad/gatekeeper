@@ -44,9 +44,10 @@ export async function registerDemoRoutes(app: FastifyInstance): Promise<void> {
         log: request.log,
       });
       reply.header('retry-after', Math.ceil(limit.resetMs / 1000));
-      return reply
-        .status(429)
-        .send({ error: 'Demo rate limit exceeded — try again shortly', retry_after_ms: limit.resetMs });
+      return reply.status(429).send({
+        error: 'Demo rate limit exceeded — try again shortly',
+        retry_after_ms: limit.resetMs,
+      });
     }
 
     const parsed = demoJudgeSchema.safeParse(request.body);

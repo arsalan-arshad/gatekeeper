@@ -30,7 +30,8 @@ export const DEMO_PROFILES: DemoProfile[] = [
     name: 'Sam Rivera',
     label: 'Indie SaaS founder',
     bio: 'Building a usage-based billing product for indie SaaS. Open to peer intros — not cold pitches.',
-    wantsText: 'Peer founders shipping B2B SaaS, early customers with a concrete use case, senior TypeScript collaborators.',
+    wantsText:
+      'Peer founders shipping B2B SaaS, early customers with a concrete use case, senior TypeScript collaborators.',
     offersText: 'Honest notes on billing edge cases, founder-led sales, and shipping AGPL tools.',
     neverText: 'Crypto, NFTs, generic SEO agencies, “quick sync” with no written ask.',
     ruleText:

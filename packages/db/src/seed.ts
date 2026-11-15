@@ -304,7 +304,10 @@ async function upsertUser(
   return created!.id;
 }
 
-async function seedDemoRequests(db: ReturnType<typeof createDb>, demoUserId: string): Promise<void> {
+async function seedDemoRequests(
+  db: ReturnType<typeof createDb>,
+  demoUserId: string,
+): Promise<void> {
   // Clear all @demo requests then re-insert labeled set (idempotent seed).
   await db.delete(requests).where(eq(requests.targetUserId, demoUserId));
 

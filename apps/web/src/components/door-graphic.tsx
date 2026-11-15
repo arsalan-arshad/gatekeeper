@@ -3,10 +3,17 @@ export type DoorState = 'idle' | 'open' | 'closed';
 /** Animated principal door — opens on accept, closes on reject/spam. */
 export function DoorGraphic({ state = 'idle' }: { state?: DoorState }) {
   const leafClass =
-    state === 'open' ? 'door-leaf-open' : state === 'closed' ? 'door-leaf-closed' : 'door-leaf-idle';
+    state === 'open'
+      ? 'door-leaf-open'
+      : state === 'closed'
+        ? 'door-leaf-closed'
+        : 'door-leaf-idle';
 
   return (
-    <div className="relative mx-auto aspect-[3/5] w-full max-w-[14rem] sm:max-w-[16rem]" aria-hidden>
+    <div
+      className="relative mx-auto aspect-[3/5] w-full max-w-[14rem] sm:max-w-[16rem]"
+      aria-hidden
+    >
       <div className="door-glow absolute inset-[-10%] rounded-[50%] bg-[radial-gradient(circle,var(--glow),transparent_68%)] blur-2xl" />
       <div className="relative h-full overflow-hidden rounded-t-[999px] border border-[rgba(95,212,164,0.28)] bg-[linear-gradient(180deg,#1a2c24_0%,#0d1713_55%,#080e0b_100%)] shadow-[0_0_80px_rgba(95,212,164,0.12)]">
         {/* Inner light */}

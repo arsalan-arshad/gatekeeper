@@ -29,11 +29,7 @@ export function HeroDemo() {
     return () => window.clearInterval(id);
   }, []);
 
-  const doorState: DoorState = !result
-    ? 'idle'
-    : result.decision === 'accept'
-      ? 'open'
-      : 'closed';
+  const doorState: DoorState = !result ? 'idle' : result.decision === 'accept' ? 'open' : 'closed';
 
   function onJudge() {
     setError(null);
@@ -164,7 +160,9 @@ function DecisionBadge({ decision }: { decision: DemoResult['decision'] }) {
         ? 'bg-red-500/20 text-red-200'
         : 'bg-amber-500/15 text-amber-100';
   return (
-    <span className={`rounded-md px-2.5 py-1 text-xs font-semibold tracking-wide uppercase ${styles}`}>
+    <span
+      className={`rounded-md px-2.5 py-1 text-xs font-semibold tracking-wide uppercase ${styles}`}
+    >
       {decision}
     </span>
   );
