@@ -42,8 +42,16 @@ export const SCORE_BANDS = {
 
 const DECISIONS = new Set<JudgeDecision>(['accept', 'reject', 'spam']);
 
+/** Placeholders the model must never emit in rewrites (or reasons). */
 const PLACEHOLDER_RE =
-  /<[^>\s][^>]*>|\[[^\]]+\]|\{[A-Za-z][^}]*\}|\bYourCompany\b|\bYourName\b|\bTBD\b|\bTODO\b/i;
+  /<[^>\n]+>|\[[^\]]+\]|\{[A-Za-z][^}]*\}|\bYourCompany\b|\bYourName\b|\bTBD\b|\bTODO\b|\b(?:X|Y|Z)\b/i;
+
+/** Corporate/support desk voice — reasons must sound like a personal gatekeeper instead. */
+const COMPANY_VOICE_RE =
+  /\b(appropriate team|our team|the team|forward(?:ed|ing)? (?:this )?to (?:the )?(?:appropriate )?team|customer support|as a company|our staff)\b/i;
+
+const COACHING_TIP_RE =
+  /^(say |add |include |tell |mention |write |share )|\bwho you are\b|\bwhat specific\b|\bwhy \w+/i;
 
 export const llmJudgePayloadSchema = z
   .object({
@@ -93,17 +101,109 @@ export const llmJudgePayloadSchema = z
       ctx.addIssue({
         code: 'custom',
         message:
-          'suggested_rewrite must not invent companies or use placeholders like <YourCompany> or [role]',
+          'suggested_rewrite must not invent facts or use placeholders like X, Y, <YourCompany>, or [role]',
         path: ['suggested_rewrite'],
+      });
+    }
+
+    if (hasRewritePlaceholders(data.reason_public) || hasCompanyVoice(data.reason_public)) {
+      ctx.addIssue({
+        code: 'custom',
+        message:
+          'reason_public must be one personal-gatekeeper sentence (no placeholders, no company/team voice)',
+        path: ['reason_public'],
       });
     }
   });
 
 export type LlmJudgePayload = z.infer<typeof llmJudgePayloadSchema>;
 
-/** True when rewrite text contains banned placeholders. */
+/** True when rewrite text contains banned placeholders (X/Y, <...>, [...], etc.). */
 export function hasRewritePlaceholders(text: string): boolean {
   return PLACEHOLDER_RE.test(text);
+}
+
+/** True when the reason sounds like a company desk rather than a personal gatekeeper. */
+export function hasCompanyVoice(text: string): boolean {
+  return COMPANY_VOICE_RE.test(text);
+}
+
+/** Coaching tip (not a forged full message) for sparse rejects. */
+export function isCoachingTip(text: string): boolean {
+  return COACHING_TIP_RE.test(text.trim());
+}
+
+/** Default sparse-message tip naming the owner when known. */
+export function defaultCoachingTip(ownerName?: string | null): string {
+  const who = ownerName?.trim() || 'them';
+  return `Say who you are, what specific thing you want from ${who}, and why ${who}.`;
+}
+
+/**
+ * True when a full rewrite appears to invent a proper name/product not present
+ * in the sender message or sender name. Coaching tips are exempt.
+ */
+export function inventsFactsInRewrite(
+  rewrite: string,
+  message: string,
+  senderName: string,
+  ownerName?: string | null,
+): boolean {
+  const text = rewrite.trim();
+  if (!text || isCoachingTip(text)) return false;
+
+  const allowed = `${message}\n${senderName}\n${ownerName ?? ''}`.toLowerCase();
+  const properNouns = text.match(/\b[A-Z][a-z]{2,}(?:\s+[A-Z][a-z]{2,})*\b/g) ?? [];
+
+  for (const noun of properNouns) {
+    const lower = noun.toLowerCase();
+    // Skip sentence-initial filler when it is a single common word.
+    if (
+      /^(hey|hi|hello|thanks|thank|dear|regarding|about|looking|open|fellow|senior|former)$/i.test(
+        noun,
+      )
+    ) {
+      continue;
+    }
+    if (!allowed.includes(lower)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/** Post-check after zod parse — placeholders, invented facts, company voice. */
+export function describeJudgeOutputIssues(
+  payload: Pick<LlmJudgePayload, 'decision' | 'reason_public' | 'suggested_rewrite'>,
+  context: { message: string; senderName: string; ownerName?: string | null },
+): string[] {
+  const issues: string[] = [];
+
+  if (hasRewritePlaceholders(payload.reason_public) || hasCompanyVoice(payload.reason_public)) {
+    issues.push(
+      'reason_public must be the owner’s personal gatekeeper voice (e.g. "I\'ll pass this to Sam"), never a company/team desk',
+    );
+  }
+
+  if (payload.decision === 'reject' && payload.suggested_rewrite) {
+    if (hasRewritePlaceholders(payload.suggested_rewrite)) {
+      issues.push('suggested_rewrite has placeholders (X, Y, <...>, [...])');
+    } else if (
+      inventsFactsInRewrite(
+        payload.suggested_rewrite,
+        context.message,
+        context.senderName,
+        context.ownerName,
+      )
+    ) {
+      issues.push(
+        'suggested_rewrite invents a name/company/product not present in the sender message — reuse only their facts or return a coaching tip',
+      );
+    }
+  }
+
+  return issues;
 }
 
 /** Whether score sits in the band required by the verdict. */
@@ -214,44 +314,49 @@ Critical: a real person with a clear honest ask must NEVER be SPAM — use REJEC
 - ACCEPT → 60–100
 
 ## suggested_rewrite
-Improve the SENDER's own message. Keep their identity and goal.
-Never invent a company. Never copy the owner's profile into the rewrite.
-Never output placeholders like <YourCompany>, [role], {Name}, or similar.
+Only reuse facts already present in the sender's message (and their given sender name).
+Never invent a name, company, product, or problem.
+Never output X, Y, <...>, [...], {Name}, or any other placeholder.
+Never copy the owner's profile into the rewrite.
+If the message has too few facts to rewrite honestly, return a short coaching tip instead — e.g. "Say who you are, what specific thing you want from Sam, and why Sam."
 If verdict is SPAM: suggested_rewrite must be null.
 If verdict is ACCEPT: suggested_rewrite must be null.
-If verdict is REJECT: optional improved message the sender could send instead.
+If verdict is REJECT: either a fact-faithful improved message OR a coaching tip (never invented details).
 
 ## reason_public
-Exactly one grammatically correct polite sentence, written as the owner's gatekeeper speaking to the sender. Never quote private rules.
+Exactly one grammatically correct polite sentence as the owner's personal gatekeeper speaking to the sender.
+Speak in first person about the owner by name when known (e.g. "I'll pass this to Sam" / "Sam isn't taking vague coffee chats right now").
+Never sound like a company desk ("forward to the appropriate team", "our staff", etc.).
+Never quote private rules.
 
 ## Few-shot examples
 
 Example 1 — SPAM:
 Message: "Hot crypto NFT token launch — promote to your audience for guaranteed leads!!"
-→ {"score":8,"decision":"spam","reason_public":"Unsolicited crypto and NFT promotion is not something I forward.","reason_private":"crypto/NFT blast","suggested_rewrite":null,"deal_breaker_hit":true}
+→ {"score":8,"decision":"spam","reason_public":"I won't pass unsolicited crypto or NFT pitches along to Sam.","reason_private":"crypto/NFT blast","suggested_rewrite":null,"deal_breaker_hit":true}
 
 Example 2 — SPAM:
 Message: "We 10x any SaaS with guaranteed leads — book a free SEO agency audit today!!!"
-→ {"score":12,"decision":"spam","reason_public":"Mass sales outreach for agency services is blocked as spam.","reason_private":"unsolicited agency sales","suggested_rewrite":null,"deal_breaker_hit":true}
+→ {"score":12,"decision":"spam","reason_public":"I block mass agency sales outreach before it reaches Sam.","reason_private":"unsolicited agency sales","suggested_rewrite":null,"deal_breaker_hit":true}
 
-Example 3 — REJECT:
+Example 3 — REJECT (sparse → coaching tip, do NOT invent a bio):
 Message: "Quick sync sometime? Would love to pick your brain over coffee — no agenda yet."
-→ {"score":34,"decision":"reject","reason_public":"A vague coffee chat without a written ask is not a strong fit right now.","reason_private":"vague; no concrete ask","suggested_rewrite":"Hi — I'm Alex, a founder shipping usage-based invoicing. I'd love a short written intro to compare Stripe metered-billing edge cases.","deal_breaker_hit":false}
+→ {"score":34,"decision":"reject","reason_public":"Sam isn't taking vague coffee chats right now — send a specific written ask.","reason_private":"vague; no concrete ask","suggested_rewrite":"Say who you are, what specific thing you want from Sam, and why Sam.","deal_breaker_hit":false}
 
-Example 4 — REJECT:
+Example 4 — REJECT (reuse only sender facts; no X/Y placeholders):
 Message: "Hi — I'm a student exploring startups. Any chance of a casual chat about your journey?"
 (Owner wants peer founders / concrete collabs, not informal mentorship.)
-→ {"score":42,"decision":"reject","reason_public":"Thanks for reaching out — informal mentorship chats are outside what they are open to right now.","reason_private":"honest but outside wants","suggested_rewrite":"Hi — I'm a student building X. I have a concrete question about Y and would value a short written reply if useful.","deal_breaker_hit":false}
+→ {"score":42,"decision":"reject","reason_public":"I'll pass on informal mentorship chats — Sam is focused on concrete peer asks.","reason_private":"honest but outside wants","suggested_rewrite":"Say who you are, what specific thing you want from Sam, and why Sam.","deal_breaker_hit":false}
 
 Example 5 — ACCEPT:
 Message: "Hey Sam — I'm a founder shipping usage-based billing SaaS for indie tools. Would love a short peer intro to compare Stripe edge cases and founder-led sales."
 (Owner wants peer B2B SaaS/billing founders.)
-→ {"score":88,"decision":"accept","reason_public":"This is a clear peer-founder ask about billing that matches what they are open to.","reason_private":"peer SaaS billing; strong fit","suggested_rewrite":null,"deal_breaker_hit":false}
+→ {"score":88,"decision":"accept","reason_public":"I'll pass this to Sam — it's a clear peer-founder billing ask he welcomes.","reason_private":"peer SaaS billing; strong fit","suggested_rewrite":null,"deal_breaker_hit":false}
 
 Example 6 — ACCEPT:
 Message: "Referring Jordan Lee, a staff design-eng who shipped our design system in production — portfolio linked, happy to intro if useful."
 (Owner wants named staff designer / design-eng referrals.)
-→ {"score":82,"decision":"accept","reason_public":"A named staff design-eng referral with production context is exactly the kind of intro they welcome.","reason_private":"named referral; fits hiring wants","suggested_rewrite":null,"deal_breaker_hit":false}
+→ {"score":82,"decision":"accept","reason_public":"I'll pass this named staff design-eng referral to Sam.","reason_private":"named referral; fits hiring wants","suggested_rewrite":null,"deal_breaker_hit":false}
 `;
 
 function buildJudgePrompt(input: JudgeRequestInput, similarity: number): string {
@@ -275,10 +380,10 @@ function buildJudgePrompt(input: JudgeRequestInput, similarity: number): string 
         score: 'integer 0-100 matching the verdict band',
         decision: 'accept | reject | spam',
         reason_public:
-          'one polite sentence for the sender — NEVER quote or paraphrase private gate rules',
+          "one polite personal-gatekeeper sentence (e.g. I'll pass this to Sam) — NEVER company/team voice; NEVER quote private rules",
         reason_private: 'internal notes; may reference rules',
         suggested_rewrite:
-          'null for accept/spam; for reject, improve the sender message without placeholders',
+          'null for accept/spam; for reject, fact-faithful rewrite OR short coaching tip — never invent facts or placeholders',
         deal_breaker_hit: 'boolean',
       },
       score_bands: SCORE_BANDS,
@@ -363,16 +468,52 @@ export function enforceDecision(options: {
 function finalizeSuggestedRewrite(
   decision: JudgeDecision,
   rewrite: string | null | undefined,
+  context: { message: string; senderName: string; ownerName?: string | null },
 ): string | null {
   if (decision === 'spam' || decision === 'accept') return null;
   const text = asString(rewrite);
-  if (!text || hasRewritePlaceholders(text)) return null;
-  return text;
+  if (
+    text &&
+    !hasRewritePlaceholders(text) &&
+    !inventsFactsInRewrite(text, context.message, context.senderName, context.ownerName)
+  ) {
+    return text;
+  }
+  // Sparse / invalid rewrite → coaching tip instead of inventing facts.
+  return defaultCoachingTip(context.ownerName);
+}
+
+function personalDefaultReason(decision: JudgeDecision, ownerName?: string | null): string {
+  const who = ownerName?.trim() || 'them';
+  if (decision === 'accept') {
+    return `I'll pass this to ${who} — it looks like a relevant intro.`;
+  }
+  if (decision === 'spam') {
+    return `I won't pass this along to ${who}.`;
+  }
+  return `This isn't a strong fit for ${who} right now.`;
+}
+
+function finalizePublicReason(
+  decision: JudgeDecision,
+  reason: string,
+  privateRuleText: string,
+  ownerName?: string | null,
+): string {
+  const cleaned = sanitizePublicReason(
+    reason || personalDefaultReason(decision, ownerName),
+    privateRuleText,
+  );
+  if (hasRewritePlaceholders(cleaned) || hasCompanyVoice(cleaned)) {
+    return personalDefaultReason(decision, ownerName);
+  }
+  return cleaned;
 }
 
 function coercePayload(
   partial: Partial<LlmJudgePayload>,
   minRelevance: number,
+  context: { message: string; senderName: string; ownerName?: string | null },
 ): {
   score: number;
   decision: JudgeDecision;
@@ -405,7 +546,7 @@ function coercePayload(
     decision,
     reason_public: asString(partial.reason_public) || '',
     reason_private: asString(partial.reason_private) || '',
-    suggested_rewrite: finalizeSuggestedRewrite(decision, partial.suggested_rewrite),
+    suggested_rewrite: finalizeSuggestedRewrite(decision, partial.suggested_rewrite, context),
     deal_breaker_hit: dealBreakerHit || decision === 'spam',
   };
 }
@@ -428,6 +569,12 @@ export async function judgeRequest(input: JudgeRequestInput, llm: Llm): Promise<
     similarity = 0.5;
   }
 
+  const rewriteContext = {
+    message: input.message,
+    senderName: input.senderName,
+    ownerName: input.target.name,
+  };
+
   const userPrompt = buildJudgePrompt(input, similarity);
   const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
     { role: 'system', content: JUDGE_SYSTEM_PROMPT },
@@ -436,13 +583,17 @@ export async function judgeRequest(input: JudgeRequestInput, llm: Llm): Promise<
 
   let raw = await llm.complete(messages, { json: true, userId: input.userId });
   let parsed = parseJudgePayload(raw);
+  let postIssues = parsed.ok ? describeJudgeOutputIssues(parsed.data, rewriteContext) : [];
 
-  if (!parsed.ok) {
+  if (!parsed.ok || postIssues.length > 0) {
+    const problems = !parsed.ok ? parsed.error : postIssues.join('; ');
     const correction = [
       'Your previous JSON failed validation. Fix it and return JSON only.',
-      `Problems: ${parsed.error}`,
+      `Problems: ${problems}`,
       'Remember: SPAM scores 0-25 with suggested_rewrite null; REJECT 26-59; ACCEPT 60-100 with suggested_rewrite null.',
-      'Never use placeholders like <YourCompany> or [role] in suggested_rewrite.',
+      'suggested_rewrite may only reuse facts from the sender message — never invent a name/company/product, never output X, Y, <...>, or [...].',
+      'If the message is too sparse, return a coaching tip like "Say who you are, what specific thing you want from Sam, and why Sam."',
+      'reason_public must be the owner\'s personal gatekeeper (e.g. "I\'ll pass this to Sam"), never a company/team desk.',
       'A real person with a clear honest ask is never SPAM.',
     ].join('\n');
 
@@ -451,6 +602,7 @@ export async function judgeRequest(input: JudgeRequestInput, llm: Llm): Promise<
       { json: true, userId: input.userId },
     );
     parsed = parseJudgePayload(raw);
+    postIssues = parsed.ok ? describeJudgeOutputIssues(parsed.data, rewriteContext) : [];
   }
 
   const payload = parsed.ok
@@ -470,24 +622,25 @@ export async function judgeRequest(input: JudgeRequestInput, llm: Llm): Promise<
           decision,
           reason_public: parsed.data.reason_public,
           reason_private: parsed.data.reason_private,
-          suggested_rewrite: finalizeSuggestedRewrite(decision, parsed.data.suggested_rewrite),
+          suggested_rewrite: finalizeSuggestedRewrite(
+            decision,
+            parsed.data.suggested_rewrite,
+            rewriteContext,
+          ),
           deal_breaker_hit: parsed.data.deal_breaker_hit,
         };
       })()
-    : coercePayload(parsed.partial, input.target.minRelevance);
+    : coercePayload(parsed.partial, input.target.minRelevance, rewriteContext);
 
   const reasonPrivate =
     payload.reason_private ||
     `score=${payload.score}; similarity=${similarity.toFixed(3)}; deal_breaker=${payload.deal_breaker_hit}`;
 
-  const defaultPublic =
-    payload.decision === 'accept'
-      ? 'This looks like a relevant intro.'
-      : 'This request was not a strong fit right now.';
-
-  const reasonPublic = sanitizePublicReason(
-    payload.reason_public || defaultPublic,
+  const reasonPublic = finalizePublicReason(
+    payload.decision,
+    payload.reason_public,
     input.target.ruleText,
+    input.target.name,
   );
 
   return {

@@ -3,54 +3,59 @@ import { test } from 'node:test';
 
 import { JUDGE_EVAL_CASES } from './eval-judge.cases.ts';
 import { runJudgeEval } from './eval-judge.ts';
+import { defaultCoachingTip } from './judge.ts';
 import type { Llm, LlmProvider } from './llm.ts';
 
-test('judge eval suite has ~12 labeled cases across verdicts', () => {
-  assert.ok(JUDGE_EVAL_CASES.length >= 12);
+test('judge eval suite covers verdicts plus rewrite/reason polish cases', () => {
+  assert.ok(JUDGE_EVAL_CASES.length >= 15);
   assert.ok(JUDGE_EVAL_CASES.filter((c) => c.expected === 'accept').length >= 3);
   assert.ok(JUDGE_EVAL_CASES.filter((c) => c.expected === 'reject').length >= 3);
   assert.ok(JUDGE_EVAL_CASES.filter((c) => c.expected === 'spam').length >= 3);
+  assert.ok(JUDGE_EVAL_CASES.some((c) => c.checks?.rewriteIsCoachingTip));
+  assert.ok(JUDGE_EVAL_CASES.some((c) => c.checks?.reasonPersonalVoice));
+  assert.ok(JUDGE_EVAL_CASES.some((c) => c.checks?.rewriteNoPlaceholders));
 });
 
-test('runJudgeEval scores mock LLM labels and enforces band match', async () => {
+test('runJudgeEval scores mock LLM labels, bands, and polish checks', async () => {
   const byId = new Map(JUDGE_EVAL_CASES.map((c) => [c.id, c]));
 
   const provider: LlmProvider = {
     name: 'mock',
-    async complete(_messages) {
-      // Pull expected label from the user prompt message text via last case run order —
-      // demoJudgeRequest embeds the message; map by scanning known messages.
-      return JSON.stringify({
-        score: 88,
-        decision: 'accept',
-        reason_public: 'Clear peer ask.',
-        reason_private: 'ok',
-        suggested_rewrite: null,
-        deal_breaker_hit: false,
-      });
+    async complete() {
+      return '{}';
     },
     async embed() {
       return [0.5, 0.5, 0.1];
     },
   };
 
-  // Per-case mock: return the expected verdict with a matching score band.
   const llm: Llm = {
     providerName: 'mock',
     provider,
     async complete(messages) {
       const blob = messages.map((m) => m.content).join('\n');
-      const match = [...byId.values()].find((c) => blob.includes(c.message.slice(0, 48)));
+      // Prefer the longest full-message match so system-prompt few-shots don't steal the label.
+      const match = [...byId.values()]
+        .filter((c) => blob.includes(c.message))
+        .sort((a, b) => b.message.length - a.message.length)[0];
       const decision = match?.expected ?? 'reject';
       const score = decision === 'spam' ? 10 : decision === 'reject' ? 40 : 85;
+      const wantsCoaching = Boolean(match?.checks?.rewriteIsCoachingTip);
       return JSON.stringify({
         score,
         decision,
-        reason_public: 'Labeled fixture response.',
+        reason_public:
+          decision === 'accept'
+            ? "I'll pass this to Sam — clear peer ask."
+            : decision === 'spam'
+              ? "I won't pass this spam along to Sam."
+              : "Sam isn't open to this ask right now.",
         reason_private: 'eval',
         suggested_rewrite:
           decision === 'reject'
-            ? 'Hi Sam — I’m a peer founder shipping usage-based billing and wanted a short intro.'
+            ? wantsCoaching
+              ? defaultCoachingTip('Sam')
+              : 'Hi Sam — I’m a student exploring startups and wanted a concrete written question.'
             : null,
         deal_breaker_hit: decision === 'spam',
       });
