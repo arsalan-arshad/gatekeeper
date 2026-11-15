@@ -3,7 +3,8 @@
 :root {
   --bg: #0b1210;
   --fg: #eef3ef;
-  --muted: #8fa198;
+  /* WCAG AA on --bg (~5.2:1) for body copy */
+  --muted: #a8b5ac;
   --accent: #5fd4a4;
   --accent-deep: #1b6b4f;
   --glow: rgba(95, 212, 164, 0.35);
@@ -19,6 +20,8 @@ body {
   background: var(--bg);
   color: var(--fg);
   font-family: var(--font-sans), 'IBM Plex Sans', sans-serif;
+  font-size: 17px;
+  line-height: 1.55;
 }
 
 @keyframes rise {
@@ -58,6 +61,24 @@ body {
   }
 }
 
+@keyframes door-open {
+  from {
+    transform: perspective(800px) rotateY(0deg);
+  }
+  to {
+    transform: perspective(800px) rotateY(-62deg);
+  }
+}
+
+@keyframes door-close {
+  from {
+    transform: perspective(800px) rotateY(-20deg);
+  }
+  to {
+    transform: perspective(800px) rotateY(0deg) scaleX(1.02);
+  }
+}
+
 .animate-rise {
   animation: rise 0.9s ease-out both;
 }
@@ -78,12 +99,38 @@ body {
   animation: sweep 7s ease-in-out infinite;
 }
 
+.door-leaf-idle {
+  transform: perspective(800px) rotateY(-8deg);
+  transition: transform 0.7s ease;
+}
+
+.door-leaf-open {
+  animation: door-open 0.85s ease forwards;
+  box-shadow: 12px 0 40px rgba(95, 212, 164, 0.18);
+}
+
+.door-leaf-closed {
+  animation: door-close 0.55s ease forwards;
+  filter: brightness(0.72);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-rise,
   .animate-rise-delay,
   .animate-rise-delay-2,
   .door-glow,
-  .light-sweep {
+  .light-sweep,
+  .door-leaf-open,
+  .door-leaf-closed {
     animation: none;
+  }
+
+  .door-leaf-open {
+    transform: perspective(800px) rotateY(-55deg);
+  }
+
+  .door-leaf-closed {
+    transform: none;
+    filter: brightness(0.72);
   }
 }

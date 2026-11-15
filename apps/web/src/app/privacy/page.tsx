@@ -1,6 +1,4 @@
-import Link from 'next/link';
-
-import { BRAND } from '@/lib/brand';
+import { SiteNav } from '@/components/site-nav';
 
 export const metadata = {
   title: 'Privacy — Gatekeeper',
@@ -10,9 +8,7 @@ export const metadata = {
 export default function PrivacyPage() {
   return (
     <main className="mx-auto min-h-screen max-w-2xl px-6 py-16">
-      <Link href="/" className="text-sm uppercase tracking-[0.2em] text-[var(--accent)]">
-        {BRAND.name}
-      </Link>
+      <SiteNav compact />
       <h1 className="mt-8 text-4xl" style={{ fontFamily: 'var(--font-display), Georgia, serif' }}>
         Privacy
       </h1>

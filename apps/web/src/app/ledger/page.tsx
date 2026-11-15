@@ -21,6 +21,7 @@ export default async function GlobalLedgerPage() {
     <LedgerView
       data={data}
       title="Public ledger"
+      demoData={false}
       notice={
         unavailable
           ? 'Live totals are temporarily unavailable. This page stays public — try again shortly.'
