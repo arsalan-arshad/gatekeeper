@@ -4,10 +4,16 @@ import { useEffect } from 'react';
 
 import { identifyUser } from '@/lib/analytics/client';
 
-/** Identify with Gatekeeper users.id (UUID) only — never email. */
-export function AnalyticsIdentify({ userId }: { userId: string | null | undefined }) {
+/** Identifies once when the authenticated session reaches the browser, including page refreshes. */
+export function AnalyticsIdentify({
+  userId,
+  email,
+}: {
+  userId: string | null | undefined;
+  email?: string | null;
+}) {
   useEffect(() => {
-    if (userId) identifyUser(userId);
-  }, [userId]);
+    if (userId) identifyUser(userId, email);
+  }, [email, userId]);
   return null;
 }

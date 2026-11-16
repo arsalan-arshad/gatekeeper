@@ -23,20 +23,7 @@ let initialized = false;
 let optedOut = false;
 
 function posthogKey(): string {
-  return (process.env.NEXT_PUBLIC_POSTHOG_KEY ?? '').trim();
-}
-
-function posthogHost(): string {
-  const host = (process.env.NEXT_PUBLIC_POSTHOG_HOST ?? '/ingest').trim();
-  return host || '/ingest';
-}
-
-function uiHostFromProxyOrigins(): string {
-  const explicit = (process.env.NEXT_PUBLIC_POSTHOG_UI_HOST ?? '').trim();
-  if (explicit) return explicit;
-  const proxy = (process.env.POSTHOG_PROXY_INGEST_ORIGIN ?? '').trim().toLowerCase();
-  if (proxy.includes('eu.i.posthog.com')) return 'https://eu.posthog.com';
-  return 'https://us.posthog.com';
+  return (process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN ?? '').trim();
 }
 
 function dntEnabled(): boolean {
@@ -67,8 +54,8 @@ function applyDashboardMasking(pathname: string): void {
 }
 
 /**
- * Init PostHog once on the client. No-op without key or when DNT is set.
- * Safe to call repeatedly.
+ * Init PostHog once on the client. Missing configuration is a production no-op and
+ * raises in development; DNT disables capture. Safe to call repeatedly.
  */
 export function initAnalytics(): void {
   if (typeof window === 'undefined') return;
@@ -77,6 +64,11 @@ export function initAnalytics(): void {
   const key = posthogKey();
   if (!key) {
     initialized = true;
+    if (process.env.NODE_ENV !== 'production') {
+      throw new Error(
+        'NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN variable required by PostHog is missing or un-configured, this causes events to be silently missed. This error stops appearing once NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN is configured',
+      );
+    }
     return;
   }
 
@@ -89,11 +81,15 @@ export function initAnalytics(): void {
   const onDashboard = window.location.pathname.startsWith('/dashboard');
 
   posthog.init(key, {
-    api_host: posthogHost(),
-    ui_host: uiHostFromProxyOrigins(),
+    api_host: '/ingest',
     person_profiles: 'identified_only',
     capture_pageview: false,
     capture_pageleave: true,
+    capture_exceptions: {
+      capture_unhandled_errors: true,
+      capture_unhandled_rejections: true,
+      capture_console_errors: false,
+    },
     persistence: 'localStorage+cookie',
     session_recording: {
       maskAllInputs: true,
@@ -130,16 +126,23 @@ export function capturePageview(pathWithSearch: string): void {
   captureEvent('$pageview', { $current_url: path });
 }
 
-/**
- * Identify only with Gatekeeper users.id (UUID). Never pass email.
- */
-export function identifyUser(userId: string): void {
+/** Capture an exception from the application's global error boundary. */
+export function captureException(error: Error): void {
+  if (typeof window === 'undefined') return;
+  if (!posthogKey() || dntEnabled() || optedOut) return;
+  if (!initialized) initAnalytics();
+  if (!isAnalyticsEnabled()) return;
+  posthog.captureException(error);
+}
+
+/** Identify with the stable auth user UUID; email is a person property, never an event property. */
+export function identifyUser(userId: string, email?: string | null): void {
   if (typeof window === 'undefined') return;
   if (!userId || !/^[0-9a-f-]{36}$/i.test(userId)) return;
   if (!posthogKey() || dntEnabled() || optedOut) return;
   if (!initialized) initAnalytics();
   if (!isAnalyticsEnabled()) return;
-  posthog.identify(userId);
+  posthog.identify(userId, email ? { email } : undefined);
 }
 
 export function resetAnalytics(): void {

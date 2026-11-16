@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react';
 
+import { captureEvent } from '@/lib/analytics/client';
 import { API_URL } from '@/lib/api-url';
 
 const MESSAGE_MAX = 2000;
@@ -59,6 +60,7 @@ export function IntroRequestForm({ handle }: { handle: string }) {
         setError(body.error || 'Could not send request');
         return;
       }
+      captureEvent('intro_request_submitted');
       setStatus(
         'Request received — verdict is on-screen. Check your email to verify your address before Gatekeeper will message you.',
       );

@@ -149,6 +149,10 @@ const nextConfig: NextConfig = {
         destination: `${posthogAssetOrigin}/static/:path*`,
       },
       {
+        source: '/ingest/array/:path*',
+        destination: `${posthogAssetOrigin}/array/:path*`,
+      },
+      {
         source: '/ingest/:path*',
         destination: `${posthogIngestOrigin}/:path*`,
       },

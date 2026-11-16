@@ -1,9 +1,11 @@
 'use server';
 
+import { SeverityNumber } from '@opentelemetry/api-logs';
 import { AuthError } from 'next-auth';
 import { redirect } from 'next/navigation';
 
 import { auth, signIn, signOut } from '@/auth';
+import { posthogLogsLogger, posthogLogsProvider } from '@/instrumentation';
 import { apiFetch } from '@/lib/api';
 
 export async function requestMagicLink(formData: FormData): Promise<void> {
@@ -88,6 +90,13 @@ export async function completeOnboarding(input: {
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Failed to save profile' };
   }
+
+  posthogLogsLogger?.emit({
+    body: 'Onboarding profile completed',
+    severityNumber: SeverityNumber.INFO,
+    attributes: { action: 'onboarding_completed' },
+  });
+  await posthogLogsProvider?.forceFlush().catch(() => {});
 
   redirect('/dashboard');
 }

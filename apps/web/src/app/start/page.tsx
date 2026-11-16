@@ -25,11 +25,11 @@ export default async function StartPage({
 }) {
   const session = await auth();
   const email = session?.user?.email ?? null;
+  const userId = session?.user?.id;
   const params = await searchParams;
   const redo = params.redo === '1' || params.redo === 'true';
 
   let onboardedHandle: string | null = null;
-  let userId: string | null = null;
   if (email) {
     try {
       const me = await apiFetch<{
@@ -38,7 +38,6 @@ export default async function StartPage({
       }>('/v1/onboarding/me', { email });
       if (me.onboarded && me.user) {
         onboardedHandle = me.user.handle;
-        userId = me.user.id;
       }
     } catch {
       onboardedHandle = null;
@@ -112,7 +111,7 @@ export default async function StartPage({
           <InterviewClient email={email} />
         </>
       )}
-      {userId ? <AnalyticsIdentify userId={userId} /> : null}
+      {userId ? <AnalyticsIdentify userId={userId} email={email} /> : null}
       <SiteFooter />
     </main>
   );

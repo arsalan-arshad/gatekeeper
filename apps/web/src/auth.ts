@@ -138,6 +138,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async session({ session, token }) {
       if (session.user) {
         session.user.email = (token.email as string | undefined) ?? session.user.email;
+        // Expose the adapter's stable auth user UUID to client-side analytics.
+        if (typeof token.sub === 'string') session.user.id = token.sub;
       }
       return session;
     },

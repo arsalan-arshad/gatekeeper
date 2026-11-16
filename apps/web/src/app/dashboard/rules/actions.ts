@@ -1,6 +1,9 @@
 'use server';
 
+import { SeverityNumber } from '@opentelemetry/api-logs';
+
 import { auth } from '@/auth';
+import { posthogLogsLogger, posthogLogsProvider } from '@/instrumentation';
 import { apiFetch } from '@/lib/api';
 
 async function requireEmail() {
@@ -50,6 +53,12 @@ export async function saveRules(input: {
       email,
       body: JSON.stringify(input),
     });
+    posthogLogsLogger?.emit({
+      body: 'Dashboard rules saved',
+      severityNumber: SeverityNumber.INFO,
+      attributes: { action: 'rules_saved' },
+    });
+    await posthogLogsProvider?.forceFlush().catch(() => {});
     return { ok: true as const };
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Save failed' };
