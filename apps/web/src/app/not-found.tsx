@@ -4,8 +4,16 @@ import Link from 'next/link';
 import { SiteFooter } from '@/components/site-footer';
 import { SiteNav } from '@/components/site-nav';
 
+/**
+ * Do not set `robots` here: Next.js already injects
+ * `<meta name="robots" content="noindex"/>` on not-found responses. A second
+ * robots meta would duplicate the signal. Nofollow is supplied via
+ * `X-Robots-Tag: noindex, nofollow` on `/_not-found` in next.config.ts.
+ *
+ * Homepage canonical/OG are intentionally not in the root layout, so this
+ * page does not inherit them.
+ */
 export const metadata: Metadata = {
-  robots: { index: false, follow: false },
   title: 'Not found · Gatekeeper',
 };
 

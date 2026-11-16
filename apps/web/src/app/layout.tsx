@@ -4,7 +4,6 @@ import { IBM_Plex_Sans, Syne } from 'next/font/google';
 
 import { AnalyticsProvider } from '@/components/analytics-provider';
 import { BRAND } from '@/lib/brand';
-import { publicPageMetadata } from '@/lib/seo';
 
 import './globals.css';
 
@@ -20,16 +19,13 @@ const display = Syne({
   variable: '--font-display',
 });
 
-const homeTitle = 'Gatekeeper — Only the right ones get through';
-const homeMeta = publicPageMetadata({
-  title: homeTitle,
-  description: BRAND.summary,
-  path: '/',
-});
-
+/**
+ * Root layout keeps only site-wide chrome metadata.
+ * Homepage title/description/canonical/OG live on `app/page.tsx` so `not-found`
+ * does not inherit the homepage canonical or social tags.
+ */
 export const metadata: Metadata = {
   metadataBase: new URL(BRAND.siteUrl),
-  ...homeMeta,
   authors: [{ name: 'Arsalan', url: BRAND.creator.studioUrl }],
   creator: 'Arsalan',
   icons: {
