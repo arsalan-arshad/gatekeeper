@@ -50,6 +50,9 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   transpilePackages: ['@gatekeeper/db'],
+  // PostHog capture/replay POSTs use trailing slashes (`/ingest/i/v0/e/`, `/ingest/s/`).
+  // Next's default slash-strip 308 breaks sendBeacon; public pages are stripped in middleware.
+  skipTrailingSlashRedirect: true,
   async headers() {
     return [
       {
@@ -62,6 +65,12 @@ const nextConfig: NextConfig = {
       },
       {
         source: '/start/check-email',
+        headers: noindexHeaders,
+      },
+      // Next always injects `<meta name="robots" content="noindex"/>` on not-found;
+      // keep a single meta tag and supply nofollow via the HTTP header instead.
+      {
+        source: '/_not-found',
         headers: noindexHeaders,
       },
       {

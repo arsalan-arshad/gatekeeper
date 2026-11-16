@@ -5,6 +5,13 @@ import { LandingSections } from '@/components/landing-sections';
 import { SiteFooter } from '@/components/site-footer';
 import { SiteNav } from '@/components/site-nav';
 import { BRAND } from '@/lib/brand';
+import { publicPageMetadata } from '@/lib/seo';
+
+export const metadata = publicPageMetadata({
+  title: 'Gatekeeper — Only the right ones get through',
+  description: BRAND.summary,
+  path: '/',
+});
 
 const jsonLd = {
   '@context': 'https://schema.org',

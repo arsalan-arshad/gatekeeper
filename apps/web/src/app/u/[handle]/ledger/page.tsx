@@ -69,6 +69,11 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { handle } = await params;
   const normalized = handle.toLowerCase();
+  const { data } = await getUserLedger(handle);
+  if (!data || !data.user) {
+    // Avoid emitting a canonical/OG URL for a 404 ledger page.
+    return { title: 'Not found · Gatekeeper' };
+  }
   const title = `@${normalized} public ledger · Gatekeeper`;
   const description = `Public Gatekeeper ledger for @${normalized} — accept rates, spam blocked, and trust signals.`;
   const url = `${BRAND.siteUrl}/@${normalized}/ledger`;
