@@ -1,11 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import {
-  bandFromDecision,
-  sanitizeAnalyticsPath,
-  sanitizeAnalyticsProps,
-} from './sanitize.ts';
+import { bandFromDecision, sanitizeAnalyticsPath, sanitizeAnalyticsProps } from './sanitize.ts';
 
 test('sanitizeAnalyticsProps strips email, message, token, and related PII keys', () => {
   const cleaned = sanitizeAnalyticsProps({
@@ -29,10 +25,7 @@ test('sanitizeAnalyticsProps returns undefined for empty or fully blocked input'
 });
 
 test('sanitizeAnalyticsPath strips email and token query params', () => {
-  assert.equal(
-    sanitizeAnalyticsPath('/start?email=a%40b.com&redo=1'),
-    '/start?redo=1',
-  );
+  assert.equal(sanitizeAnalyticsPath('/start?email=a%40b.com&redo=1'), '/start?redo=1');
   assert.equal(sanitizeAnalyticsPath('/dashboard'), '/dashboard');
 });
 

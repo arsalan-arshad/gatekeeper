@@ -305,9 +305,7 @@ export async function submitIntroRequest(options: {
   const verified = await isSenderContactVerified(options.body.senderContact);
 
   const band =
-    judgment.decision === 'spam' ||
-    judgment.decision === 'reject' ||
-    judgment.decision === 'accept'
+    judgment.decision === 'spam' || judgment.decision === 'reject' || judgment.decision === 'accept'
       ? judgment.decision
       : null;
   if (band) {

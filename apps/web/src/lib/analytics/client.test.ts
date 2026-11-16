@@ -1,11 +1,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'node:test';
 
-import {
-  __resetAnalyticsStateForTests,
-  captureEvent,
-  isAnalyticsEnabled,
-} from './client.ts';
+import { __resetAnalyticsStateForTests, captureEvent, isAnalyticsEnabled } from './client.ts';
 
 afterEach(() => {
   delete process.env.NEXT_PUBLIC_POSTHOG_KEY;

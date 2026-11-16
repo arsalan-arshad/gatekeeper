@@ -31,11 +31,11 @@ export default function PrivacyPage() {
           limits, spam decisions, oversized payloads) may be logged to protect the service.
         </p>
         <p>
-          When product analytics is enabled, Gatekeeper uses PostHog for pageviews and funnel
-          events (for example demo start, signup steps, and owner approve/decline). Session replay
-          may run with all inputs masked and dashboard/inbox text masked. Do Not Track is honored.
-          We do not send email addresses or message contents to PostHog. Signed-in users are
-          identified only by an internal id.
+          When product analytics is enabled, Gatekeeper uses PostHog for pageviews and funnel events
+          (for example demo start, signup steps, and owner approve/decline). Session replay may run
+          with all inputs masked and dashboard/inbox text masked. Do Not Track is honored. We do not
+          send email addresses or message contents to PostHog. Signed-in users are identified only
+          by an internal id.
         </p>
         <p>
           LLM providers process request text and embeddings to run Gatekeeper. Do not put secrets

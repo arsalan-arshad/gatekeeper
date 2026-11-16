@@ -11,7 +11,15 @@ test('robots allows public paths and disallows dashboard/auth/u', () => {
   assert.equal(rule.userAgent, '*');
   assert.equal(rule.allow, '/');
   const disallow = Array.isArray(rule.disallow) ? rule.disallow : [rule.disallow];
-  for (const path of ['/dashboard', '/dashboard/', '/e2e', '/e2e/', '/api/', '/start/check-email', '/u/']) {
+  for (const path of [
+    '/dashboard',
+    '/dashboard/',
+    '/e2e',
+    '/e2e/',
+    '/api/',
+    '/start/check-email',
+    '/u/',
+  ]) {
     assert.ok(disallow.includes(path), `expected disallow ${path}`);
   }
   assert.equal(result.sitemap, `${BRAND.siteUrl}/sitemap.xml`);
