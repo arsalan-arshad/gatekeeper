@@ -1,11 +1,22 @@
 import Link from 'next/link';
 
 import { auth } from '@/auth';
+import { AnalyticsIdentify } from '@/components/analytics-identify';
+import { CopyHandleLink } from '@/components/copy-handle-link';
+import { MagicLinkForm } from '@/components/magic-link-form';
+import { SignOutButton } from '@/components/sign-out-button';
 import { SiteFooter } from '@/components/site-footer';
 import { apiFetch } from '@/lib/api';
+import { publicPageMetadata } from '@/lib/seo';
 
-import { requestMagicLink, signOutAction } from './actions';
 import { InterviewClient } from './interview-client';
+
+export const metadata = publicPageMetadata({
+  title: 'Set up your front door · Gatekeeper',
+  description:
+    'Sign in with a magic link, complete a short interview, and publish your public Gatekeeper handle.',
+  path: '/start',
+});
 
 export default async function StartPage({
   searchParams,
@@ -18,14 +29,16 @@ export default async function StartPage({
   const redo = params.redo === '1' || params.redo === 'true';
 
   let onboardedHandle: string | null = null;
+  let userId: string | null = null;
   if (email) {
     try {
       const me = await apiFetch<{
         onboarded: boolean;
-        user: { handle: string } | null;
+        user: { id: string; handle: string } | null;
       }>('/v1/onboarding/me', { email });
       if (me.onboarded && me.user) {
         onboardedHandle = me.user.handle;
+        userId = me.user.id;
       }
     } catch {
       onboardedHandle = null;
@@ -38,13 +51,7 @@ export default async function StartPage({
         <Link href="/" className="text-sm uppercase tracking-[0.2em] text-[var(--accent)]">
           Gatekeeper
         </Link>
-        {email ? (
-          <form action={signOutAction}>
-            <button type="submit" className="text-sm text-[var(--muted)] underline">
-              Sign out
-            </button>
-          </form>
-        ) : null}
+        {email ? <SignOutButton className="text-sm text-[var(--muted)] underline" /> : null}
       </div>
 
       {!email ? (
@@ -58,24 +65,7 @@ export default async function StartPage({
               publish your public Gatekeeper page.
             </p>
           </div>
-          <form action={requestMagicLink} className="flex max-w-md flex-col gap-3">
-            <label className="text-sm">
-              Work email
-              <input
-                required
-                type="email"
-                name="email"
-                placeholder="you@company.com"
-                className="mt-2 w-full rounded-md border border-white/15 bg-black/30 px-3 py-2"
-              />
-            </label>
-            <button
-              type="submit"
-              className="w-fit rounded-md bg-[var(--accent)] px-4 py-2 font-medium text-black"
-            >
-              Email me a magic link
-            </button>
-          </form>
+          <MagicLinkForm />
         </>
       ) : onboardedHandle && !redo ? (
         <div className="flex flex-col gap-5">
@@ -86,7 +76,7 @@ export default async function StartPage({
             Your Gatekeeper is published. Manage intros from the dashboard or share your public
             page.
           </p>
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <Link
               href="/dashboard"
               className="rounded-md bg-[var(--accent)] px-4 py-2 font-medium text-black"
@@ -99,6 +89,7 @@ export default async function StartPage({
             >
               Public page
             </Link>
+            <CopyHandleLink handle={onboardedHandle} />
           </div>
           <p className="text-sm text-[var(--muted)]">
             Need a fresh interview?{' '}
@@ -121,6 +112,7 @@ export default async function StartPage({
           <InterviewClient email={email} />
         </>
       )}
+      {userId ? <AnalyticsIdentify userId={userId} /> : null}
       <SiteFooter />
     </main>
   );

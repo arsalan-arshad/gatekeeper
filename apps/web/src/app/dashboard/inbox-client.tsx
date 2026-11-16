@@ -3,6 +3,8 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState, useTransition } from 'react';
 
+import { captureEvent } from '@/lib/analytics/client';
+
 import {
   approveRequest,
   declineRequest,
@@ -113,6 +115,7 @@ export function InboxClient({
     action: () => Promise<{ error?: string; ok?: true }>,
     next: Partial<InboxItem>,
     message: string,
+    analytics?: 'owner_approved' | 'owner_rejected',
   ) {
     setError(null);
     // Optimistic status badge before the server round-trip finishes.
@@ -133,6 +136,7 @@ export function InboxClient({
         });
         return;
       }
+      if (analytics) captureEvent(analytics);
       router.refresh();
     });
   }
@@ -213,6 +217,7 @@ export function InboxClient({
                       () => approveRequest(item.id),
                       { status: 'accepted', ownerDecision: 'accept' },
                       `Intro sent to ${item.senderName}`,
+                      'owner_approved',
                     )
                   }
                   className="rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm font-medium text-[#062015] disabled:opacity-50"
@@ -228,6 +233,7 @@ export function InboxClient({
                       () => declineRequest(item.id),
                       { status: 'declined', ownerDecision: 'reject' },
                       `Declined ${item.senderName}`,
+                      'owner_rejected',
                     )
                   }
                   className="rounded-md border border-white/15 px-3 py-1.5 text-sm disabled:opacity-50"

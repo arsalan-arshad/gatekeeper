@@ -1,7 +1,9 @@
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { LedgerView } from '@/components/ledger-view';
 import { API_URL } from '@/lib/api';
+import { BRAND } from '@/lib/brand';
 import { DEMO_LEDGER_FALLBACK } from '@/lib/demo';
 import { emptyGlobalLedger, type LedgerPayload } from '@/lib/ledger';
 
@@ -58,6 +60,35 @@ async function getUserLedger(handle: string): Promise<{
       demoData: false,
     };
   }
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ handle: string }>;
+}): Promise<Metadata> {
+  const { handle } = await params;
+  const normalized = handle.toLowerCase();
+  const title = `@${normalized} public ledger · Gatekeeper`;
+  const description = `Public Gatekeeper ledger for @${normalized} — accept rates, spam blocked, and trust signals.`;
+  const url = `${BRAND.siteUrl}/@${normalized}/ledger`;
+  return {
+    title,
+    description,
+    alternates: { canonical: url },
+    openGraph: {
+      title,
+      description,
+      url,
+      images: [{ url: '/og.png', width: 1200, height: 630, alt: title }],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: ['/og.png'],
+    },
+  };
 }
 
 export default async function UserLedgerPage({ params }: { params: Promise<{ handle: string }> }) {

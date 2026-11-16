@@ -4,6 +4,7 @@ import { markSenderContactVerified, verifySenderVerifyToken } from '../sender-ve
 
 export async function registerSenderVerifyRoutes(app: FastifyInstance): Promise<void> {
   app.get('/v1/senders/verify', async (request, reply) => {
+    reply.header('X-Robots-Tag', 'noindex, nofollow');
     const query = request.query as { token?: string };
     const token = typeof query.token === 'string' ? query.token : '';
     if (!token) {
@@ -17,7 +18,7 @@ export async function registerSenderVerifyRoutes(app: FastifyInstance): Promise<
 
     await markSenderContactVerified(verified.email);
     reply.type('text/html; charset=utf-8');
-    return `<!doctype html><html lang="en"><body style="font-family:system-ui,sans-serif;padding:2rem;background:#07110e;color:#f4f1ea;">
+    return `<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="robots" content="noindex, nofollow"/><title>Email verified</title></head><body style="font-family:system-ui,sans-serif;padding:2rem;background:#07110e;color:#f4f1ea;">
       <h1>Email verified</h1>
       <p>You can now receive Gatekeeper updates at this address.</p>
     </body></html>`;

@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from 'react';
 
+import { resetAnalytics } from '@/lib/analytics/client';
+
 import { deleteAccount, exportData, saveSettings } from './actions';
 
 export function SettingsClient({
@@ -56,6 +58,7 @@ export function SettingsClient({
     }
     setError(null);
     startTransition(async () => {
+      resetAnalytics();
       const result = await deleteAccount();
       if (result.error) setError(result.error);
     });

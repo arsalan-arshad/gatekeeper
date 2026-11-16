@@ -2,6 +2,14 @@ import Link from 'next/link';
 
 import { SiteFooter } from '@/components/site-footer';
 import { SiteNav } from '@/components/site-nav';
+import { publicPageMetadata } from '@/lib/seo';
+
+export const metadata = publicPageMetadata({
+  title: 'Terms of use · Gatekeeper',
+  description:
+    'Terms of use for Gatekeeper — AGPL open-source AI principal software and the hosted service.',
+  path: '/terms',
+});
 
 export default function TermsPage() {
   return (

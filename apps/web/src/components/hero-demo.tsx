@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 
 import { DoorGraphic, type DoorState } from '@/components/door-graphic';
+import { bandFromDecision, captureEvent } from '@/lib/analytics';
 import { DEMO_CHIPS, DEMO_PLACEHOLDERS, DEMO_PROFILE_OPTIONS } from '@/lib/demo';
 import { DEMO_MESSAGE_MAX_CHARS, demoMessageOverLimit } from '@/lib/demo-char-limit';
 
@@ -27,11 +28,18 @@ export function HeroDemo() {
   const [slamKey, setSlamKey] = useState(0);
   const [remaining, setRemaining] = useState<number | null>(null);
   const [limit, setLimit] = useState(20);
+  const demoStarted = useRef(false);
 
   const profile = DEMO_PROFILE_OPTIONS.find((p) => p.handle === handle) ?? DEMO_PROFILE_OPTIONS[0]!;
   const messageLen = message.length;
   const messageOver = demoMessageOverLimit(messageLen);
   const canJudge = message.trim().length > 0 && !messageOver;
+
+  function markDemoStarted() {
+    if (demoStarted.current) return;
+    demoStarted.current = true;
+    captureEvent('demo_started', { surface: 'landing' });
+  }
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -62,6 +70,7 @@ export function HeroDemo() {
 
   function judge(text: string, example: boolean) {
     setError(null);
+    markDemoStarted();
     startTransition(async () => {
       try {
         const response = await fetch('/api/demo/judge', {
@@ -98,6 +107,8 @@ export function HeroDemo() {
           remaining: body.remaining,
           limit: body.limit,
         });
+        const band = bandFromDecision(body.decision);
+        if (band) captureEvent('demo_submitted', { band });
         if (body.decision !== 'accept') {
           setSlamKey((k) => k + 1);
         }

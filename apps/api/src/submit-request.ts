@@ -27,6 +27,7 @@ import {
   refundStake,
   stakeCentsFromEnv,
 } from './payments.js';
+import { captureServerEvent } from './posthog.js';
 import { DEDUPE_WINDOW_MS, messageDedupeHash, normalizeSenderEmail } from './request-dedupe.js';
 import { MESSAGE_MAX_CHARS, NAME_MAX_CHARS } from './request-limits.js';
 
@@ -302,6 +303,16 @@ export async function submitIntroRequest(options: {
   }
 
   const verified = await isSenderContactVerified(options.body.senderContact);
+
+  const band =
+    judgment.decision === 'spam' ||
+    judgment.decision === 'reject' ||
+    judgment.decision === 'accept'
+      ? judgment.decision
+      : null;
+  if (band) {
+    captureServerEvent(user.id, 'request_received', { band });
+  }
 
   return {
     ok: true,

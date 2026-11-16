@@ -12,7 +12,6 @@ export const metadata: Metadata = {
 export default function NotFound() {
   return (
     <main className="relative min-h-screen overflow-hidden">
-      <meta name="robots" content="noindex, nofollow" />
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0"

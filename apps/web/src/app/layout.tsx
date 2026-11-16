@@ -1,7 +1,10 @@
 import type { Metadata } from 'next';
+
 import { IBM_Plex_Sans, Syne } from 'next/font/google';
 
+import { AnalyticsProvider } from '@/components/analytics-provider';
 import { BRAND } from '@/lib/brand';
+import { publicPageMetadata } from '@/lib/seo';
 
 import './globals.css';
 
@@ -17,13 +20,16 @@ const display = Syne({
   variable: '--font-display',
 });
 
-const ogTitle = 'Gatekeeper · by arsalandev.studio';
-const siteUrl = BRAND.siteUrl;
+const homeTitle = 'Gatekeeper — Only the right ones get through';
+const homeMeta = publicPageMetadata({
+  title: homeTitle,
+  description: BRAND.summary,
+  path: '/',
+});
 
 export const metadata: Metadata = {
-  metadataBase: new URL(siteUrl),
-  title: 'Gatekeeper — Let anyone reach you. Only the right ones get through.',
-  description: BRAND.summary,
+  metadataBase: new URL(BRAND.siteUrl),
+  ...homeMeta,
   authors: [{ name: 'Arsalan', url: BRAND.creator.studioUrl }],
   creator: 'Arsalan',
   icons: {
@@ -35,62 +41,13 @@ export const metadata: Metadata = {
     ],
     apple: [{ url: '/apple-touch-icon.png', sizes: '180x180' }],
   },
-  openGraph: {
-    title: ogTitle,
-    description: BRAND.summary,
-    url: siteUrl,
-    siteName: BRAND.name,
-    images: [
-      {
-        url: '/og.png',
-        width: 1200,
-        height: 630,
-        alt: ogTitle,
-      },
-    ],
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: ogTitle,
-    description: BRAND.summary,
-    images: ['/og.png'],
-  },
-};
-
-const jsonLd = {
-  '@context': 'https://schema.org',
-  '@graph': [
-    {
-      '@type': 'SoftwareApplication',
-      name: 'Gatekeeper',
-      applicationCategory: 'BusinessApplication',
-      operatingSystem: 'Web',
-      license: 'https://www.gnu.org/licenses/agpl-3.0.html',
-      description: BRAND.summary,
-      url: 'https://gatekeeper.arsalandev.studio',
-      creator: {
-        '@type': 'Person',
-        name: 'Arsalan',
-        url: 'https://arsalandev.studio',
-      },
-    },
-    {
-      '@type': 'Person',
-      name: 'Arsalan',
-      url: 'https://arsalandev.studio',
-    },
-  ],
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${sans.variable} ${display.variable}`}>
       <body className="min-h-screen antialiased">
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-        />
-        {children}
+        <AnalyticsProvider>{children}</AnalyticsProvider>
       </body>
     </html>
   );

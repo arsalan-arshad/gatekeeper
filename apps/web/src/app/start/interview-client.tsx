@@ -1,6 +1,8 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+
+import { captureEvent } from '@/lib/analytics/client';
 
 import { completeOnboarding, synthesizeRules } from './actions';
 
@@ -62,9 +64,16 @@ export function InterviewClient({ email }: { email: string }) {
   const [draftStep, setDraftStep] = useState(0);
   const [drafting, setDrafting] = useState(false);
   const [pending, startTransition] = useTransition();
+  const signupCaptured = useRef(false);
 
   const current = QUESTIONS[step];
   const progress = useMemo(() => `${Math.min(step + 1, 5)} / 5`, [step]);
+
+  useEffect(() => {
+    if (signupCaptured.current) return;
+    signupCaptured.current = true;
+    captureEvent('signup_completed');
+  }, []);
 
   async function runDraft(withRetry = false) {
     setError(null);
@@ -91,6 +100,8 @@ export function InterviewClient({ email }: { email: string }) {
       setDraft(result.profile);
       setHandle(result.profile.handleSuggestion);
       setDraftStep(DRAFT_STEPS.length - 1);
+      captureEvent('interview_completed');
+      captureEvent('rules_drafted');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Could not synthesize rules';
       if (withRetry) {

@@ -1,9 +1,12 @@
 import { SiteNav } from '@/components/site-nav';
+import { publicPageMetadata } from '@/lib/seo';
 
-export const metadata = {
+export const metadata = publicPageMetadata({
   title: 'Privacy — Gatekeeper',
-  description: 'How Gatekeeper handles privacy for receivers and senders.',
-};
+  description:
+    'How Gatekeeper handles privacy for receivers and senders, including product analytics via PostHog.',
+  path: '/privacy',
+});
 
 export default function PrivacyPage() {
   return (
@@ -26,6 +29,13 @@ export default function PrivacyPage() {
           We store account email for magic-link sign-in, request metadata for judging and the
           ledger, and optional billing identifiers when payments are enabled. Abuse signals (rate
           limits, spam decisions, oversized payloads) may be logged to protect the service.
+        </p>
+        <p>
+          When product analytics is enabled, Gatekeeper uses PostHog for pageviews and funnel
+          events (for example demo start, signup steps, and owner approve/decline). Session replay
+          may run with all inputs masked and dashboard/inbox text masked. Do Not Track is honored.
+          We do not send email addresses or message contents to PostHog. Signed-in users are
+          identified only by an internal id.
         </p>
         <p>
           LLM providers process request text and embeddings to run Gatekeeper. Do not put secrets

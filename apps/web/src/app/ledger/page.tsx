@@ -1,6 +1,14 @@
+import { LedgerView } from '@/components/ledger-view';
 import { API_URL } from '@/lib/api';
 import { emptyGlobalLedger, type LedgerPayload } from '@/lib/ledger';
-import { LedgerView } from '@/components/ledger-view';
+import { publicPageMetadata } from '@/lib/seo';
+
+export const metadata = publicPageMetadata({
+  title: 'Public ledger · Gatekeeper',
+  description:
+    'Public Gatekeeper ledger — accept rates, spam blocked, and trust signals across the network.',
+  path: '/ledger',
+});
 
 async function getGlobalLedger(): Promise<{ data: LedgerPayload; unavailable: boolean }> {
   try {

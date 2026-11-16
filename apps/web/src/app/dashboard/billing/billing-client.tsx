@@ -2,6 +2,8 @@
 
 import { useState, useTransition, type FormEvent } from 'react';
 
+import { captureEvent } from '@/lib/analytics/client';
+
 import { joinWaitlist, startCheckout, type BillingMe } from './actions';
 
 export function BillingClient({ initial }: { initial: BillingMe }) {
@@ -17,6 +19,9 @@ export function BillingClient({ initial }: { initial: BillingMe }) {
 
   function checkout(kind: 'pro' | 'credits') {
     setError(null);
+    if (kind === 'pro') {
+      captureEvent('upgrade_clicked', { surface: 'billing' });
+    }
     if (!checkoutAvailable) {
       setError('Coming soon');
       return;

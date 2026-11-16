@@ -6,9 +6,49 @@ import { SiteFooter } from '@/components/site-footer';
 import { SiteNav } from '@/components/site-nav';
 import { BRAND } from '@/lib/brand';
 
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'SoftwareApplication',
+      name: 'Gatekeeper',
+      applicationCategory: 'BusinessApplication',
+      operatingSystem: 'Web',
+      license: 'https://www.gnu.org/licenses/agpl-3.0.html',
+      description: BRAND.summary,
+      url: BRAND.siteUrl,
+      offers: {
+        '@type': 'Offer',
+        price: '0',
+        priceCurrency: 'USD',
+        description: 'Free hosted plan; AGPL open-source',
+      },
+      creator: {
+        '@type': 'Person',
+        name: 'Arsalan',
+        url: BRAND.creator.studioUrl,
+      },
+    },
+    {
+      '@type': 'Organization',
+      name: 'Gatekeeper',
+      url: BRAND.siteUrl,
+      creator: {
+        '@type': 'Person',
+        name: 'Arsalan',
+        url: BRAND.creator.studioUrl,
+      },
+    },
+  ],
+};
+
 export default function HomePage() {
   return (
     <main className="relative min-h-screen overflow-x-hidden">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0"

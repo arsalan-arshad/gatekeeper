@@ -230,7 +230,7 @@ Content-Type: application/json
           <aside className="mt-14 flex flex-col gap-4 border-t border-white/10 pt-10 sm:flex-row sm:items-center sm:gap-6">
             <img
               src={BRAND.creator.avatarUrl}
-              alt=""
+              alt={BRAND.creator.name}
               width={56}
               height={56}
               className="h-14 w-14 rounded-full border border-white/10 object-cover"
