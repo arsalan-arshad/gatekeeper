@@ -15,11 +15,16 @@ import { verifyOptInToken, type OptInAction } from '../tokens.js';
 function htmlPage(title: string, body: string): string {
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"/><title>${title}</title>
+<meta name="robots" content="noindex, nofollow"/>
 <style>
   body{font-family:IBM Plex Sans,system-ui,sans-serif;background:#0f1419;color:#f4f1ea;
   max-width:40rem;margin:4rem auto;padding:0 1.25rem;line-height:1.5}
   a{color:#3dd6c6}
 </style></head><body>${body}</body></html>`;
+}
+
+function withNoindex(reply: { header: (k: string, v: string) => unknown }) {
+  reply.header('X-Robots-Tag', 'noindex, nofollow');
 }
 
 export async function registerOptInRoutes(app: FastifyInstance): Promise<void> {
@@ -28,6 +33,8 @@ export async function registerOptInRoutes(app: FastifyInstance): Promise<void> {
     const query = request.query as { action?: string; token?: string };
     const action = query.action === 'accept' || query.action === 'decline' ? query.action : null;
     const token = query.token;
+
+    withNoindex(reply);
 
     if (!action || !token) {
       return reply

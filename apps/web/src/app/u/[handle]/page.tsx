@@ -63,6 +63,7 @@ export async function generateMetadata({
   return {
     title,
     description,
+    alternates: { canonical: url },
     openGraph: {
       title,
       description,
@@ -90,9 +91,25 @@ export default async function PublicHandlePage({
 
   const { user, demoFallback } = data;
   const isDemo = user.handle === 'demo' || demoFallback;
+  const profileUrl = `${BRAND.siteUrl}/@${user.handle}`;
+  const profileJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'ProfilePage',
+    mainEntity: {
+      '@type': 'Person',
+      name: user.name,
+      url: profileUrl,
+      ...(user.bio ? { description: user.bio } : {}),
+    },
+    url: profileUrl,
+  };
 
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-8 px-6 py-16">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(profileJsonLd) }}
+      />
       <SiteNav compact />
 
       <header className="flex flex-col gap-3">

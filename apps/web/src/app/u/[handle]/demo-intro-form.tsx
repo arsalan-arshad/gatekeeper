@@ -1,6 +1,8 @@
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
+
+import { bandFromDecision, captureEvent } from '@/lib/analytics';
 
 type DemoResult = {
   score: number;
@@ -16,6 +18,7 @@ export function DemoIntroForm({ handle }: { handle: string }) {
   const [pending, startTransition] = useTransition();
   const [remaining, setRemaining] = useState<number | null>(null);
   const [limit, setLimit] = useState(20);
+  const demoStarted = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -38,6 +41,10 @@ export function DemoIntroForm({ handle }: { handle: string }) {
   function onSubmit(formData: FormData) {
     setError(null);
     setResult(null);
+    if (!demoStarted.current) {
+      demoStarted.current = true;
+      captureEvent('demo_started', { surface: 'demo_profile' });
+    }
     startTransition(async () => {
       const senderName = String(formData.get('senderName') ?? '').trim();
       const senderContact = String(formData.get('senderContact') ?? '').trim();
@@ -80,6 +87,8 @@ export function DemoIntroForm({ handle }: { handle: string }) {
           reason_public: body.reason_public,
           suggested_rewrite: body.suggested_rewrite,
         });
+        const band = bandFromDecision(body.decision);
+        if (band) captureEvent('demo_submitted', { band });
       } catch {
         setError('AI busy, try again');
       }

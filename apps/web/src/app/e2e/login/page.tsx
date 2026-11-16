@@ -1,7 +1,13 @@
+import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 
 import { signIn } from '@/auth';
 import { e2eSecretsEqual, isE2eLoginEnabled } from '@/lib/e2e-gate';
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+  title: 'E2E login · Gatekeeper',
+};
 
 async function e2eLoginAction(formData: FormData) {
   'use server';

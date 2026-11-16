@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
-import { signOutAction } from '@/app/start/actions';
+import { CopyHandleLink } from '@/components/copy-handle-link';
+import { SignOutButton } from '@/components/sign-out-button';
 
 const LINKS = [
   { href: '/dashboard', label: 'Inbox' },
@@ -29,15 +30,14 @@ export function DashboardNav({
             Dashboard
           </Link>
           {handle ? (
-            <Link href={`/@${handle}`} className="hover:text-[var(--fg)]">
-              My page
-            </Link>
+            <>
+              <Link href={`/@${handle}`} className="hover:text-[var(--fg)]">
+                My page
+              </Link>
+              <CopyHandleLink handle={handle} />
+            </>
           ) : null}
-          <form action={signOutAction}>
-            <button type="submit" className="hover:text-[var(--fg)]">
-              Sign out
-            </button>
-          </form>
+          <SignOutButton className="hover:text-[var(--fg)]" />
         </nav>
       </div>
       <nav className="flex flex-wrap gap-2">

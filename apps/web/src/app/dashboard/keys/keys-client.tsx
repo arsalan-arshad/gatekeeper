@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 
+import { captureEvent } from '@/lib/analytics/client';
+
 import { createApiKey, revokeApiKey, type ApiKeyRow } from './actions';
 
 export function KeysClient({ initialKeys }: { initialKeys: ApiKeyRow[] }) {
@@ -33,6 +35,7 @@ export function KeysClient({ initialKeys }: { initialKeys: ApiKeyRow[] }) {
           },
           ...prev,
         ]);
+        captureEvent('api_key_created');
       }
       router.refresh();
     });
