@@ -78,23 +78,23 @@ export const DEMO_LEDGER_FALLBACK = {
   user: { handle: 'demo', name: 'Sam Rivera' },
   totals: {
     requestCount: 12,
-    deliveredCount: 6,
-    acceptedCount: 5,
+    acceptedCount: 6,
+    deliveredCount: 5,
     spamCount: 3,
     helpfulCount: 4,
-    // accepted / total_requests
-    acceptRate: Number((5 / 12).toFixed(4)),
-    trustScore: 0.6667,
+    // accepted / total_requests (Accepted ≥ Delivered)
+    acceptRate: Number((6 / 12).toFixed(4)),
+    trustScore: 0.8,
   },
   months: [
     {
       month: new Date().toISOString().slice(0, 7),
       requestCount: 5,
-      deliveredCount: 3,
-      acceptedCount: 2,
+      acceptedCount: 3,
+      deliveredCount: 2,
       spamCount: 1,
       helpfulCount: 2,
-      acceptRate: 0.4,
+      acceptRate: 0.6,
     },
     {
       month: (() => {
@@ -103,8 +103,8 @@ export const DEMO_LEDGER_FALLBACK = {
         return d.toISOString().slice(0, 7);
       })(),
       requestCount: 4,
-      deliveredCount: 2,
       acceptedCount: 2,
+      deliveredCount: 2,
       spamCount: 1,
       helpfulCount: 1,
       acceptRate: 0.5,
@@ -116,8 +116,8 @@ export const DEMO_LEDGER_FALLBACK = {
         return d.toISOString().slice(0, 7);
       })(),
       requestCount: 3,
-      deliveredCount: 1,
       acceptedCount: 1,
+      deliveredCount: 1,
       spamCount: 1,
       helpfulCount: 1,
       acceptRate: Number((1 / 3).toFixed(4)),

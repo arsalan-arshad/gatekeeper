@@ -7,10 +7,13 @@ import { clientIp } from './client-ip.ts';
 import {
   FixedWindowRateLimiter,
   IP_LIMIT,
+  checkDemoIpRateLimit,
   checkIpRateLimit,
   checkPublicFormIpRateLimit,
   checkPublicFormSenderOwnerRateLimit,
+  peekDemoIpRateLimit,
   rateLimitResultFromCount,
+  refundDemoIpRateLimit,
   resetRateLimitersForTests,
   retryAfterSeconds,
   useMemoryRateLimitersForTests,
@@ -42,6 +45,17 @@ test('peek reports remaining without consuming quota', () => {
   assert.equal(limiter.peek('a').remaining, 3);
   assert.equal(limiter.check('a').remaining, 2);
   assert.equal(limiter.peek('a').remaining, 2);
+});
+
+test('refundDemoIpRateLimit restores one consumed demo quota slot', async () => {
+  resetRateLimitersForTests();
+  const ip = '198.51.100.44';
+  const first = await checkDemoIpRateLimit(ip);
+  assert.equal(first.ok, true);
+  assert.equal(first.remaining, 19);
+  const refunded = await refundDemoIpRateLimit(ip);
+  assert.equal(refunded.remaining, 20);
+  assert.equal((await peekDemoIpRateLimit(ip)).remaining, 20);
 });
 
 test('public form limits: 5/IP/hour and 3/sender/owner/day', async () => {

@@ -454,3 +454,36 @@ test('POST /v1/demo/judge returns 503 AI busy when LLM fails', async () => {
     resetDemoRateLimiterForTests();
   }
 });
+
+test('POST /v1/demo/judge does not decrement quota on AI busy / refunds 5xx', async () => {
+  resetDemoRateLimiterForTests();
+  setDemoLlmForTests(mockLlm({ completion: '{}', fail: true }));
+
+  try {
+    const app = await buildServer();
+    const headers = { 'x-forwarded-for': '203.0.113.91' };
+
+    const before = await app.inject({ method: 'GET', url: '/v1/demo/quota', headers });
+    assert.equal(before.statusCode, 200);
+    const beforeRemaining = (before.json() as { remaining: number }).remaining;
+
+    const busy = await app.inject({
+      method: 'POST',
+      url: '/v1/demo/judge',
+      headers,
+      payload: { handle: 'demo', message: STRONG_MESSAGE },
+    });
+    assert.equal(busy.statusCode, 503);
+    const busyBody = busy.json() as { error?: string; remaining?: number };
+    assert.equal(busyBody.error, DEMO_BUSY_ERROR);
+    assert.equal(busyBody.remaining, beforeRemaining);
+
+    const after = await app.inject({ method: 'GET', url: '/v1/demo/quota', headers });
+    assert.equal((after.json() as { remaining: number }).remaining, beforeRemaining);
+
+    await app.close();
+  } finally {
+    setDemoLlmForTests(undefined);
+    resetDemoRateLimiterForTests();
+  }
+});

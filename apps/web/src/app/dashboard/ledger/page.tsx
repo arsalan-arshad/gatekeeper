@@ -5,7 +5,12 @@ import { auth } from '@/auth';
 import { DashboardNav } from '@/components/dashboard-nav';
 import { SiteFooter } from '@/components/site-footer';
 import { API_URL, apiFetch } from '@/lib/api';
-import { emptyGlobalLedger, formatPercent, type LedgerPayload } from '@/lib/ledger';
+import {
+  emptyGlobalLedger,
+  formatPercent,
+  LEDGER_STAT_HELP,
+  type LedgerPayload,
+} from '@/lib/ledger';
 
 async function loadUserLedger(handle: string): Promise<LedgerPayload> {
   try {
@@ -66,23 +71,24 @@ export default async function DashboardLedgerPage() {
         </Link>
       </div>
 
+      <p className="text-sm text-[var(--muted)]">{LEDGER_STAT_HELP.blurb}</p>
       <section className="grid gap-4 sm:grid-cols-2">
         <Stat label="Requests" value={String(totals.requestCount)} />
         <Stat
-          label="Delivered"
-          value={String(totals.deliveredCount)}
-          title="AI accepted and forwarded for opt-in (not the same as Accepted)"
-        />
-        <Stat
           label="Accepted"
           value={String(totals.acceptedCount)}
-          title="Receiver opted in to the intro"
+          title={LEDGER_STAT_HELP.accepted}
+        />
+        <Stat
+          label="Delivered"
+          value={String(totals.deliveredCount)}
+          title={LEDGER_STAT_HELP.delivered}
         />
         <Stat label="Spam blocked" value={String(totals.spamCount)} />
         <Stat
           label="Accept rate"
           value={formatPercent(totals.acceptRate)}
-          title="Accepted ÷ total requests (delivered is AI-forwarded, not this rate)"
+          title={LEDGER_STAT_HELP.acceptRate}
         />
         <Stat label="Trust" value={formatPercent(totals.trustScore)} />
       </section>

@@ -189,8 +189,9 @@ export const emailSuppressions = pgTable('email_suppressions', {
 
 /**
  * Monthly public-ledger aggregates per target user.
- * - delivered = AI accepted (forwarded to receiver for opt-in)
- * - accepted = receiver opted in
+ * - accepted = owner-approved (owner_decision=accept) or AI-forwarded (status=delivered/accepted)
+ *   — may still await double opt-in completion
+ * - delivered = both sides confirmed (status=accepted)
  * - accept_rate = accepted / requests (0 when no requests)
  * - trust uses helpful among delivered (computed in API all-time too)
  */
@@ -209,13 +210,21 @@ export const ledgerStats = pgView('ledger_stats', {
       target_user_id,
       date_trunc('month', created_at) AS month,
       count(*)::int AS request_count,
-      count(*) FILTER (WHERE decision = 'accept')::int AS delivered_count,
-      count(*) FILTER (WHERE status = 'accepted')::int AS accepted_count,
+      count(*) FILTER (WHERE status = 'accepted')::int AS delivered_count,
+      count(*) FILTER (
+        WHERE owner_decision = 'accept'
+          OR status IN ('delivered', 'accepted')
+      )::int AS accepted_count,
       count(*) FILTER (WHERE decision = 'spam')::int AS spam_count,
       count(*) FILTER (WHERE helpful IS TRUE)::int AS helpful_count,
       CASE
         WHEN count(*) = 0 THEN 0::float8
-        ELSE (count(*) FILTER (WHERE status = 'accepted'))::float8 / count(*)::float8
+        ELSE (
+          count(*) FILTER (
+            WHERE owner_decision = 'accept'
+              OR status IN ('delivered', 'accepted')
+          )
+        )::float8 / count(*)::float8
       END AS accept_rate
     FROM requests
     GROUP BY target_user_id, date_trunc('month', created_at)

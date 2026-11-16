@@ -12,15 +12,21 @@ export function IntroRequestForm({ handle }: { handle: string }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
 
   const nameOver = name.trim().length > NAME_MAX;
   const messageOver = message.trim().length > MESSAGE_MAX;
   const canSubmit = useMemo(() => {
     return (
-      name.trim().length > 0 && message.trim().length > 0 && !nameOver && !messageOver && !pending
+      name.trim().length > 0 &&
+      email.trim().length > 0 &&
+      message.trim().length > 0 &&
+      !nameOver &&
+      !messageOver &&
+      !pending
     );
-  }, [name, message, nameOver, messageOver, pending]);
+  }, [name, email, message, nameOver, messageOver, pending]);
 
   function onSubmit(formData: FormData) {
     setError(null);
@@ -32,6 +38,11 @@ export function IntroRequestForm({ handle }: { handle: string }) {
         senderContact: String(formData.get('senderContact') ?? '').trim(),
         message: String(formData.get('message') ?? '').trim(),
       };
+
+      // Keep controlled fields in sync so rate-limit / validation errors retain values.
+      setName(payload.senderName);
+      setEmail(payload.senderContact);
+      setMessage(payload.message);
 
       if (payload.senderName.length > NAME_MAX || payload.message.length > MESSAGE_MAX) {
         setError('Name or message is too long');
@@ -76,7 +87,10 @@ export function IntroRequestForm({ handle }: { handle: string }) {
           required
           type="email"
           name="senderContact"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
           className="mt-2 w-full rounded-md border border-white/15 bg-black/30 px-3 py-2"
+          data-testid="intro-email"
         />
       </label>
       <label className="text-sm">
