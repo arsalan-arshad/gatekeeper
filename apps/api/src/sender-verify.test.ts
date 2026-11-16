@@ -3,6 +3,7 @@ import { test } from 'node:test';
 
 import { clearConsoleEmailLog, createConsoleEmailSender } from './email.ts';
 import { buildSenderVerifyEmail } from './email-templates.ts';
+import { resetEmailSuppressionsForTests } from './email-suppression.ts';
 import {
   createSenderVerifyToken,
   resetSenderOutboundLimiterForTests,
@@ -12,6 +13,7 @@ import {
   setSenderVerifiedForTests,
   SENDER_OUTBOUND_DAILY_LIMIT,
   SENDER_VERIFY_EMAIL_LIMIT,
+  SENDER_VERIFY_GLOBAL_LIMIT,
   SENDER_VERIFY_IP_LIMIT,
 } from './sender-verify.ts';
 
@@ -45,18 +47,21 @@ test('outbound mails to sender capped at 3/day', async () => {
   assert.equal((await consumeSenderOutboundSlot('sender@example.com')).ok, false);
 });
 
-test('sender verification emails capped at 1/address/day and 20/IP/day', async () => {
+test('sender verification emails capped at 1/address/day, per owner, 20/IP/day, global 200', async () => {
   resetSenderOutboundLimiterForTests();
+  resetEmailSuppressionsForTests();
   setSenderVerifiedForTests(null);
   clearConsoleEmailLog();
   const send = createConsoleEmailSender();
 
   assert.equal(SENDER_VERIFY_EMAIL_LIMIT, 1);
   assert.equal(SENDER_VERIFY_IP_LIMIT, 20);
+  assert.equal(SENDER_VERIFY_GLOBAL_LIMIT, 200);
 
   const first = await maybeSendSenderVerificationEmail(send, {
     senderEmail: 'verify-cap@example.com',
     senderName: 'Casey',
+    ownerId: 'owner-a',
     clientIp: '203.0.113.10',
     env: { ...env, API_URL: 'http://localhost:4000' },
   });
@@ -65,17 +70,41 @@ test('sender verification emails capped at 1/address/day and 20/IP/day', async (
   const second = await maybeSendSenderVerificationEmail(send, {
     senderEmail: 'verify-cap@example.com',
     senderName: 'Casey',
+    ownerId: 'owner-b',
     clientIp: '203.0.113.11',
     env: { ...env, API_URL: 'http://localhost:4000' },
   });
   assert.equal(second.sent, false);
   assert.equal(second.reason, 'verify_email_cap');
 
+  // Same address already burned; distinct address + same owner still allowed once.
+  const ownerScoped = await maybeSendSenderVerificationEmail(send, {
+    senderEmail: 'verify-owner-scoped@example.com',
+    senderName: 'Casey',
+    ownerId: 'owner-a',
+    clientIp: '203.0.113.99',
+    env: { ...env, API_URL: 'http://localhost:4000' },
+  });
+  assert.equal(ownerScoped.sent, true);
+
+  const ownerAgain = await maybeSendSenderVerificationEmail(send, {
+    senderEmail: 'verify-owner-scoped@example.com',
+    senderName: 'Casey',
+    ownerId: 'owner-a',
+    clientIp: '203.0.113.98',
+    env: { ...env, API_URL: 'http://localhost:4000' },
+  });
+  assert.equal(ownerAgain.sent, false);
+  assert.ok(
+    ownerAgain.reason === 'verify_email_cap' || ownerAgain.reason === 'verify_owner_email_cap',
+  );
+
   // Exhaust IP quota across distinct addresses (1/email already proven).
   for (let i = 0; i < SENDER_VERIFY_IP_LIMIT - 1; i += 1) {
     const result = await maybeSendSenderVerificationEmail(send, {
       senderEmail: `verify-ip-${i}@example.com`,
       senderName: 'Casey',
+      ownerId: `owner-ip-${i}`,
       clientIp: '203.0.113.10',
       env: { ...env, API_URL: 'http://localhost:4000' },
     });
@@ -84,6 +113,7 @@ test('sender verification emails capped at 1/address/day and 20/IP/day', async (
   const ipBlocked = await maybeSendSenderVerificationEmail(send, {
     senderEmail: 'verify-ip-blocked@example.com',
     senderName: 'Casey',
+    ownerId: 'owner-ip-blocked',
     clientIp: '203.0.113.10',
     env: { ...env, API_URL: 'http://localhost:4000' },
   });

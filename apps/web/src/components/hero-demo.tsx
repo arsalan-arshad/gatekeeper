@@ -4,6 +4,9 @@ import { useEffect, useState, useTransition } from 'react';
 
 import { DoorGraphic, type DoorState } from '@/components/door-graphic';
 import { DEMO_CHIPS, DEMO_PLACEHOLDERS, DEMO_PROFILE_OPTIONS } from '@/lib/demo';
+import { DEMO_MESSAGE_MAX_CHARS, demoMessageOverLimit } from '@/lib/demo-char-limit';
+
+const MESSAGE_MAX = DEMO_MESSAGE_MAX_CHARS;
 
 type DemoResult = {
   score: number;
@@ -26,7 +29,9 @@ export function HeroDemo() {
   const [limit, setLimit] = useState(20);
 
   const profile = DEMO_PROFILE_OPTIONS.find((p) => p.handle === handle) ?? DEMO_PROFILE_OPTIONS[0]!;
-  const canJudge = message.trim().length > 0;
+  const messageLen = message.length;
+  const messageOver = demoMessageOverLimit(messageLen);
+  const canJudge = message.trim().length > 0 && !messageOver;
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -119,6 +124,10 @@ export function HeroDemo() {
       setError('Enter a message to judge');
       return;
     }
+    if (message.length > MESSAGE_MAX) {
+      setError('Keep it under 2,000 characters');
+      return;
+    }
     judge(text, false);
   }
 
@@ -159,11 +168,20 @@ export function HeroDemo() {
           Your request
           <textarea
             value={message}
-            onChange={(e) => setMessage(e.target.value)}
+            onChange={(e) => {
+              setMessage(e.target.value);
+              setError(null);
+            }}
             placeholder={DEMO_PLACEHOLDERS[placeholderIndex]}
             rows={4}
             className="mt-2 w-full resize-y rounded-md border border-white/15 bg-[#0a110e] px-3 py-2.5 text-[var(--fg)] placeholder:text-[var(--muted)]/70"
           />
+          <span
+            className={`mt-1 block text-xs ${messageOver ? 'text-red-300' : 'text-[var(--muted)]'}`}
+            data-testid="demo-char-counter"
+          >
+            {messageLen}/{MESSAGE_MAX}
+          </span>
         </label>
 
         <p className="mt-2 text-sm text-[var(--muted)]">

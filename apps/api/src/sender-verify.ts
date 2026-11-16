@@ -4,14 +4,18 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 
 import { getDb } from './db.js';
 import type { EmailSender } from './email.js';
+import { isEmailSuppressed } from './email-suppression.js';
 import { buildSenderVerifyEmail } from './email-templates.js';
 import {
   checkSenderVerifyEmailRateLimit,
+  checkSenderVerifyGlobalRateLimit,
   checkSenderVerifyIpRateLimit,
+  checkSenderVerifyOwnerEmailRateLimit,
   consumePostgresRateLimit,
   peekPostgresRateLimit,
   resetRateLimitersForTests,
   SENDER_VERIFY_EMAIL_LIMIT,
+  SENDER_VERIFY_GLOBAL_LIMIT,
   SENDER_VERIFY_IP_LIMIT,
 } from './rate-limit.js';
 import { normalizeSenderEmail } from './request-dedupe.js';
@@ -21,7 +25,7 @@ import { resolveEmailLinkSecret } from './tokens.js';
 export const SENDER_OUTBOUND_DAILY_LIMIT = 3;
 const SENDER_OUTBOUND_WINDOW_MS = 24 * 60 * 60 * 1000;
 
-export { SENDER_VERIFY_EMAIL_LIMIT, SENDER_VERIFY_IP_LIMIT };
+export { SENDER_VERIFY_EMAIL_LIMIT, SENDER_VERIFY_GLOBAL_LIMIT, SENDER_VERIFY_IP_LIMIT };
 
 export function resetSenderOutboundLimiterForTests(): void {
   resetRateLimitersForTests();
@@ -139,6 +143,8 @@ export async function maybeSendSenderVerificationEmail(
   input: {
     senderEmail: string;
     senderName: string;
+    /** Gate owner id — scopes the 1/address/24h cap per owner. */
+    ownerId?: string;
     clientIp?: string | null;
     env?: NodeJS.ProcessEnv;
   },
@@ -147,9 +153,27 @@ export async function maybeSendSenderVerificationEmail(
     return { sent: false, reason: 'already_verified' };
   }
 
+  if (await isEmailSuppressed(input.senderEmail)) {
+    return { sent: false, reason: 'suppressed' };
+  }
+
+  // Max 1 per address per 24h (global across owners).
   const emailLimit = await checkSenderVerifyEmailRateLimit(input.senderEmail);
   if (!emailLimit.ok) {
     return { sent: false, reason: 'verify_email_cap' };
+  }
+
+  // And max 1 per (owner, address) per 24h when owner is known.
+  if (input.ownerId) {
+    const ownerLimit = await checkSenderVerifyOwnerEmailRateLimit(input.ownerId, input.senderEmail);
+    if (!ownerLimit.ok) {
+      return { sent: false, reason: 'verify_owner_email_cap' };
+    }
+  }
+
+  const globalLimit = await checkSenderVerifyGlobalRateLimit();
+  if (!globalLimit.ok) {
+    return { sent: false, reason: 'verify_global_cap' };
   }
 
   const ipLimit = await checkSenderVerifyIpRateLimit(input.clientIp || 'unknown');
@@ -181,8 +205,11 @@ export async function maybeSendSenderVerificationEmail(
  */
 export async function canEmailSenderContact(email: string): Promise<{
   ok: boolean;
-  reason?: 'unverified' | 'outbound_cap';
+  reason?: 'unverified' | 'outbound_cap' | 'suppressed';
 }> {
+  if (await isEmailSuppressed(email)) {
+    return { ok: false, reason: 'suppressed' };
+  }
   if (!(await isSenderContactVerified(email))) {
     return { ok: false, reason: 'unverified' };
   }

@@ -148,6 +148,11 @@ export async function registerDemoRoutes(app: FastifyInstance): Promise<void> {
   app.post('/v1/demo/judge', async (request, reply) => {
     const ip = clientIp(request);
 
+    const rawBody = (request.body ?? {}) as { message?: unknown };
+    if (typeof rawBody.message === 'string' && rawBody.message.length > MESSAGE_MAX_CHARS) {
+      return reply.status(400).send({ error: 'Keep it under 2,000 characters' });
+    }
+
     const parsed = demoJudgeSchema.safeParse(request.body);
     if (!parsed.success) {
       return reply

@@ -289,6 +289,7 @@ export async function submitIntroRequest(options: {
       const verify = await maybeSendSenderVerificationEmail(send, {
         senderEmail: options.body.senderContact,
         senderName: options.body.senderName,
+        ownerId: user.id,
         clientIp: options.clientIp,
       });
       verifyEmailSent = verify.sent;

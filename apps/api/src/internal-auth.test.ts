@@ -77,6 +77,7 @@ test('isInternalAuthProtectedPath covers required prefixes and lemon exception',
   assert.equal(isInternalAuthProtectedPath('/v1/payments/me'), true);
   assert.equal(isInternalAuthProtectedPath('/v1/payments/config'), true);
   assert.equal(isInternalAuthProtectedPath('/v1/payments/webhooks/lemon'), false);
+  assert.equal(isInternalAuthProtectedPath('/v1/webhooks/resend'), false);
   assert.equal(isInternalAuthProtectedPath('/health'), false);
   assert.equal(isInternalAuthProtectedPath('/v1/public/foo'), false);
 });

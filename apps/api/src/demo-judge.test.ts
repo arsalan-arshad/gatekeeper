@@ -276,6 +276,25 @@ test('demo verdict cache key includes PROMPT_VERSION and ignores whitespace', as
   assert.notEqual(a, c);
 });
 
+test('POST /v1/demo/judge over 2000 chars returns Keep it under 2,000 characters', async () => {
+  resetDemoRateLimiterForTests();
+  const app = await buildServer();
+  app.log.level = 'silent';
+  try {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/demo/judge',
+      headers: { 'x-forwarded-for': '203.0.113.88' },
+      payload: { handle: 'demo', message: 'x'.repeat(2001) },
+    });
+    assert.equal(res.statusCode, 400);
+    assert.equal((res.json() as { error?: string }).error, 'Keep it under 2,000 characters');
+  } finally {
+    await app.close();
+    resetDemoRateLimiterForTests();
+  }
+});
+
 test('POST /admin/cache/clear requires ADMIN_TOKEN and clears demo cache', async () => {
   resetDemoRateLimiterForTests();
   const previous = process.env.ADMIN_TOKEN;

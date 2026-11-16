@@ -123,6 +123,7 @@ export async function sendDeclineAutoReply(
     senderEmail: string;
     senderName: string;
     receiverName: string;
+    ownerId?: string;
     env?: NodeJS.ProcessEnv;
   },
 ) {
@@ -132,6 +133,7 @@ export async function sendDeclineAutoReply(
       await maybeSendSenderVerificationEmail(send, {
         senderEmail: input.senderEmail,
         senderName: input.senderName,
+        ownerId: input.ownerId,
         clientIp: null,
         env: input.env,
       });
@@ -172,6 +174,7 @@ export async function sendIntroEmailToBoth(
     senderName: string;
     message: string;
     requestId: string;
+    ownerId?: string;
     env?: NodeJS.ProcessEnv;
   },
 ) {
@@ -193,6 +196,7 @@ export async function sendIntroEmailToBoth(
       await maybeSendSenderVerificationEmail(send, {
         senderEmail: input.senderEmail,
         senderName: input.senderName,
+        ownerId: input.ownerId,
         clientIp: null,
         env: input.env,
       });
