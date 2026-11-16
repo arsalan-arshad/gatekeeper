@@ -17,6 +17,11 @@ export type AnalyticsEvent =
   | 'owner_rejected'
   | 'api_key_created'
   | 'upgrade_clicked'
+  | 'rules_saved'
+  | 'rules_tested'
+  | 'notification_settings_saved'
+  | 'data_exported'
+  | 'intro_request_submitted'
   | '$pageview';
 
 let initialized = false;

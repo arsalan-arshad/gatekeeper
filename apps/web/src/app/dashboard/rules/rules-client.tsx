@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { useState, useTransition } from 'react';
 
+import { captureEvent } from '@/lib/analytics/client';
+
 import { saveRules, testRulesMessage, type RulesPayload } from './actions';
 
 export function RulesClient({ initial }: { initial: RulesPayload }) {
@@ -38,6 +40,7 @@ export function RulesClient({ initial }: { initial: RulesPayload }) {
         setError(result.error);
         return;
       }
+      captureEvent('rules_saved');
       setMessage('Saved.');
     });
   }
@@ -52,6 +55,7 @@ export function RulesClient({ initial }: { initial: RulesPayload }) {
         return;
       }
       const j = result.judgment!;
+      captureEvent('rules_tested', { decision: j.decision });
       setTestResult(
         `${j.decision} · ${j.score}/100 — ${j.reason_public}${
           j.suggested_rewrite ? `\nRewrite: ${j.suggested_rewrite}` : ''

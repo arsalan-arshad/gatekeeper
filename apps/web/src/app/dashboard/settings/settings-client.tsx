@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 
-import { resetAnalytics } from '@/lib/analytics/client';
+import { captureEvent, resetAnalytics } from '@/lib/analytics/client';
 
 import { deleteAccount, exportData, saveSettings } from './actions';
 
@@ -27,6 +27,7 @@ export function SettingsClient({
         setError(result.error);
         return;
       }
+      captureEvent('notification_settings_saved', { notification_mode: mode });
       setMessage('Notification settings saved.');
     });
   }
@@ -46,6 +47,7 @@ export function SettingsClient({
       a.download = 'gatekeeper-export.json';
       a.click();
       URL.revokeObjectURL(url);
+      captureEvent('data_exported');
       setMessage('Export downloaded.');
     });
   }
