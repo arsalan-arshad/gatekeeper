@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { clientIp } from './client-ip.ts';
+import { clientIp, rateLimitIpBucket } from './client-ip.ts';
 import {
   FixedWindowRateLimiter,
   IP_LIMIT,
@@ -100,6 +100,33 @@ test('clientIp ignores spoofed X-Forwarded-For (uses request.ip only)', () => {
     headers: { 'x-forwarded-for': '1.2.3.4, 9.9.9.9' },
   } as { ip: string });
   assert.equal(ip, '10.0.0.5');
+});
+
+test('RATE-003 rateLimitIpBucket uses IPv4 /32 and IPv6 /64', () => {
+  assert.equal(rateLimitIpBucket('203.0.113.9'), '203.0.113.9');
+  assert.equal(rateLimitIpBucket('2001:db8:1:2:3:4:5:6'), '2001:0db8:0001:0002::/64');
+  assert.equal(rateLimitIpBucket('2001:db8:1:2::9'), '2001:0db8:0001:0002::/64');
+  // Distinct /128s in the same /64 share a bucket.
+  assert.equal(
+    rateLimitIpBucket('2001:db8:aaaa:bbbb:1111:2222:3333:4444'),
+    rateLimitIpBucket('2001:db8:aaaa:bbbb:9999:8888:7777:6666'),
+  );
+  // IPv4-mapped IPv6 → underlying IPv4 /32
+  assert.equal(rateLimitIpBucket('::ffff:203.0.113.9'), '203.0.113.9');
+  assert.equal(clientIp({ ip: '2001:db8:1:2::abc' }), '2001:0db8:0001:0002::/64');
+});
+
+test('RATE-003 IPv6 addresses in the same /64 share IP rate-limit quota', async () => {
+  useMemoryRateLimitersForTests(true);
+  resetRateLimitersForTests();
+  const a = '2001:db8:cafe:babe:1:2:3:4';
+  const b = '2001:db8:cafe:babe:dead:beef:0:1';
+  for (let i = 0; i < IP_LIMIT; i += 1) {
+    assert.equal((await checkIpRateLimit(a)).ok, true);
+  }
+  assert.equal((await checkIpRateLimit(a)).ok, false);
+  assert.equal((await checkIpRateLimit(b)).ok, false, 'same /64 must share quota');
+  assert.equal((await checkIpRateLimit('2001:db8:cafe:ffff::1')).ok, true, 'other /64 is separate');
 });
 
 test('spoofed XFF does not reset rate limit key', async () => {

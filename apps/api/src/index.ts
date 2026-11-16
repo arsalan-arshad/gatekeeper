@@ -112,12 +112,13 @@ export async function buildServer() {
     }
     try {
       done(null, JSON.parse(raw));
-    } catch (error) {
-      done(error as Error, undefined);
+    } catch {
+      // ERR-01: never let malformed JSON fall through as an untyped 500.
+      done(Object.assign(new Error('Invalid JSON'), { statusCode: 400 }), undefined);
     }
   });
 
-  app.setErrorHandler((error: Error & { statusCode?: number }, request, reply) => {
+  app.setErrorHandler((error: Error & { statusCode?: number; code?: string }, request, reply) => {
     const statusCode = typeof error.statusCode === 'number' ? error.statusCode : 500;
     if (statusCode === 413) {
       void logAbuse({
@@ -129,6 +130,15 @@ export async function buildServer() {
       return reply
         .status(413)
         .send({ error: 'Request body too large', max_bytes: FASTIFY_BODY_LIMIT });
+    }
+    // Content-type parser + Fastify default JSON parse failures → stable 400.
+    const invalidJson =
+      statusCode === 400 &&
+      (error.message === 'Invalid JSON' ||
+        error.code === 'FST_ERR_CTP_INVALID_JSON_BODY' ||
+        error instanceof SyntaxError);
+    if (invalidJson) {
+      return reply.status(400).send({ error: 'Invalid JSON' });
     }
     request.log.error(error);
     return reply.status(statusCode).send({

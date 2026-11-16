@@ -3,6 +3,7 @@ import { test } from 'node:test';
 
 import { normalizeEmailForRateLimit } from './email-normalize.ts';
 import { gateMagicLinkSend } from './magic-rate-limit.ts';
+import { rateLimitIpBucket } from './rate-limit-ip.ts';
 
 test('gateMagicLinkSend fails closed with 503 when limiter throws', async () => {
   const logs: unknown[] = [];
@@ -41,4 +42,10 @@ test('magic-link rate-limit email keys collapse aliases', () => {
     normalizeEmailForRateLimit('a+1@gmail.com'),
     normalizeEmailForRateLimit('a+2@gmail.com'),
   );
+});
+
+test('RATE-003 magic-link IP keys bucket IPv6 /64 and IPv4 /32', () => {
+  assert.equal(rateLimitIpBucket('203.0.113.9'), '203.0.113.9');
+  assert.equal(rateLimitIpBucket('2001:db8:1:2:3:4:5:6'), rateLimitIpBucket('2001:db8:1:2::9'));
+  assert.match(rateLimitIpBucket('2001:db8:1:2::9'), /::\/64$/);
 });

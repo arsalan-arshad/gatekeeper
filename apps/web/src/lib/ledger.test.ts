@@ -18,10 +18,10 @@ test('formatPercent handles null', () => {
   assert.equal(formatPercent(0.5), '50%');
 });
 
-test('ledger Accepted/Delivered copy explains owner-approved vs both sides', () => {
-  assert.match(LEDGER_STAT_HELP.accepted, /Owner-approved/i);
-  assert.match(LEDGER_STAT_HELP.accepted, /double opt-in/i);
+test('ledger Accepted tooltip is AI or owner (LEDGER-01)', () => {
+  assert.equal(LEDGER_STAT_HELP.accepted, 'Accepted by the AI or the owner');
   assert.equal(LEDGER_STAT_HELP.delivered, 'Delivered = both sides confirmed');
+  assert.match(LEDGER_STAT_HELP.blurb, /AI or the owner/i);
   assert.match(LEDGER_STAT_HELP.blurb, /both sides confirmed/i);
 });
 
@@ -29,6 +29,14 @@ test('landing hero aligns text to top at md+ (not vertically centered)', async (
   const page = await readFile(fileURLToPath(new URL('../app/page.tsx', import.meta.url)), 'utf8');
   assert.match(page, /md:items-start/);
   assert.doesNotMatch(page, /md:items-center/);
+});
+
+test('landing hero reduces top padding near header (narrow / 200% zoom)', async () => {
+  const page = await readFile(fileURLToPath(new URL('../app/page.tsx', import.meta.url)), 'utf8');
+  assert.match(page, /\bpt-6\b/);
+  assert.match(page, /\bsm:pt-10\b/);
+  assert.doesNotMatch(page, /\bpt-14\b/);
+  assert.doesNotMatch(page, /\bsm:pt-20\b/);
 });
 
 test('public intro form keeps email as a controlled value', async () => {
