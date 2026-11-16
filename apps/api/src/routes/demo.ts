@@ -14,6 +14,7 @@ import {
   checkDemoIpRateLimit,
   DEMO_IP_DAILY_LIMIT,
   peekDemoIpRateLimit,
+  refundDemoIpRateLimit,
   retryAfterSeconds,
   resetRateLimitersForTests,
 } from '../rate-limit.js';
@@ -204,6 +205,7 @@ export async function registerDemoRoutes(app: FastifyInstance): Promise<void> {
 
     const isExample = parsed.data.example === true;
     let remaining = (await peekDemoIpRateLimit(ip)).remaining;
+    let consumedQuota = false;
     if (!isExample) {
       const limit = await checkDemoIpRateLimit(ip);
       if (!limit.ok) {
@@ -222,11 +224,26 @@ export async function registerDemoRoutes(app: FastifyInstance): Promise<void> {
         });
       }
       remaining = limit.remaining;
+      consumedQuota = true;
     }
 
-    const result = await demoJudgeRequest({ ...parsed.data, message }, llm, request.log);
+    let result: Awaited<ReturnType<typeof demoJudgeRequest>>;
+    try {
+      result = await demoJudgeRequest({ ...parsed.data, message }, llm, request.log);
+    } catch (error) {
+      request.log.error({ err: error }, 'demo judge unexpected failure');
+      if (consumedQuota) {
+        remaining = (await refundDemoIpRateLimit(ip)).remaining;
+      }
+      return reply.status(503).send({ error: DEMO_BUSY_ERROR, remaining });
+    }
+
     if ('error' in result) {
       if (isBusyFailure(result)) {
+        // LLM/provider failure must not burn demo quota.
+        if (consumedQuota) {
+          remaining = (await refundDemoIpRateLimit(ip)).remaining;
+        }
         return reply.status(503).send({ error: result.error, remaining });
       }
       return reply.status(400).send({ error: result.error, remaining });

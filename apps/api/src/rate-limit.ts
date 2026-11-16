@@ -66,6 +66,21 @@ export class FixedWindowRateLimiter {
     };
   }
 
+  /** Undo one successful consume in the current window (no-op if empty/expired). */
+  refund(key: string): RateLimitResult {
+    const now = this.now();
+    const existing = this.buckets.get(key);
+    if (!existing || now - existing.windowStart >= this.windowMs) {
+      return { ok: true, remaining: this.limit, resetMs: this.windowMs };
+    }
+    if (existing.count > 0) existing.count -= 1;
+    return {
+      ok: true,
+      remaining: Math.max(0, this.limit - existing.count),
+      resetMs: this.windowMs - (now - existing.windowStart),
+    };
+  }
+
   clear(): void {
     this.buckets.clear();
   }
@@ -269,6 +284,50 @@ export async function checkDemoIpRateLimit(ip: string): Promise<RateLimitResult>
 
 export async function peekDemoIpRateLimit(ip: string): Promise<RateLimitResult> {
   return peekPostgresRateLimit(`demo:${ip || 'unknown'}`, DEMO_IP_DAILY_LIMIT, DEMO_IP_WINDOW_MS);
+}
+
+/**
+ * Refund one demo IP consume (LLM busy / 5xx / timeout). Never drops below 0.
+ */
+export async function refundDemoIpRateLimit(ip: string): Promise<RateLimitResult> {
+  return refundPostgresRateLimit(`demo:${ip || 'unknown'}`, DEMO_IP_DAILY_LIMIT, DEMO_IP_WINDOW_MS);
+}
+
+export async function refundPostgresRateLimit(
+  key: string,
+  limit: number,
+  windowMs: number,
+  nowMs: number = Date.now(),
+): Promise<RateLimitResult> {
+  if (forceMemory || !process.env.DATABASE_URL) {
+    return memoryLimiter(limit, windowMs).refund(key);
+  }
+
+  const db = getDb();
+  const expiredBeforeMs = nowMs - windowMs;
+  const [row] = await db
+    .update(rateLimitBuckets)
+    .set({
+      count: sql`CASE
+        WHEN (EXTRACT(EPOCH FROM ${rateLimitBuckets.windowStart}) * 1000) <= ${expiredBeforeMs}
+        THEN 0
+        WHEN ${rateLimitBuckets.count} > 0
+        THEN ${rateLimitBuckets.count} - 1
+        ELSE 0
+      END`,
+      updatedAt: new Date(nowMs),
+    })
+    .where(eq(rateLimitBuckets.bucketKey, key))
+    .returning({
+      count: rateLimitBuckets.count,
+      windowStart: rateLimitBuckets.windowStart,
+    });
+
+  if (!row || nowMs - row.windowStart.getTime() >= windowMs) {
+    return { ok: true, remaining: limit, resetMs: windowMs };
+  }
+
+  return rateLimitResultFromCount(row.count, limit, row.windowStart.getTime(), nowMs, windowMs);
 }
 
 export async function checkMagicEmailRateLimit(email: string): Promise<RateLimitResult> {

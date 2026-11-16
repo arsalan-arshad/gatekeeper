@@ -7,6 +7,12 @@ import {
   type ResendWebhookEvent,
 } from '../email-suppression.js';
 
+function headerString(value: string | string[] | undefined): string | undefined {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value) && typeof value[0] === 'string') return value[0];
+  return undefined;
+}
+
 export async function registerResendWebhookRoutes(app: FastifyInstance): Promise<void> {
   app.post('/v1/webhooks/resend', async (request, reply) => {
     const rawBody =
@@ -15,12 +21,23 @@ export async function registerResendWebhookRoutes(app: FastifyInstance): Promise
 
     const secret = process.env.RESEND_WEBHOOK_SECRET?.trim();
     if (!secret) {
-      return reply.status(500).send({ error: 'RESEND_WEBHOOK_SECRET is not configured' });
+      request.log.warn(
+        'RESEND_WEBHOOK_SECRET unset — ignoring Resend webhook (configure to verify Svix signatures)',
+      );
+      return reply.status(204).send();
     }
 
-    const signatureHeader = request.headers['x-resend-signature'] ?? request.headers['x-signature'];
-    const signature = typeof signatureHeader === 'string' ? signatureHeader : undefined;
-    if (!verifyResendWebhookSignature(rawBody, signature, secret)) {
+    const ok = verifyResendWebhookSignature(
+      rawBody,
+      {
+        id: headerString(request.headers['svix-id']),
+        timestamp: headerString(request.headers['svix-timestamp']),
+        signature: headerString(request.headers['svix-signature']),
+      },
+      secret,
+    );
+
+    if (!ok) {
       return reply.status(401).send({ error: 'Invalid webhook signature' });
     }
 

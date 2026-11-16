@@ -1,7 +1,7 @@
 import Link from 'next/link';
 
 import { SiteNav } from '@/components/site-nav';
-import { formatPercent, type LedgerPayload } from '@/lib/ledger';
+import { formatPercent, LEDGER_STAT_HELP, type LedgerPayload } from '@/lib/ledger';
 
 export function LedgerView({
   data,
@@ -29,8 +29,11 @@ export function LedgerView({
           </h1>
         </div>
         <p className="mt-3 max-w-2xl text-[var(--muted)]">
-          Public reputation: requests, delivered intros, receiver accepts, spam blocked, and trust
-          from helpful ratings. Private gate rules are never shown.
+          Public reputation: requests, owner accepts, delivered intros, spam blocked, and trust from
+          helpful ratings. Private gate rules are never shown.
+        </p>
+        <p className="mt-2 max-w-2xl text-sm text-[var(--muted)]" data-testid="ledger-stat-blurb">
+          {LEDGER_STAT_HELP.blurb}
         </p>
         {notice ? <p className="mt-3 text-sm text-[var(--muted)]">{notice}</p> : null}
         <div className="mt-4 flex flex-wrap gap-4 text-sm">
@@ -60,20 +63,20 @@ export function LedgerView({
         <div className="grid gap-4 sm:grid-cols-2">
           <Stat label="Requests" value={String(totals.requestCount)} />
           <Stat
-            label="Delivered"
-            value={String(totals.deliveredCount)}
-            title="AI accepted and forwarded for opt-in (not the same as Accepted)"
-          />
-          <Stat
             label="Accepted"
             value={String(totals.acceptedCount)}
-            title="Receiver opted in to the intro"
+            title={LEDGER_STAT_HELP.accepted}
+          />
+          <Stat
+            label="Delivered"
+            value={String(totals.deliveredCount)}
+            title={LEDGER_STAT_HELP.delivered}
           />
           <Stat label="Spam blocked" value={String(totals.spamCount)} />
           <Stat
             label="Accept rate"
             value={formatPercent(totals.acceptRate)}
-            title="Accepted ÷ total requests (delivered is AI-forwarded, not this rate)"
+            title={LEDGER_STAT_HELP.acceptRate}
           />
           <Stat label="Trust score" value={formatPercent(totals.trustScore)} />
         </div>
@@ -131,8 +134,8 @@ export function LedgerView({
                 <tr>
                   <th className="py-2 pr-3 font-medium">Month</th>
                   <th className="py-2 pr-3 font-medium">Requests</th>
-                  <th className="py-2 pr-3 font-medium">Delivered</th>
                   <th className="py-2 pr-3 font-medium">Accepted</th>
+                  <th className="py-2 pr-3 font-medium">Delivered</th>
                   <th className="py-2 pr-3 font-medium">Spam</th>
                   <th className="py-2 pr-3 font-medium">Accept rate</th>
                 </tr>
@@ -142,8 +145,8 @@ export function LedgerView({
                   <tr key={row.month} className="border-t border-white/10">
                     <td className="py-2 pr-3">{row.month}</td>
                     <td className="py-2 pr-3">{row.requestCount}</td>
-                    <td className="py-2 pr-3">{row.deliveredCount}</td>
                     <td className="py-2 pr-3">{row.acceptedCount}</td>
+                    <td className="py-2 pr-3">{row.deliveredCount}</td>
                     <td className="py-2 pr-3">{row.spamCount}</td>
                     <td className="py-2 pr-3">{formatPercent(row.acceptRate)}</td>
                   </tr>

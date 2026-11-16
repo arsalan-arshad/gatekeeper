@@ -46,3 +46,11 @@ export function formatPercent(rate: number | null): string {
   if (rate === null || Number.isNaN(rate)) return '—';
   return `${Math.round(rate * 100)}%`;
 }
+
+/** Public ledger copy — Accepted may exceed Delivered while opt-in is pending. */
+export const LEDGER_STAT_HELP = {
+  accepted: 'Owner-approved; not yet double opt-in',
+  delivered: 'Delivered = both sides confirmed',
+  acceptRate: 'Accepted ÷ total requests',
+  blurb: 'Accepted means the owner approved the intro. Delivered means both sides confirmed.',
+} as const;

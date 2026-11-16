@@ -27,7 +27,7 @@ export default function HomePage() {
         </div>
 
         {/* Hero: brand, headline, subhead, CTA, interactive demo */}
-        <section className="mx-auto grid max-w-6xl grid-cols-1 gap-12 px-6 pb-16 pt-14 sm:px-10 sm:pb-24 sm:pt-20 md:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] md:items-center">
+        <section className="mx-auto grid max-w-6xl grid-cols-1 gap-12 px-6 pb-16 pt-14 sm:px-10 sm:pb-24 sm:pt-20 md:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] md:items-start">
           <div className="max-w-xl">
             <p
               className="animate-rise text-5xl leading-none tracking-tight text-[var(--fg)] sm:text-6xl md:text-7xl"

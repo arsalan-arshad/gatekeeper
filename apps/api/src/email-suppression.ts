@@ -71,18 +71,63 @@ export async function recordEmailSuppression(input: {
     });
 }
 
-/** HMAC-SHA256 hex of raw body — used when Resend/Svix full verify is not wired. */
+/** Reject Svix timestamps older/newer than this (seconds). */
+export const RESEND_WEBHOOK_TOLERANCE_SEC = 5 * 60;
+
+export type SvixWebhookHeaders = {
+  id?: string;
+  timestamp?: string;
+  signature?: string;
+};
+
+/** Decode Resend/Svix `whsec_…` (or raw base64) signing secret to key bytes. */
+export function decodeResendWebhookSecret(secret: string): Buffer {
+  const trimmed = secret.trim();
+  const payload = trimmed.startsWith('whsec_') ? trimmed.slice('whsec_'.length) : trimmed;
+  return Buffer.from(payload, 'base64');
+}
+
+/**
+ * Verify Resend webhooks (Svix): HMAC-SHA256 over `{id}.{timestamp}.{rawBody}`,
+ * compared to any `v1,…` token in `svix-signature`. Rejects timestamps outside ±5 min.
+ */
 export function verifyResendWebhookSignature(
   rawBody: string,
-  signature: string | undefined,
+  headers: SvixWebhookHeaders,
   secret: string,
+  nowSec: number = Math.floor(Date.now() / 1000),
 ): boolean {
-  if (!signature || !secret) return false;
-  const expected = createHmac('sha256', secret).update(rawBody).digest('hex');
-  const a = Buffer.from(signature);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
+  const id = headers.id?.trim();
+  const timestamp = headers.timestamp?.trim();
+  const signatureHeader = headers.signature?.trim();
+  if (!id || !timestamp || !signatureHeader || !secret) return false;
+
+  if (!/^\d+$/.test(timestamp)) return false;
+  const ts = Number(timestamp);
+  if (!Number.isFinite(ts)) return false;
+  if (Math.abs(nowSec - ts) > RESEND_WEBHOOK_TOLERANCE_SEC) return false;
+
+  let secretBytes: Buffer;
+  try {
+    secretBytes = decodeResendWebhookSecret(secret);
+  } catch {
+    return false;
+  }
+  if (secretBytes.length === 0) return false;
+
+  const signedContent = `${id}.${timestamp}.${rawBody}`;
+  const expected = createHmac('sha256', secretBytes).update(signedContent).digest('base64');
+  const expectedBuf = Buffer.from(expected);
+
+  for (const part of signatureHeader.split(' ')) {
+    const trimmed = part.trim();
+    if (!trimmed.startsWith('v1,')) continue;
+    const provided = trimmed.slice(3);
+    const providedBuf = Buffer.from(provided);
+    if (providedBuf.length !== expectedBuf.length) continue;
+    if (timingSafeEqual(providedBuf, expectedBuf)) return true;
+  }
+  return false;
 }
 
 export type ResendWebhookEvent = {
