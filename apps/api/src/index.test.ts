@@ -22,6 +22,23 @@ test('GET /health returns ok', async () => {
   await app.close();
 });
 
+test('ERR-01 malformed JSON returns 400 Invalid JSON (not 500)', async () => {
+  const app = await buildServer();
+  app.log.level = 'silent';
+
+  const response = await app.inject({
+    method: 'POST',
+    url: '/v1/demo/judge',
+    headers: { 'content-type': 'application/json' },
+    payload: '{not-json',
+  });
+
+  assert.equal(response.statusCode, 400);
+  assert.deepEqual(response.json(), { error: 'Invalid JSON' });
+
+  await app.close();
+});
+
 test('GET /health/llm requires ADMIN_TOKEN', async () => {
   const previous = process.env.ADMIN_TOKEN;
   delete process.env.ADMIN_TOKEN;

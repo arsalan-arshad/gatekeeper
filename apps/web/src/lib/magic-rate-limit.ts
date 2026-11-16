@@ -2,6 +2,7 @@ import { createDb, rateLimitBuckets } from '@gatekeeper/db';
 import { sql } from 'drizzle-orm';
 
 import { normalizeEmailForRateLimit } from './email-normalize';
+import { rateLimitIpBucket } from './rate-limit-ip';
 
 const MAGIC_EMAIL_LIMIT = 3;
 const MAGIC_EMAIL_WINDOW_MS = 60 * 60 * 1000;
@@ -79,7 +80,8 @@ export async function allowMagicLinkSend(email: string, ip: string): Promise<boo
     MAGIC_EMAIL_WINDOW_MS,
   );
   if (!emailOk) return false;
-  return consume(`magic-ip:${ip || 'unknown'}`, MAGIC_IP_LIMIT, MAGIC_IP_WINDOW_MS);
+  const bucket = rateLimitIpBucket(ip);
+  return consume(`magic-ip:${bucket}`, MAGIC_IP_LIMIT, MAGIC_IP_WINDOW_MS);
 }
 
 /**

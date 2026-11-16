@@ -49,8 +49,9 @@ export function formatPercent(rate: number | null): string {
 
 /** Public ledger copy — Accepted may exceed Delivered while opt-in is pending. */
 export const LEDGER_STAT_HELP = {
-  accepted: 'Owner-approved; not yet double opt-in',
+  accepted: 'Accepted by the AI or the owner',
   delivered: 'Delivered = both sides confirmed',
   acceptRate: 'Accepted ÷ total requests',
-  blurb: 'Accepted means the owner approved the intro. Delivered means both sides confirmed.',
+  blurb:
+    'Accepted means the AI or the owner approved the intro (may still await double opt-in). Delivered means both sides confirmed.',
 } as const;

@@ -1,6 +1,7 @@
 import { rateLimitBuckets } from '@gatekeeper/db';
 import { eq, sql } from 'drizzle-orm';
 
+import { rateLimitIpBucket } from './client-ip.js';
 import { getDb } from './db.js';
 import { normalizeEmailForRateLimit } from './email-normalize.js';
 
@@ -243,12 +244,14 @@ export const SENDER_VERIFY_GLOBAL_LIMIT = 200;
 export const SENDER_VERIFY_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 export async function checkIpRateLimit(ip: string): Promise<RateLimitResult> {
-  return consumePostgresRateLimit(`ip:${ip || 'unknown'}`, IP_LIMIT, IP_WINDOW_MS);
+  const bucket = rateLimitIpBucket(ip);
+  return consumePostgresRateLimit(`ip:${bucket}`, IP_LIMIT, IP_WINDOW_MS);
 }
 
 export async function checkPublicFormIpRateLimit(ip: string): Promise<RateLimitResult> {
+  const bucket = rateLimitIpBucket(ip);
   return consumePostgresRateLimit(
-    `public-ip:${ip || 'unknown'}`,
+    `public-ip:${bucket}`,
     PUBLIC_FORM_IP_LIMIT,
     PUBLIC_FORM_IP_WINDOW_MS,
   );
@@ -275,22 +278,21 @@ export async function checkApiKeyRateLimit(
 }
 
 export async function checkDemoIpRateLimit(ip: string): Promise<RateLimitResult> {
-  return consumePostgresRateLimit(
-    `demo:${ip || 'unknown'}`,
-    DEMO_IP_DAILY_LIMIT,
-    DEMO_IP_WINDOW_MS,
-  );
+  const bucket = rateLimitIpBucket(ip);
+  return consumePostgresRateLimit(`demo:${bucket}`, DEMO_IP_DAILY_LIMIT, DEMO_IP_WINDOW_MS);
 }
 
 export async function peekDemoIpRateLimit(ip: string): Promise<RateLimitResult> {
-  return peekPostgresRateLimit(`demo:${ip || 'unknown'}`, DEMO_IP_DAILY_LIMIT, DEMO_IP_WINDOW_MS);
+  const bucket = rateLimitIpBucket(ip);
+  return peekPostgresRateLimit(`demo:${bucket}`, DEMO_IP_DAILY_LIMIT, DEMO_IP_WINDOW_MS);
 }
 
 /**
  * Refund one demo IP consume (LLM busy / 5xx / timeout). Never drops below 0.
  */
 export async function refundDemoIpRateLimit(ip: string): Promise<RateLimitResult> {
-  return refundPostgresRateLimit(`demo:${ip || 'unknown'}`, DEMO_IP_DAILY_LIMIT, DEMO_IP_WINDOW_MS);
+  const bucket = rateLimitIpBucket(ip);
+  return refundPostgresRateLimit(`demo:${bucket}`, DEMO_IP_DAILY_LIMIT, DEMO_IP_WINDOW_MS);
 }
 
 export async function refundPostgresRateLimit(
@@ -339,11 +341,8 @@ export async function checkMagicEmailRateLimit(email: string): Promise<RateLimit
 }
 
 export async function checkMagicIpRateLimit(ip: string): Promise<RateLimitResult> {
-  return consumePostgresRateLimit(
-    `magic-ip:${ip || 'unknown'}`,
-    MAGIC_IP_LIMIT,
-    MAGIC_IP_WINDOW_MS,
-  );
+  const bucket = rateLimitIpBucket(ip);
+  return consumePostgresRateLimit(`magic-ip:${bucket}`, MAGIC_IP_LIMIT, MAGIC_IP_WINDOW_MS);
 }
 
 export async function checkSenderVerifyEmailRateLimit(email: string): Promise<RateLimitResult> {
@@ -367,8 +366,9 @@ export async function checkSenderVerifyOwnerEmailRateLimit(
 }
 
 export async function checkSenderVerifyIpRateLimit(ip: string): Promise<RateLimitResult> {
+  const bucket = rateLimitIpBucket(ip);
   return consumePostgresRateLimit(
-    `sender-verify-ip:${ip || 'unknown'}`,
+    `sender-verify-ip:${bucket}`,
     SENDER_VERIFY_IP_LIMIT,
     SENDER_VERIFY_WINDOW_MS,
   );
