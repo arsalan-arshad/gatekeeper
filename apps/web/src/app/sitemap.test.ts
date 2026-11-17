@@ -33,12 +33,20 @@ test('sitemap includes published handle and excludes unpublished', () => {
       { handle: 'published-user', updatedAt, published: true },
       { handle: 'secret-draft', updatedAt, published: false },
       { handle: 'ada', updatedAt, published: true },
+      { handle: 'e2ehzyrvm', updatedAt, published: true },
+      { handle: 'testfounder-gk', updatedAt, published: true },
+      { handle: 'arsalan-a-software-engin', updatedAt, published: true },
+      { handle: 'arsalandev', updatedAt, published: true },
     ],
     BRAND.siteUrl,
   );
   const urls = entries.map((e) => e.url);
   assert.ok(urls.includes(`${BRAND.siteUrl}/@published-user`));
+  assert.ok(urls.includes(`${BRAND.siteUrl}/@arsalandev`));
   assert.ok(!urls.includes(`${BRAND.siteUrl}/@secret-draft`));
   assert.ok(!urls.includes(`${BRAND.siteUrl}/@ada`));
+  assert.ok(!urls.includes(`${BRAND.siteUrl}/@e2ehzyrvm`));
+  assert.ok(!urls.includes(`${BRAND.siteUrl}/@testfounder-gk`));
+  assert.ok(!urls.includes(`${BRAND.siteUrl}/@arsalan-a-software-engin`));
   assert.ok(!urls.some((u) => u.includes('/ledger')));
 });

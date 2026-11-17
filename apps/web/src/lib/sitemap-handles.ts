@@ -6,6 +6,19 @@ import type { MetadataRoute } from 'next';
  */
 export const SITEMAP_DEMO_ONLY_HANDLES = new Set(['ada', 'jonas', 'mira']);
 
+/**
+ * Explicit junk / throwaway handles that must never appear in the sitemap
+ * (case-insensitive). Prefer patterns below when possible; use this for
+ * one-off handles that do not match `e2e*` or `test*-gk`.
+ */
+export const SITEMAP_EXCLUDED_HANDLES = new Set(['arsalan-a-software-engin']);
+
+/** Matches Playwright / e2e-login handles (`e2ehzyrvm`, `e2eti1ypaz`, …). */
+const E2E_HANDLE_RE = /^e2e/;
+
+/** Matches manual QA handles like `testfounder-gk`, `testuser2-gk`. */
+const TEST_GK_HANDLE_RE = /^test.*-gk$/;
+
 export type SitemapProfile = {
   handle: string;
   updatedAt: Date | string;
@@ -15,6 +28,22 @@ export type SitemapProfile = {
   deleted?: boolean;
 };
 
+/**
+ * True for ephemeral/test/junk handles that must stay out of the public sitemap.
+ * Patterns (not one-off lists) so future e2e / QA accounts stay excluded:
+ * - `e2e*` prefix
+ * - `test*-gk`
+ * - explicit {@link SITEMAP_EXCLUDED_HANDLES}
+ */
+export function isExcludedTestOrJunkHandle(handle: string): boolean {
+  const h = handle.trim().toLowerCase();
+  if (!h) return true;
+  if (SITEMAP_EXCLUDED_HANDLES.has(h)) return true;
+  if (E2E_HANDLE_RE.test(h)) return true;
+  if (TEST_GK_HANDLE_RE.test(h)) return true;
+  return false;
+}
+
 /** True when a profile should appear as `/@handle` in the public sitemap. */
 export function shouldIncludeHandleInSitemap(profile: SitemapProfile): boolean {
   if (profile.deleted) return false;
@@ -23,6 +52,7 @@ export function shouldIncludeHandleInSitemap(profile: SitemapProfile): boolean {
   if (!handle) return false;
   if (handle === 'demo') return true;
   if (SITEMAP_DEMO_ONLY_HANDLES.has(handle)) return false;
+  if (isExcludedTestOrJunkHandle(handle)) return false;
   return true;
 }
 
