@@ -99,6 +99,41 @@
       "when": 1795500000000,
       "tag": "0013_users_updated_at",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1795600000000,
+      "tag": "0014_directory_opt_in",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1795700000000,
+      "tag": "0015_match_embeddings",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1795800000000,
+      "tag": "0016_intro_matches",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1795900000000,
+      "tag": "0017_intro_contact_email",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1796000000000,
+      "tag": "0018_intro_contact_verified_at",
+      "breakpoints": true
     }
   ]
 }

@@ -33,7 +33,17 @@ export default async function SettingsPage() {
           Email notifications, data export, and account deletion.
         </p>
       </div>
-      <SettingsClient initialMode={data.notificationEmailMode} email={data.email} />
+      <SettingsClient
+        initialMode={data.notificationEmailMode}
+        email={data.email}
+        handle={data.handle}
+        initialIntroContactEmail={data.introContactEmail}
+        initialIntroContactVerified={data.introContactVerified}
+        initialIntroContactNeedsVerification={data.introContactNeedsVerification}
+        initialDirectoryOptIn={data.directoryOptIn}
+        initialDirectoryRole={data.directoryRole}
+        initialDirectoryTags={data.directoryTags}
+      />
       <SiteFooter />
     </main>
   );

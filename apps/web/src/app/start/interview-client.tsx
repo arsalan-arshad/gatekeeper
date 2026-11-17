@@ -60,6 +60,9 @@ export function InterviewClient({ email }: { email: string }) {
   });
   const [draft, setDraft] = useState<ProfileDraft | null>(null);
   const [handle, setHandle] = useState('');
+  const [directoryOptIn, setDirectoryOptIn] = useState(false);
+  const [directoryRole, setDirectoryRole] = useState('');
+  const [directoryTags, setDirectoryTags] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [draftStep, setDraftStep] = useState(0);
   const [drafting, setDrafting] = useState(false);
@@ -136,6 +139,10 @@ export function InterviewClient({ email }: { email: string }) {
   function saveProfile() {
     if (!draft) return;
     startTransition(async () => {
+      const tags = directoryTags
+        .split(/[,\s]+/)
+        .map((t) => t.trim().toLowerCase())
+        .filter(Boolean);
       const result = await completeOnboarding({
         handle,
         name: draft.name,
@@ -144,10 +151,15 @@ export function InterviewClient({ email }: { email: string }) {
         offersText: draft.offersText,
         neverText: draft.neverText,
         ruleText: draft.ruleText,
+        directoryOptIn,
+        directoryRole: directoryOptIn ? directoryRole.trim() || null : null,
+        directoryTags: directoryOptIn ? tags : [],
       });
       if (result?.error) {
         setError(result.error);
+        return;
       }
+      captureEvent('directory_opt_in', { enabled: directoryOptIn, surface: 'publish' });
     });
   }
 
@@ -223,6 +235,47 @@ export function InterviewClient({ email }: { email: string }) {
         </label>
 
         {error ? <p className="text-sm text-red-300">{error}</p> : null}
+
+        <label className="flex items-start gap-3 text-sm">
+          <input
+            type="checkbox"
+            className="mt-1"
+            checked={directoryOptIn}
+            onChange={(e) => setDirectoryOptIn(e.target.checked)}
+          />
+          <span>
+            <span className="font-medium text-[var(--fg)]">
+              List me in the Gatekeeper directory
+            </span>
+            <span className="mt-1 block text-[var(--muted)]">
+              People can find you on /explore. Every intro still goes through your rules.
+            </span>
+          </span>
+        </label>
+
+        {directoryOptIn ? (
+          <div className="flex flex-col gap-3 rounded-md border border-white/10 bg-black/20 p-4">
+            <label className="flex flex-col gap-2 text-sm">
+              Role (optional)
+              <input
+                className="rounded-md border border-white/15 bg-black/30 px-3 py-2"
+                value={directoryRole}
+                onChange={(e) => setDirectoryRole(e.target.value)}
+                maxLength={80}
+                placeholder="e.g. Mobile engineer"
+              />
+            </label>
+            <label className="flex flex-col gap-2 text-sm">
+              Tags (optional, comma-separated)
+              <input
+                className="rounded-md border border-white/15 bg-black/30 px-3 py-2"
+                value={directoryTags}
+                onChange={(e) => setDirectoryTags(e.target.value)}
+                placeholder="e.g. saas, mobile, hiring"
+              />
+            </label>
+          </div>
+        ) : null}
 
         <button
           type="button"

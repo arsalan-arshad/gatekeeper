@@ -14,6 +14,22 @@ export type HelpfulTokenPayload = {
   exp: number;
 };
 
+export type MatchAction = 'accept' | 'decline';
+
+export type MatchTokenPayload = {
+  matchId: string;
+  action: MatchAction;
+  exp: number;
+};
+
+/** User-scoped ownership proof for alternate intro contact emails. */
+export type IntroContactVerifyPayload = {
+  userId: string;
+  email: string;
+  purpose: 'intro_contact_verify';
+  exp: number;
+};
+
 export const EMAIL_LINK_SECRET_MIN_LENGTH = 32;
 
 /**
@@ -167,4 +183,134 @@ export function verifyHelpfulToken(
   }
 
   return { ok: true, payload };
+}
+
+export function createMatchToken(
+  payload: Omit<MatchTokenPayload, 'exp'> & { exp?: number },
+  options?: { env?: NodeJS.ProcessEnv; ttlSeconds?: number; now?: number },
+): string {
+  // Align with MATCH_EXPIRES_DAYS (14) so email Accept/Decline links remain
+  // usable for the full pending match lifetime.
+  const ttlSeconds = options?.ttlSeconds ?? 60 * 60 * 24 * 14;
+  const now = options?.now ?? Math.floor(Date.now() / 1000);
+  const full: MatchTokenPayload = {
+    matchId: payload.matchId,
+    action: payload.action,
+    exp: payload.exp ?? now + ttlSeconds,
+  };
+  const body = encodeJson(full);
+  const signature = sign(body, resolveEmailLinkSecret(options?.env));
+  return `${body}.${signature}`;
+}
+
+export function verifyMatchToken(
+  token: string,
+  expected: { matchId: string; action: MatchAction },
+  options?: { env?: NodeJS.ProcessEnv; now?: number },
+): { ok: true; payload: MatchTokenPayload } | { ok: false; error: string } {
+  const [body, signature] = token.split('.');
+  if (!body || !signature) {
+    return { ok: false, error: 'Malformed token' };
+  }
+
+  let secret: string;
+  try {
+    secret = resolveEmailLinkSecret(options?.env);
+  } catch {
+    return { ok: false, error: 'Signing secret not configured' };
+  }
+
+  if (!verifySignature(body, signature, secret)) {
+    return { ok: false, error: 'Invalid signature' };
+  }
+
+  let payload: MatchTokenPayload;
+  try {
+    payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8')) as MatchTokenPayload;
+  } catch {
+    return { ok: false, error: 'Invalid payload' };
+  }
+
+  if (!payload.matchId || (payload.action !== 'accept' && payload.action !== 'decline')) {
+    return { ok: false, error: 'Invalid payload' };
+  }
+
+  const now = options?.now ?? Math.floor(Date.now() / 1000);
+  if (typeof payload.exp !== 'number' || payload.exp < now) {
+    return { ok: false, error: 'Token expired' };
+  }
+
+  if (payload.matchId !== expected.matchId || payload.action !== expected.action) {
+    return { ok: false, error: 'Token mismatch' };
+  }
+
+  return { ok: true, payload };
+}
+
+export function createIntroContactVerifyToken(
+  payload: Omit<IntroContactVerifyPayload, 'exp' | 'purpose'> & { exp?: number },
+  options?: { env?: NodeJS.ProcessEnv; ttlSeconds?: number; now?: number },
+): string {
+  const ttlSeconds = options?.ttlSeconds ?? 60 * 60 * 24; // 24h
+  const now = options?.now ?? Math.floor(Date.now() / 1000);
+  const full: IntroContactVerifyPayload = {
+    userId: payload.userId,
+    email: payload.email.trim().toLowerCase(),
+    purpose: 'intro_contact_verify',
+    exp: payload.exp ?? now + ttlSeconds,
+  };
+  const body = encodeJson(full);
+  const signature = sign(body, resolveEmailLinkSecret(options?.env));
+  return `${body}.${signature}`;
+}
+
+export function verifyIntroContactVerifyToken(
+  token: string,
+  options?: { env?: NodeJS.ProcessEnv; now?: number },
+): { ok: true; payload: IntroContactVerifyPayload } | { ok: false; error: string } {
+  const [body, signature] = token.split('.');
+  if (!body || !signature) {
+    return { ok: false, error: 'Malformed token' };
+  }
+
+  let secret: string;
+  try {
+    secret = resolveEmailLinkSecret(options?.env);
+  } catch {
+    return { ok: false, error: 'Signing secret not configured' };
+  }
+
+  if (!verifySignature(body, signature, secret)) {
+    return { ok: false, error: 'Invalid signature' };
+  }
+
+  let payload: IntroContactVerifyPayload;
+  try {
+    payload = JSON.parse(
+      Buffer.from(body, 'base64url').toString('utf8'),
+    ) as IntroContactVerifyPayload;
+  } catch {
+    return { ok: false, error: 'Invalid payload' };
+  }
+
+  if (
+    payload.purpose !== 'intro_contact_verify' ||
+    typeof payload.userId !== 'string' ||
+    typeof payload.email !== 'string'
+  ) {
+    return { ok: false, error: 'Invalid payload' };
+  }
+
+  const now = options?.now ?? Math.floor(Date.now() / 1000);
+  if (typeof payload.exp !== 'number' || payload.exp < now) {
+    return { ok: false, error: 'Token expired' };
+  }
+
+  return {
+    ok: true,
+    payload: {
+      ...payload,
+      email: payload.email.trim().toLowerCase(),
+    },
+  };
 }

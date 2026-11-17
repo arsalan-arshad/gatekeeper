@@ -1,4 +1,5 @@
 import type { EmailSender } from './email.js';
+import { EmailSendError } from './email.js';
 import { sendDeclineAutoReply, sendIntroEmailToBoth, statusAfterJudgment } from './opt-in.js';
 import {
   claimOwnerDecision,
@@ -6,13 +7,18 @@ import {
   type ClaimedRequest,
   type OwnerDecisionValue,
 } from './owner-decision.js';
-import { claimOutboundEmailSlot, OUTBOUND_EMAIL_TYPES } from './outbound-email.js';
+import {
+  claimOutboundEmailSlot,
+  OUTBOUND_EMAIL_TYPES,
+  releaseOutboundEmailSlot,
+} from './outbound-email.js';
 import { forfeitStakeToReceiver, refundStake, settleAcceptedIntro } from './payments.js';
 
 export const ALREADY_DECIDED_ERROR = 'Already decided';
 
 export type ApproveResult =
-  { ok: true; status: 'accepted' } | { ok: false; status: 402 | 409; error: string };
+  | { ok: true; status: 'accepted'; introEmail?: 'sent' | 'failed' | 'skipped' }
+  | { ok: false; status: 402 | 409; error: string };
 
 export type DeclineResult =
   { ok: true; status: 'declined' } | { ok: false; status: 409; error: string };
@@ -49,20 +55,34 @@ export async function approveInboxRequest(input: {
     return { ok: false, status: 402, error: settlement.error };
   }
 
+  let introEmail: 'sent' | 'failed' | 'skipped' = 'skipped';
   const emailSlot = await claimOutboundEmailSlot({
     requestId: input.requestId,
     emailType: OUTBOUND_EMAIL_TYPES.introConnected,
   });
   if (emailSlot.claimed) {
-    await sendIntroEmailToBoth(input.send, {
-      receiverEmail: input.owner.email,
-      receiverName: input.owner.name,
-      senderEmail: row.senderContact,
-      senderName: row.senderName,
-      message: row.message,
-      requestId: input.requestId,
-      ownerId: input.owner.id,
-    });
+    try {
+      await sendIntroEmailToBoth(input.send, {
+        receiverEmail: input.owner.email,
+        receiverName: input.owner.name,
+        senderEmail: row.senderContact,
+        senderName: row.senderName,
+        message: row.message,
+        requestId: input.requestId,
+        ownerId: input.owner.id,
+      });
+      introEmail = 'sent';
+    } catch (error) {
+      if (error instanceof EmailSendError) {
+        await releaseOutboundEmailSlot({
+          requestId: input.requestId,
+          emailType: OUTBOUND_EMAIL_TYPES.introConnected,
+        });
+        introEmail = 'failed';
+      } else {
+        throw error;
+      }
+    }
   }
 
   await finalizeOwnerDecision({
@@ -72,7 +92,7 @@ export async function approveInboxRequest(input: {
     stakeCents: 0,
   });
 
-  return { ok: true, status: 'accepted' };
+  return { ok: true, status: 'accepted', introEmail };
 }
 
 export async function declineInboxRequest(input: {

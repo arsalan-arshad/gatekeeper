@@ -118,6 +118,18 @@ Optional `stakeCents: 100` on intro requests holds $1 — refunded on accept, fo
 
 With the flag off, checkout returns 503, stakes/credits are skipped, and webhooks no-op.
 
+### Directory, matching & email intros
+
+Opt-in public directory at `/explore` (`GET /v1/directory`). Existing users stay opted out until they enable Directory in Settings or via the dashboard banner. Matching uses separate wants/offers embeddings (never private rules).
+
+```bash
+# Backfill null profile / match embeddings (not run on Railway start)
+pnpm --filter @gatekeeper/api backfill:embeddings -- --dry-run
+pnpm --filter @gatekeeper/api backfill:embeddings -- --limit 50
+```
+
+Optional `MATCH_MIN_SIMILARITY` (default `0.55`) controls mutual-fit threshold. Accepted matches and normal inbox approvals send a Reply-all intro email (Gatekeeper is not CC’d).
+
 ### Public ledger & trust
 
 

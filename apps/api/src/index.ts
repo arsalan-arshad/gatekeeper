@@ -15,13 +15,17 @@ import { assertEmailLinkSecretConfigured } from './tokens.js';
 import { registerAgentRoutes } from './routes/agent.js';
 import { registerDashboardRoutes } from './routes/dashboard.js';
 import { registerDemoRoutes } from './routes/demo.js';
+import { registerDirectoryRoutes } from './routes/directory.js';
 import { registerKeyRoutes } from './routes/keys.js';
 import { registerLedgerRoutes } from './routes/ledger.js';
+import { registerMatchRespondRoutes } from './routes/match-respond.js';
+import { registerMatchRoutes } from './routes/matches.js';
 import { registerOnboardingRoutes } from './routes/onboarding.js';
 import { registerOptInRoutes } from './routes/opt-in.js';
 import { registerPaymentRoutes } from './routes/payments.js';
 import { registerPublicRoutes } from './routes/public.js';
 import { registerResendWebhookRoutes } from './routes/resend-webhooks.js';
+import { registerIntroContactVerifyRoutes } from './routes/intro-contact-verify.js';
 import { registerSenderVerifyRoutes } from './routes/sender-verify.js';
 
 const port = Number(process.env.PORT ?? 4000);
@@ -185,11 +189,15 @@ export async function buildServer() {
 
   await registerOnboardingRoutes(app);
   await registerDashboardRoutes(app);
+  await registerDirectoryRoutes(app);
+  await registerMatchRoutes(app);
   await registerPublicRoutes(app);
   await registerSenderVerifyRoutes(app);
+  await registerIntroContactVerifyRoutes(app);
   await registerResendWebhookRoutes(app);
   await registerDemoRoutes(app);
   await registerOptInRoutes(app);
+  await registerMatchRespondRoutes(app);
   await registerAgentRoutes(app);
   await registerKeyRoutes(app);
   await registerLedgerRoutes(app);

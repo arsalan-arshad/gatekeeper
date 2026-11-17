@@ -61,3 +61,20 @@ export function replyForHandleClaimError(
   if (!isHandleUniqueViolation(error)) return null;
   return { status: 409, body: { error: HANDLE_TAKEN_ERROR } };
 }
+
+/** Detect unique violation on intro_matches_pair_live (one live match per unordered pair). */
+export function isIntroMatchPairUniqueViolation(error: unknown): boolean {
+  return findUniqueViolation(error, (info) => {
+    const haystack = [info.constraint, info.detail, info.message]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+    return (
+      haystack.includes('intro_matches_pair_live') ||
+      (haystack.includes('intro_matches') &&
+        (haystack.includes('requester') ||
+          haystack.includes('recipient') ||
+          haystack.includes('pair')))
+    );
+  });
+}

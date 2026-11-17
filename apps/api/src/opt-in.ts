@@ -202,14 +202,24 @@ export async function sendIntroEmailToBoth(
       });
     }
     // Owner/receiver still gets the intro; never CC unverified senderContact.
-    return send({ to: [input.receiverEmail], ...content });
+    // replyTo is receiver only until sender is included.
+    return send({
+      to: [input.receiverEmail],
+      replyTo: input.receiverEmail,
+      ...content,
+    });
   }
   const slot = await consumeSenderOutboundSlot(input.senderEmail);
   if (!slot.ok) {
-    return send({ to: [input.receiverEmail], ...content });
+    return send({
+      to: [input.receiverEmail],
+      replyTo: input.receiverEmail,
+      ...content,
+    });
   }
   return send({
     to: [input.receiverEmail, input.senderEmail],
+    replyTo: [input.receiverEmail, input.senderEmail],
     ...content,
   });
 }

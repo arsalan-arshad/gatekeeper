@@ -54,9 +54,105 @@ export const users = pgTable('users', {
   notificationEmailMode: notificationEmailModeEnum('notification_email_mode')
     .notNull()
     .default('instant'),
+  /**
+   * Opt-in public directory listing. Default false — never auto-opt anyone in.
+   * Existing users stay opted out until they explicitly enable it.
+   */
+  directoryOptIn: boolean('directory_opt_in').notNull().default(false),
+  directoryOptInAt: timestamp('directory_opt_in_at', { withTimezone: true }),
+  /** Short public role label for /explore (e.g. "Mobile engineer"). */
+  directoryRole: text('directory_role'),
+  /** Skill/topic tags (lowercase slugs); max 10 enforced in API. */
+  directoryTags: text('directory_tags')
+    .array()
+    .notNull()
+    .default(sql`'{}'::text[]`),
+  /** When set, hide the dashboard "list yourself" banner. */
+  directoryPromptDismissedAt: timestamp('directory_prompt_dismissed_at', {
+    withTimezone: true,
+  }),
+  /**
+   * Match embeddings (want↔offer). Never include never_text or private rules.
+   * HNSW indexes can be added later when user volume warrants it.
+   */
+  wantsEmbedding: vector('wants_embedding', {
+    dimensions: PROFILE_EMBEDDING_DIMENSIONS,
+  }),
+  offersEmbedding: vector('offers_embedding', {
+    dimensions: PROFILE_EMBEDDING_DIMENSIONS,
+  }),
+  matchEmbeddingsAt: timestamp('match_embeddings_at', { withTimezone: true }),
+  /**
+   * Optional contact email for intros. When null or unverified, login email is used.
+   * Never returned by public/directory/match endpoints.
+   * Ownership is proven via intro_contact_verified_at (user-scoped magic link) —
+   * never via the global verified_senders table.
+   */
+  introContactEmail: text('intro_contact_email'),
+  /** Set only after the user completes a verify link sent to intro_contact_email. */
+  introContactVerifiedAt: timestamp('intro_contact_verified_at', { withTimezone: true }),
   /** Profile last update — used for sitemap lastmod on `/@handle`. */
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
+
+export const matchStatusEnum = pgEnum('match_status', [
+  'pending',
+  'accepted',
+  'declined',
+  'expired',
+  'gated',
+]);
+
+/**
+ * Double opt-in intro matches between directory members.
+ * ON DELETE CASCADE cleans rows when either user is deleted.
+ */
+export const introMatches = pgTable('intro_matches', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  requesterId: uuid('requester_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  recipientId: uuid('recipient_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  note: text('note').notNull(),
+  similarity: doublePrecision('similarity').notNull(),
+  aiScore: integer('ai_score'),
+  aiDecision: decisionEnum('ai_decision'),
+  aiReasonPublic: text('ai_reason_public'),
+  status: matchStatusEnum('status').notNull().default('pending'),
+  recipientDecision: decisionEnum('recipient_decision'),
+  decidedAt: timestamp('decided_at', { withTimezone: true }),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const matchDismissals = pgTable(
+  'match_dismissals',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    dismissedUserId: uuid('dismissed_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.dismissedUserId] })],
+);
+
+/** Idempotent outbound email ledger for matches (separate from request-scoped outbound_emails). */
+export const matchOutboundEmails = pgTable(
+  'match_outbound_emails',
+  {
+    matchId: uuid('match_id')
+      .notNull()
+      .references(() => introMatches.id, { onDelete: 'cascade' }),
+    emailType: text('email_type').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.matchId, table.emailType] })],
+);
 
 /**
  * Wallet for senders (and receivers earning spam-stake credits).

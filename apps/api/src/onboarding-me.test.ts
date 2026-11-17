@@ -19,6 +19,10 @@ test('onboarding/me unknown user matches known response keys', () => {
       wantsText: '',
       offersText: '',
       neverText: '',
+      directoryOptIn: false,
+      directoryRole: null,
+      directoryTags: [] as string[],
+      directoryPromptDismissed: false,
     },
     gateRules: null,
   };

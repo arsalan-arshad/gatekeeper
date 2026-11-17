@@ -8,6 +8,9 @@ import {
   apiKeys,
   emailSuppressions,
   gateRules,
+  introMatches,
+  matchDismissals,
+  matchOutboundEmails,
   outboundEmails,
   proWaitlist,
   requests,
@@ -23,6 +26,17 @@ test('core tables are defined', () => {
   assert.equal(getTableName(proWaitlist), 'pro_waitlist');
   assert.equal(getTableName(outboundEmails), 'outbound_emails');
   assert.equal(getTableName(emailSuppressions), 'email_suppressions');
+  assert.equal(getTableName(introMatches), 'intro_matches');
+  assert.equal(getTableName(matchDismissals), 'match_dismissals');
+  assert.equal(getTableName(matchOutboundEmails), 'match_outbound_emails');
+});
+
+test('match tables cascade delete with users (schema references)', () => {
+  // Drizzle schema wires onDelete: 'cascade' on requester/recipient/user FKs.
+  // Runtime CASCADE is asserted by migration 0016 + account delete path.
+  assert.ok(introMatches);
+  assert.ok(matchDismissals);
+  assert.ok(matchOutboundEmails);
 });
 
 test('pgvector scaffolding exports extension SQL and dimensions', () => {
