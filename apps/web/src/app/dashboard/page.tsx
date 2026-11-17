@@ -68,6 +68,7 @@ export default async function DashboardPage({
           optedIn={matches.data?.optedIn ?? false}
           suggestions={matches.data?.suggestions ?? []}
           incoming={matches.data?.incoming ?? []}
+          needsIntroResend={matches.data?.needsIntroResend ?? []}
         />
       )}
       {'error' in inbox && inbox.error ? (

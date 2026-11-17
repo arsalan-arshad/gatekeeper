@@ -71,6 +71,8 @@ export async function claimMatchDecision(input: {
       return { claimed: false, reason: 'already_decided' };
     }
     if (existing.expiresAt.getTime() <= now.getTime()) {
+      // Lazily flip pending → expired so the live pair unique index frees up.
+      memoryRows.set(input.matchId, { ...existing, status: 'expired' });
       return { claimed: false, reason: 'expired' };
     }
     const next: ClaimedMatch = {
@@ -112,6 +114,17 @@ export async function claimMatchDecision(input: {
       return { claimed: false, reason: 'not_found' };
     }
     if (existing.expiresAt.getTime() <= now.getTime() && existing.status === 'pending') {
+      // Lazily flip so intro_matches_pair_live no longer blocks a new request.
+      await db
+        .update(introMatches)
+        .set({ status: 'expired' })
+        .where(
+          and(
+            eq(introMatches.id, input.matchId),
+            eq(introMatches.status, 'pending'),
+            isNull(introMatches.recipientDecision),
+          ),
+        );
       return { claimed: false, reason: 'expired' };
     }
     return { claimed: false, reason: 'already_decided' };

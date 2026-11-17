@@ -113,22 +113,33 @@ export type SuggestedMatch = {
   matchId: null;
 };
 
+export type DirectoryPerson = {
+  handle: string;
+  name: string;
+  role: string | null;
+  tags: string[];
+  bio: string | null;
+  wantsSummary: string | null;
+  offersSummary: string | null;
+  profileUrl: string;
+};
+
 export type IncomingMatch = {
   matchId: string;
   note: string;
   scoreBand: 'strong' | 'good';
   createdAt: string;
   expiresAt: string;
-  requester: {
-    handle: string;
-    name: string;
-    role: string | null;
-    tags: string[];
-    bio: string | null;
-    wantsSummary: string | null;
-    offersSummary: string | null;
-    profileUrl: string;
-  };
+  requester: DirectoryPerson;
+};
+
+export type NeedsIntroResend = {
+  matchId: string;
+  note: string;
+  scoreBand: 'strong' | 'good';
+  createdAt: string;
+  expiresAt: string;
+  counterpart: DirectoryPerson;
 };
 
 export async function loadMatches() {
@@ -139,13 +150,17 @@ export async function loadMatches() {
       apiFetch<{ optedIn: boolean; matches: SuggestedMatch[] }>('/v1/dashboard/matches', {
         email,
       }),
-      apiFetch<{ incoming: IncomingMatch[] }>('/v1/dashboard/matches/incoming', { email }),
+      apiFetch<{ incoming: IncomingMatch[]; needsIntroResend?: NeedsIntroResend[] }>(
+        '/v1/dashboard/matches/incoming',
+        { email },
+      ),
     ]);
     return {
       data: {
         optedIn: suggestions.optedIn,
         suggestions: suggestions.matches,
         incoming: incoming.incoming,
+        needsIntroResend: incoming.needsIntroResend ?? [],
       },
     };
   } catch (error) {

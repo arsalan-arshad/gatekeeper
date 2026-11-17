@@ -8,7 +8,9 @@ import {
   declineMatch,
   dismissMatchSuggestion,
   requestMatchIntro,
+  resendMatchIntro,
   type IncomingMatch,
+  type NeedsIntroResend,
   type SuggestedMatch,
 } from './actions';
 
@@ -16,10 +18,12 @@ export function MatchesClient({
   optedIn,
   suggestions,
   incoming,
+  needsIntroResend = [],
 }: {
   optedIn: boolean;
   suggestions: SuggestedMatch[];
   incoming: IncomingMatch[];
+  needsIntroResend?: NeedsIntroResend[];
 }) {
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
@@ -28,6 +32,12 @@ export function MatchesClient({
   const [note, setNote] = useState('');
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [resolvedIncoming, setResolvedIncoming] = useState<Set<string>>(new Set());
+  /** Accepted matches whose intro email failed — server seed + same-session accepts. */
+  const [needsResend, setNeedsResend] = useState<Map<string, NeedsIntroResend>>(() => {
+    const initial = new Map<string, NeedsIntroResend>();
+    for (const item of needsIntroResend) initial.set(item.matchId, item);
+    return initial;
+  });
 
   if (!optedIn) {
     return (
@@ -50,10 +60,11 @@ export function MatchesClient({
 
   const visibleSuggestions = suggestions.filter((s) => !hidden.has(s.handle));
   const visibleIncoming = incoming.filter((m) => !resolvedIncoming.has(m.matchId));
+  const resendItems = [...needsResend.values()];
 
   return (
     <div className="flex flex-col gap-8">
-      {visibleIncoming.length > 0 ? (
+      {visibleIncoming.length > 0 || resendItems.length > 0 ? (
         <section>
           <h2 className="text-xl" style={{ fontFamily: 'var(--font-display), Georgia, serif' }}>
             Intro requests for you
@@ -87,8 +98,20 @@ export function MatchesClient({
                         }
                         setResolvedIncoming((prev) => new Set(prev).add(item.matchId));
                         if ('introEmail' in result && result.introEmail === 'failed') {
+                          setNeedsResend((prev) => {
+                            const next = new Map(prev);
+                            next.set(item.matchId, {
+                              matchId: item.matchId,
+                              note: item.note,
+                              scoreBand: item.scoreBand,
+                              createdAt: item.createdAt,
+                              expiresAt: item.expiresAt,
+                              counterpart: item.requester,
+                            });
+                            return next;
+                          });
                           setMessage(
-                            "Intro accepted, but we couldn't send the email right now. Try again in a few minutes.",
+                            "Intro accepted, but we couldn't send the email right now. Use Resend intro email.",
                           );
                         } else {
                           setMessage('Intro accepted.');
@@ -106,7 +129,7 @@ export function MatchesClient({
                       setError(null);
                       startTransition(async () => {
                         const result = await declineMatch(item.matchId);
-                        if (result.error) {
+                        if ('error' in result && result.error) {
                           setError(
                             result.error === 'Already decided' ? 'Already decided' : result.error,
                           );
@@ -120,6 +143,47 @@ export function MatchesClient({
                     Decline
                   </button>
                 </div>
+              </li>
+            ))}
+            {resendItems.map((item) => (
+              <li key={`resend-${item.matchId}`} className="border-b border-white/10 pb-4">
+                <p className="font-medium">
+                  Intro with{' '}
+                  <Link href={item.counterpart.profileUrl} className="hover:text-[var(--accent)]">
+                    {item.counterpart.name}
+                  </Link>{' '}
+                  accepted
+                </p>
+                <p className="mt-2 text-sm text-[var(--muted)]">
+                  Connection email did not send. You can retry below.
+                </p>
+                <button
+                  type="button"
+                  disabled={pending}
+                  className="mt-3 rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm font-semibold text-[#062015] disabled:opacity-50"
+                  onClick={() => {
+                    setError(null);
+                    startTransition(async () => {
+                      const result = await resendMatchIntro(item.matchId);
+                      if ('error' in result && result.error) {
+                        setError(result.error);
+                        return;
+                      }
+                      if ('introEmail' in result && result.introEmail === 'sent') {
+                        setNeedsResend((prev) => {
+                          const next = new Map(prev);
+                          next.delete(item.matchId);
+                          return next;
+                        });
+                        setMessage('Intro email resent.');
+                      } else {
+                        setMessage('Still could not send — try again in a few minutes.');
+                      }
+                    });
+                  }}
+                >
+                  Resend intro email
+                </button>
               </li>
             ))}
           </ul>

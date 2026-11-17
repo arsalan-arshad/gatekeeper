@@ -181,7 +181,9 @@ export function createMatchToken(
   payload: Omit<MatchTokenPayload, 'exp'> & { exp?: number },
   options?: { env?: NodeJS.ProcessEnv; ttlSeconds?: number; now?: number },
 ): string {
-  const ttlSeconds = options?.ttlSeconds ?? 60 * 60 * 24 * 7; // 7d
+  // Align with MATCH_EXPIRES_DAYS (14) so email Accept/Decline links remain
+  // usable for the full pending match lifetime.
+  const ttlSeconds = options?.ttlSeconds ?? 60 * 60 * 24 * 14;
   const now = options?.now ?? Math.floor(Date.now() / 1000);
   const full: MatchTokenPayload = {
     matchId: payload.matchId,

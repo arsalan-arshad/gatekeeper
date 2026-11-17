@@ -2,9 +2,12 @@ import { introMatches, users } from '@gatekeeper/db';
 import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 
+import { resolveIntroContactEmail } from '../contact-email.js';
 import { getDb } from '../db.js';
+import { createEmailSender } from '../email.js';
 import { escapeHtml } from '../email-templates.js';
 import { claimMatchDecision, writeMatchDismissalsBothWays } from '../match-decision.js';
+import { sendMatchIntroEmail } from '../match-intro.js';
 import { scoreBandFromSimilarity } from '../matching.js';
 import { captureServerEvent } from '../posthog.js';
 import { verifyMatchToken, type MatchAction } from '../tokens.js';
@@ -22,6 +25,18 @@ function htmlPage(title: string, body: string): string {
 
 function withNoindex(reply: { header: (k: string, v: string) => unknown }) {
   reply.header('X-Robots-Tag', 'noindex, nofollow');
+}
+
+function publicSummary(user: {
+  name: string;
+  directoryRole: string | null;
+  offersText: string | null;
+  bio: string | null;
+}): string {
+  return [user.name, user.directoryRole, user.offersText || user.bio]
+    .filter(Boolean)
+    .join(' — ')
+    .slice(0, 280);
 }
 
 export async function registerMatchRespondRoutes(app: FastifyInstance): Promise<void> {
@@ -76,10 +91,14 @@ export async function registerMatchRespondRoutes(app: FastifyInstance): Promise<
         status: 'declined',
       });
       if (!result.claimed) {
+        const copy =
+          result.reason === 'expired'
+            ? 'This intro request has expired.'
+            : 'This intro request was already decided.';
         return reply
           .status(409)
           .type('text/html')
-          .send(htmlPage('Already decided', '<p>This intro request was already decided.</p>'));
+          .send(htmlPage('Already decided', `<p>${copy}</p>`));
       }
       await writeMatchDismissalsBothWays({
         userA: result.row.requesterId,
@@ -97,22 +116,62 @@ export async function registerMatchRespondRoutes(app: FastifyInstance): Promise<
       status: 'accepted',
     });
     if (!result.claimed) {
+      const copy =
+        result.reason === 'expired'
+          ? 'This intro request has expired.'
+          : 'This intro request was already decided.';
       return reply
         .status(409)
         .type('text/html')
-        .send(htmlPage('Already decided', '<p>This intro request was already decided.</p>'));
+        .send(htmlPage('Already decided', `<p>${copy}</p>`));
     }
 
     captureServerEvent(recipient.id, 'match_accepted', {
       score_band: scoreBandFromSimilarity(result.row.similarity),
     });
 
+    const [requester] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, result.row.requesterId))
+      .limit(1);
+
+    let introEmail: 'sent' | 'failed' | 'skipped' = 'failed';
+    if (requester) {
+      introEmail = await sendMatchIntroEmail({
+        send: createEmailSender(),
+        matchId: result.row.id,
+        note: result.row.note,
+        personA: {
+          name: requester.name,
+          contactEmail: await resolveIntroContactEmail(requester),
+          summary: publicSummary(requester),
+        },
+        personB: {
+          name: recipient.name,
+          contactEmail: await resolveIntroContactEmail(recipient),
+          summary: publicSummary(recipient),
+        },
+      });
+    }
+
+    if (introEmail === 'failed') {
+      return reply
+        .type('text/html')
+        .send(
+          htmlPage(
+            'Accepted',
+            '<p>Intro accepted, but we could not send the connection email right now. Open your Gatekeeper dashboard and use <strong>Resend intro email</strong>.</p>',
+          ),
+        );
+    }
+
     return reply
       .type('text/html')
       .send(
         htmlPage(
           'Accepted',
-          '<p>Intro accepted. Check your email for the connection (or retry from the dashboard if it did not arrive).</p>',
+          '<p>Intro accepted. Check your email for the connection — just hit Reply-all to continue.</p>',
         ),
       );
   });

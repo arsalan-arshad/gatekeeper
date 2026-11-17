@@ -3,10 +3,12 @@ import {
   gateRules,
   introMatches,
   matchDismissals,
+  matchOutboundEmails,
   requests,
   users,
 } from '@gatekeeper/db';
-import { and, desc, eq, gt, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, isNull, lte, or, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
@@ -25,7 +27,11 @@ import { judgeRequest } from '../judge.js';
 import { createLlm } from '../llm.js';
 import { claimMatchDecision, writeMatchDismissalsBothWays } from '../match-decision.js';
 import { sendMatchIntroEmail } from '../match-intro.js';
-import { claimMatchEmailSlot, MATCH_EMAIL_TYPES } from '../match-outbound-email.js';
+import {
+  claimMatchEmailSlot,
+  MATCH_EMAIL_TYPES,
+  releaseMatchEmailSlot,
+} from '../match-outbound-email.js';
 import {
   emptyExclusions,
   matchMinSimilarity,
@@ -88,14 +94,34 @@ function appBase(): string {
 async function loadExclusionsForViewer(viewerId: string, viewerEmail: string) {
   const db = getDb();
   const exclusions = emptyExclusions();
+  const now = new Date();
 
+  // Lazily expire stale pending rows so the live pair index frees up.
+  await db
+    .update(introMatches)
+    .set({ status: 'expired' })
+    .where(
+      and(
+        or(eq(introMatches.requesterId, viewerId), eq(introMatches.recipientId, viewerId)),
+        eq(introMatches.status, 'pending'),
+        lte(introMatches.expiresAt, now),
+      ),
+    );
+
+  // Expired rows do not permanently block rematching (unique index is pending|accepted only).
   const matchRows = await db
     .select({
       requesterId: introMatches.requesterId,
       recipientId: introMatches.recipientId,
+      status: introMatches.status,
     })
     .from(introMatches)
-    .where(or(eq(introMatches.requesterId, viewerId), eq(introMatches.recipientId, viewerId)));
+    .where(
+      and(
+        or(eq(introMatches.requesterId, viewerId), eq(introMatches.recipientId, viewerId)),
+        sql`${introMatches.status} <> 'expired'`,
+      ),
+    );
   for (const row of matchRows) {
     exclusions.matchedUserIds.add(row.requesterId === viewerId ? row.recipientId : row.requesterId);
   }
@@ -133,7 +159,16 @@ async function loadExclusionsForViewer(viewerId: string, viewerEmail: string) {
     .where(eq(requests.targetUserId, viewerId));
 
   if (inbound.length > 0) {
-    const counterparts = await db.select({ id: users.id, email: users.email }).from(users);
+    const emails = [...new Set(inbound.map((r) => r.senderContact.toLowerCase()))];
+    const counterparts = await db
+      .select({ id: users.id, email: users.email })
+      .from(users)
+      .where(
+        sql`lower(${users.email}) IN (${sql.join(
+          emails.map((e) => sql`${e}`),
+          sql`, `,
+        )})`,
+      );
     const byEmail = new Map(counterparts.map((u) => [u.email.toLowerCase(), u.id]));
     for (const row of inbound) {
       const id = byEmail.get(row.senderContact.toLowerCase());
@@ -257,6 +292,66 @@ export async function registerMatchRoutes(app: FastifyInstance): Promise<void> {
       .orderBy(desc(introMatches.createdAt))
       .limit(50);
 
+    // Accepted matches where the intro email never landed — either party can resend.
+    const requesterUser = alias(users, 'match_requester');
+    const recipientUser = alias(users, 'match_recipient');
+    const needsResendRows = await db
+      .select({
+        id: introMatches.id,
+        note: introMatches.note,
+        similarity: introMatches.similarity,
+        createdAt: introMatches.createdAt,
+        expiresAt: introMatches.expiresAt,
+        requesterId: introMatches.requesterId,
+        requester: {
+          id: requesterUser.id,
+          handle: requesterUser.handle,
+          name: requesterUser.name,
+          email: requesterUser.email,
+          bio: requesterUser.bio,
+          wantsText: requesterUser.wantsText,
+          offersText: requesterUser.offersText,
+          neverText: requesterUser.neverText,
+          directoryOptIn: requesterUser.directoryOptIn,
+          directoryRole: requesterUser.directoryRole,
+          directoryTags: requesterUser.directoryTags,
+          updatedAt: requesterUser.updatedAt,
+        },
+        recipient: {
+          id: recipientUser.id,
+          handle: recipientUser.handle,
+          name: recipientUser.name,
+          email: recipientUser.email,
+          bio: recipientUser.bio,
+          wantsText: recipientUser.wantsText,
+          offersText: recipientUser.offersText,
+          neverText: recipientUser.neverText,
+          directoryOptIn: recipientUser.directoryOptIn,
+          directoryRole: recipientUser.directoryRole,
+          directoryTags: recipientUser.directoryTags,
+          updatedAt: recipientUser.updatedAt,
+        },
+      })
+      .from(introMatches)
+      .innerJoin(requesterUser, eq(requesterUser.id, introMatches.requesterId))
+      .innerJoin(recipientUser, eq(recipientUser.id, introMatches.recipientId))
+      .leftJoin(
+        matchOutboundEmails,
+        and(
+          eq(matchOutboundEmails.matchId, introMatches.id),
+          eq(matchOutboundEmails.emailType, MATCH_EMAIL_TYPES.matchIntro),
+        ),
+      )
+      .where(
+        and(
+          or(eq(introMatches.requesterId, user.id), eq(introMatches.recipientId, user.id)),
+          eq(introMatches.status, 'accepted'),
+          isNull(matchOutboundEmails.matchId),
+        ),
+      )
+      .orderBy(desc(introMatches.decidedAt))
+      .limit(20);
+
     return {
       incoming: rows.map((row) => ({
         matchId: row.id,
@@ -269,6 +364,20 @@ export async function registerMatchRoutes(app: FastifyInstance): Promise<void> {
           directoryTags: row.requester.directoryTags ?? [],
         }),
       })),
+      needsIntroResend: needsResendRows.map((row) => {
+        const counterpart = row.requesterId === user.id ? row.recipient : row.requester;
+        return {
+          matchId: row.id,
+          note: row.note,
+          scoreBand: scoreBandFromSimilarity(row.similarity),
+          createdAt: row.createdAt.toISOString(),
+          expiresAt: row.expiresAt.toISOString(),
+          counterpart: toDirectoryPublicEntry({
+            ...counterpart,
+            directoryTags: counterpart.directoryTags ?? [],
+          }),
+        };
+      }),
     };
   });
 
@@ -480,32 +589,40 @@ export async function registerMatchRoutes(app: FastifyInstance): Promise<void> {
     }
 
     if (recipient.notificationEmailMode !== 'off') {
-      const claim = await claimMatchEmailSlot({
-        matchId,
-        emailType: MATCH_EMAIL_TYPES.matchRequestNotify,
-      });
-      if (claim.claimed && !(await isEmailSuppressed(recipient.email))) {
-        const acceptToken = createMatchToken({ matchId, action: 'accept' });
-        const declineToken = createMatchToken({ matchId, action: 'decline' });
-        const base = apiBase();
-        const mail = buildMatchRequestEmail({
-          recipientName: recipient.name,
-          requesterName: requester.name,
-          requesterRole: requester.directoryRole,
-          note: parsed.data.note,
-          acceptUrl: `${base}/v1/matches/${matchId}/respond?action=accept&token=${encodeURIComponent(acceptToken)}`,
-          declineUrl: `${base}/v1/matches/${matchId}/respond?action=decline&token=${encodeURIComponent(declineToken)}`,
-          inboxUrl: `${appBase()}/dashboard`,
+      if (await isEmailSuppressed(recipient.email)) {
+        // Do not claim a notify slot for suppressed recipients — they can still act in-dashboard.
+      } else {
+        const claim = await claimMatchEmailSlot({
+          matchId,
+          emailType: MATCH_EMAIL_TYPES.matchRequestNotify,
         });
-        try {
-          await createEmailSender()({
-            to: recipient.email,
-            subject: mail.subject,
-            html: mail.html,
-            text: mail.text,
+        if (claim.claimed) {
+          const acceptToken = createMatchToken({ matchId, action: 'accept' });
+          const declineToken = createMatchToken({ matchId, action: 'decline' });
+          const base = apiBase();
+          const mail = buildMatchRequestEmail({
+            recipientName: recipient.name,
+            requesterName: requester.name,
+            requesterRole: requester.directoryRole,
+            note: parsed.data.note,
+            acceptUrl: `${base}/v1/matches/${matchId}/respond?action=accept&token=${encodeURIComponent(acceptToken)}`,
+            declineUrl: `${base}/v1/matches/${matchId}/respond?action=decline&token=${encodeURIComponent(declineToken)}`,
+            inboxUrl: `${appBase()}/dashboard`,
           });
-        } catch (error) {
-          request.log.error({ err: error }, 'match request notify failed');
+          try {
+            await createEmailSender()({
+              to: recipient.email,
+              subject: mail.subject,
+              html: mail.html,
+              text: mail.text,
+            });
+          } catch (error) {
+            request.log.error({ err: error }, 'match request notify failed');
+            await releaseMatchEmailSlot({
+              matchId,
+              emailType: MATCH_EMAIL_TYPES.matchRequestNotify,
+            });
+          }
         }
       }
     }
