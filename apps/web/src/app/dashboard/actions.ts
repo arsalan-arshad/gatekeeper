@@ -99,3 +99,120 @@ export async function loadMe() {
     return { email, me: null };
   }
 }
+
+export type SuggestedMatch = {
+  handle: string;
+  name: string;
+  role: string | null;
+  tags: string[];
+  bio: string | null;
+  wantsSummary: string | null;
+  offersSummary: string | null;
+  profileUrl: string;
+  scoreBand: 'strong' | 'good';
+  matchId: null;
+};
+
+export type IncomingMatch = {
+  matchId: string;
+  note: string;
+  scoreBand: 'strong' | 'good';
+  createdAt: string;
+  expiresAt: string;
+  requester: {
+    handle: string;
+    name: string;
+    role: string | null;
+    tags: string[];
+    bio: string | null;
+    wantsSummary: string | null;
+    offersSummary: string | null;
+    profileUrl: string;
+  };
+};
+
+export async function loadMatches() {
+  const email = await requireEmail();
+  if (!email) return { error: 'Sign in required' as const };
+  try {
+    const [suggestions, incoming] = await Promise.all([
+      apiFetch<{ optedIn: boolean; matches: SuggestedMatch[] }>('/v1/dashboard/matches', {
+        email,
+      }),
+      apiFetch<{ incoming: IncomingMatch[] }>('/v1/dashboard/matches/incoming', { email }),
+    ]);
+    return {
+      data: {
+        optedIn: suggestions.optedIn,
+        suggestions: suggestions.matches,
+        incoming: incoming.incoming,
+      },
+    };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Failed to load matches' };
+  }
+}
+
+export async function requestMatchIntro(handle: string, note: string) {
+  const email = await requireEmail();
+  if (!email) return { error: 'Sign in required' };
+  try {
+    const data = await apiFetch<{
+      status: 'pending' | 'not_a_fit' | 'already_requested';
+      reason?: string;
+      matchId?: string | null;
+    }>('/v1/dashboard/matches/request', {
+      method: 'POST',
+      email,
+      body: JSON.stringify({ handle, note }),
+    });
+    return data;
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Request failed' };
+  }
+}
+
+export async function dismissMatchSuggestion(handle: string) {
+  const email = await requireEmail();
+  if (!email) return { error: 'Sign in required' };
+  try {
+    await apiFetch('/v1/dashboard/matches/dismiss', {
+      method: 'POST',
+      email,
+      body: JSON.stringify({ handle }),
+    });
+    return { ok: true as const };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Dismiss failed' };
+  }
+}
+
+export async function acceptMatch(id: string) {
+  const email = await requireEmail();
+  if (!email) return { error: 'Sign in required' };
+  try {
+    await apiFetch(`/v1/dashboard/matches/${id}/accept`, {
+      method: 'POST',
+      email,
+      body: '{}',
+    });
+    return { ok: true as const };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Accept failed' };
+  }
+}
+
+export async function declineMatch(id: string) {
+  const email = await requireEmail();
+  if (!email) return { error: 'Sign in required' };
+  try {
+    await apiFetch(`/v1/dashboard/matches/${id}/decline`, {
+      method: 'POST',
+      email,
+      body: '{}',
+    });
+    return { ok: true as const };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Decline failed' };
+  }
+}

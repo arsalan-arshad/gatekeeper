@@ -344,3 +344,89 @@ export function buildIntroEmail(input: {
   });
   return { subject, html, text };
 }
+
+export function buildMatchRequestEmail(input: {
+  recipientName: string;
+  requesterName: string;
+  requesterRole?: string | null;
+  note: string;
+  acceptUrl: string;
+  declineUrl: string;
+  inboxUrl: string;
+  env?: NodeJS.ProcessEnv;
+}): { subject: string; html: string; text: string } {
+  const links = getEmailBrandLinks(input.env);
+  const subject = sanitizeEmailSubject(`${input.requesterName} wants an intro via Gatekeeper`);
+  const role = input.requesterRole?.trim();
+  const text = [
+    `Hi ${input.recipientName},`,
+    '',
+    `${input.requesterName}${role ? ` (${role})` : ''} requested an intro through Gatekeeper.`,
+    '',
+    'Their note:',
+    input.note.trim(),
+    '',
+    `Accept: ${input.acceptUrl}`,
+    `Decline: ${input.declineUrl}`,
+    `Dashboard: ${input.inboxUrl}`,
+    footerText(links),
+  ].join('\n');
+  const html = layoutHtml({
+    title: 'Intro request',
+    links,
+    bodyHtml: `
+      <p style="margin:0 0 12px;line-height:1.55;color:#c9d6cf;">Hi ${escapeHtml(input.recipientName)},</p>
+      <p style="margin:0 0 12px;line-height:1.55;color:#c9d6cf;">
+        <strong style="color:#f4f1ea;">${escapeHtml(input.requesterName)}</strong>${
+          role ? ` (${escapeHtml(role)})` : ''
+        } requested an intro through Gatekeeper.
+      </p>
+      <blockquote style="margin:0 0 20px;padding:12px 14px;border-left:3px solid #5fd4a4;background:#07110e;color:#f4f1ea;line-height:1.5;">${escapeHtml(input.note.trim())}</blockquote>
+      <p style="margin:0;">${buttonHtml(input.acceptUrl, 'Accept')}&nbsp;&nbsp;${buttonHtml(input.declineUrl, 'Decline', false)}</p>
+      <p style="margin:16px 0 0;font-size:13px;"><a href="${escapeHtml(input.inboxUrl)}" style="color:#5fd4a4;">Open dashboard</a></p>
+    `,
+  });
+  return { subject, html, text };
+}
+
+export function buildMatchIntroEmail(input: {
+  personAName: string;
+  personASummary: string;
+  personBName: string;
+  personBSummary: string;
+  note: string;
+  env?: NodeJS.ProcessEnv;
+}): { subject: string; html: string; text: string } {
+  const links = getEmailBrandLinks(input.env);
+  const subject = sanitizeEmailSubject(
+    `Intro: ${input.personAName} ↔ ${input.personBName} (via Gatekeeper)`,
+  );
+  const text = [
+    `Intro via Gatekeeper: ${input.personAName} ↔ ${input.personBName}`,
+    '',
+    `${input.personAName}: ${input.personASummary}`,
+    `${input.personBName}: ${input.personBSummary}`,
+    '',
+    'Note from the requester:',
+    input.note.trim(),
+    '',
+    'Just hit Reply-all to continue — Gatekeeper is not CC’d.',
+    footerText(links),
+  ].join('\n');
+  const html = layoutHtml({
+    title: 'You’re connected',
+    links,
+    bodyHtml: `
+      <p style="margin:0 0 12px;line-height:1.55;color:#c9d6cf;">
+        Intro via Gatekeeper:
+        <strong style="color:#f4f1ea;">${escapeHtml(input.personAName)}</strong> ↔
+        <strong style="color:#f4f1ea;">${escapeHtml(input.personBName)}</strong>.
+      </p>
+      <p style="margin:0 0 8px;line-height:1.55;color:#c9d6cf;"><strong style="color:#f4f1ea;">${escapeHtml(input.personAName)}</strong> — ${escapeHtml(input.personASummary)}</p>
+      <p style="margin:0 0 16px;line-height:1.55;color:#c9d6cf;"><strong style="color:#f4f1ea;">${escapeHtml(input.personBName)}</strong> — ${escapeHtml(input.personBSummary)}</p>
+      <blockquote style="margin:0 0 16px;padding:12px 14px;border-left:3px solid #5fd4a4;background:#07110e;color:#f4f1ea;line-height:1.5;">${escapeHtml(input.note.trim())}</blockquote>
+      <p style="margin:0;line-height:1.55;color:#c9d6cf;">Just hit Reply-all to continue — Gatekeeper is not CC’d.</p>
+    `,
+  });
+  return { subject, html, text };
+}

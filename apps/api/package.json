@@ -11,7 +11,8 @@
     "lint": "eslint src --max-warnings 0",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --import tsx --test --test-force-exit src/**/*.test.ts",
-    "eval:judge": "tsx src/eval-judge.ts"
+    "eval:judge": "tsx src/eval-judge.ts",
+    "backfill:embeddings": "tsx src/scripts/backfill-embeddings.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.4.3",

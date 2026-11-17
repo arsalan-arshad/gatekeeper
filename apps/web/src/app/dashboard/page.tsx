@@ -6,9 +6,10 @@ import { DashboardNav } from '@/components/dashboard-nav';
 import { SiteFooter } from '@/components/site-footer';
 import { apiFetch } from '@/lib/api';
 
-import { loadInbox } from './actions';
+import { loadInbox, loadMatches } from './actions';
 import { DirectoryBanner } from './directory-banner';
 import { InboxClient } from './inbox-client';
+import { MatchesClient } from './matches-client';
 
 export default async function DashboardPage({
   searchParams,
@@ -45,6 +46,7 @@ export default async function DashboardPage({
   }
 
   const inbox = await loadInbox(filter);
+  const matches = await loadMatches();
 
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-8 px-6 py-12">
@@ -59,6 +61,15 @@ export default async function DashboardPage({
         </p>
       </div>
       {showDirectoryBanner ? <DirectoryBanner /> : null}
+      {'error' in matches && matches.error ? (
+        <p className="text-sm text-red-300">{matches.error}</p>
+      ) : (
+        <MatchesClient
+          optedIn={matches.data?.optedIn ?? false}
+          suggestions={matches.data?.suggestions ?? []}
+          incoming={matches.data?.incoming ?? []}
+        />
+      )}
       {'error' in inbox && inbox.error ? (
         <p className="text-sm text-red-300">{inbox.error}</p>
       ) : (

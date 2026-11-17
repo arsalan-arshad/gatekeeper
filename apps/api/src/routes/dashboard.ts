@@ -29,6 +29,7 @@ import {
   type InterviewAnswers,
 } from '../interview.js';
 import { countInboxFilters, matchesInboxFilter, type InboxFilter } from '../inbox-status.js';
+import { computeMatchEmbeddings } from '../match-embeddings.js';
 import { HANDLE_TAKEN_ERROR, replyForHandleClaimError } from '../pg-errors.js';
 
 const filterSchema = z.enum(['all', 'accepted', 'rejected', 'spam']).default('all');
@@ -304,6 +305,19 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
       /* keep previous embedding */
     }
 
+    const matchEmbeds = await computeMatchEmbeddings({
+      userId: user.id,
+      fields: {
+        wantsText: body.wantsText,
+        offersText: body.offersText,
+        bio: body.bio,
+        directoryRole: user.directoryRole,
+        directoryTags: user.directoryTags ?? [],
+      },
+      previousWants: user.wantsEmbedding,
+      previousOffers: user.offersEmbedding,
+    });
+
     try {
       await db
         .update(users)
@@ -315,6 +329,11 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
           offersText: body.offersText ?? null,
           neverText: body.neverText ?? null,
           profileEmbedding: embedding,
+          wantsEmbedding: matchEmbeds.wantsEmbedding,
+          offersEmbedding: matchEmbeds.offersEmbedding,
+          ...(matchEmbeds.matchEmbeddingsAt
+            ? { matchEmbeddingsAt: matchEmbeds.matchEmbeddingsAt }
+            : {}),
           updatedAt: new Date(),
         })
         .where(eq(users.id, user.id));

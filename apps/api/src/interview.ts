@@ -129,3 +129,32 @@ export function buildProfileEmbeddingText(input: {
     .filter(Boolean)
     .join('\n');
 }
+
+/** Wants vector text — never includes never_text or private rules. */
+export function buildWantsEmbeddingText(input: {
+  wantsText?: string | null;
+  directoryRole?: string | null;
+  directoryTags?: string[] | null;
+}): string {
+  const tags = (input.directoryTags ?? []).filter(Boolean).join(', ');
+  return [input.wantsText, input.directoryRole, tags].filter(Boolean).join('\n');
+}
+
+/**
+ * Offers vector text. When offers_text is empty (common from the synthesizer
+ * fallback), use bio + role + tags so matching still has signal.
+ * Never includes never_text or private rules.
+ */
+export function buildOffersEmbeddingText(input: {
+  offersText?: string | null;
+  bio?: string | null;
+  directoryRole?: string | null;
+  directoryTags?: string[] | null;
+}): string {
+  const tags = (input.directoryTags ?? []).filter(Boolean).join(', ');
+  const offers = input.offersText?.trim();
+  if (offers) {
+    return [offers, input.directoryRole, tags].filter(Boolean).join('\n');
+  }
+  return [input.bio, input.directoryRole, tags].filter(Boolean).join('\n');
+}

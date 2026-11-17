@@ -15,6 +15,7 @@ import {
   updateMemoryDirectoryUserForTests,
   validateDirectoryTags,
 } from '../directory.js';
+import { computeMatchEmbeddings } from '../match-embeddings.js';
 import { consumePostgresRateLimit, retryAfterSeconds } from '../rate-limit.js';
 
 const DIRECTORY_IP_LIMIT = 60;
@@ -171,6 +172,34 @@ export async function registerDirectoryRoutes(app: FastifyInstance): Promise<voi
     const memoryUpdated = updateMemoryDirectoryUserForTests(user.id, patch);
     if (!memoryUpdated) {
       const db = getDb();
+      const needsMatchEmbeds =
+        patch.directoryOptIn &&
+        (!(user as { wantsEmbedding?: number[] | null }).wantsEmbedding ||
+          !(user as { offersEmbedding?: number[] | null }).offersEmbedding);
+      let matchPatch: Record<string, unknown> = {};
+      if (needsMatchEmbeds) {
+        const full = await db.select().from(users).where(eq(users.id, user.id)).limit(1);
+        const row = full[0];
+        if (row) {
+          const embeds = await computeMatchEmbeddings({
+            userId: row.id,
+            fields: {
+              wantsText: row.wantsText,
+              offersText: row.offersText,
+              bio: row.bio,
+              directoryRole: patch.directoryRole,
+              directoryTags: patch.directoryTags,
+            },
+            previousWants: row.wantsEmbedding,
+            previousOffers: row.offersEmbedding,
+          });
+          matchPatch = {
+            wantsEmbedding: embeds.wantsEmbedding,
+            offersEmbedding: embeds.offersEmbedding,
+            ...(embeds.matchEmbeddingsAt ? { matchEmbeddingsAt: embeds.matchEmbeddingsAt } : {}),
+          };
+        }
+      }
       await db
         .update(users)
         .set({
@@ -180,6 +209,7 @@ export async function registerDirectoryRoutes(app: FastifyInstance): Promise<voi
           directoryTags: patch.directoryTags,
           directoryPromptDismissedAt: patch.directoryPromptDismissedAt,
           updatedAt: patch.updatedAt,
+          ...matchPatch,
         })
         .where(eq(users.id, user.id));
     }

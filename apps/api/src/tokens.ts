@@ -14,6 +14,14 @@ export type HelpfulTokenPayload = {
   exp: number;
 };
 
+export type MatchAction = 'accept' | 'decline';
+
+export type MatchTokenPayload = {
+  matchId: string;
+  action: MatchAction;
+  exp: number;
+};
+
 export const EMAIL_LINK_SECRET_MIN_LENGTH = 32;
 
 /**
@@ -163,6 +171,66 @@ export function verifyHelpfulToken(
   }
 
   if (payload.requestId !== expected.requestId || payload.helpful !== expected.helpful) {
+    return { ok: false, error: 'Token mismatch' };
+  }
+
+  return { ok: true, payload };
+}
+
+export function createMatchToken(
+  payload: Omit<MatchTokenPayload, 'exp'> & { exp?: number },
+  options?: { env?: NodeJS.ProcessEnv; ttlSeconds?: number; now?: number },
+): string {
+  const ttlSeconds = options?.ttlSeconds ?? 60 * 60 * 24 * 7; // 7d
+  const now = options?.now ?? Math.floor(Date.now() / 1000);
+  const full: MatchTokenPayload = {
+    matchId: payload.matchId,
+    action: payload.action,
+    exp: payload.exp ?? now + ttlSeconds,
+  };
+  const body = encodeJson(full);
+  const signature = sign(body, resolveEmailLinkSecret(options?.env));
+  return `${body}.${signature}`;
+}
+
+export function verifyMatchToken(
+  token: string,
+  expected: { matchId: string; action: MatchAction },
+  options?: { env?: NodeJS.ProcessEnv; now?: number },
+): { ok: true; payload: MatchTokenPayload } | { ok: false; error: string } {
+  const [body, signature] = token.split('.');
+  if (!body || !signature) {
+    return { ok: false, error: 'Malformed token' };
+  }
+
+  let secret: string;
+  try {
+    secret = resolveEmailLinkSecret(options?.env);
+  } catch {
+    return { ok: false, error: 'Signing secret not configured' };
+  }
+
+  if (!verifySignature(body, signature, secret)) {
+    return { ok: false, error: 'Invalid signature' };
+  }
+
+  let payload: MatchTokenPayload;
+  try {
+    payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8')) as MatchTokenPayload;
+  } catch {
+    return { ok: false, error: 'Invalid payload' };
+  }
+
+  if (!payload.matchId || (payload.action !== 'accept' && payload.action !== 'decline')) {
+    return { ok: false, error: 'Invalid payload' };
+  }
+
+  const now = options?.now ?? Math.floor(Date.now() / 1000);
+  if (typeof payload.exp !== 'number' || payload.exp < now) {
+    return { ok: false, error: 'Token expired' };
+  }
+
+  if (payload.matchId !== expected.matchId || payload.action !== expected.action) {
     return { ok: false, error: 'Token mismatch' };
   }
 

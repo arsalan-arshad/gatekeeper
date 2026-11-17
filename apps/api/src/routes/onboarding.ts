@@ -12,6 +12,7 @@ import {
 } from '../interview.js';
 import { createLlm } from '../llm.js';
 import { DIRECTORY_ROLE_MAX, validateDirectoryTags } from '../directory.js';
+import { computeMatchEmbeddings } from '../match-embeddings.js';
 import { HANDLE_TAKEN_ERROR, replyForHandleClaimError } from '../pg-errors.js';
 
 const answersSchema = z.object({
@@ -178,6 +179,26 @@ export async function registerOnboardingRoutes(app: FastifyInstance): Promise<vo
       directoryPatch.directoryTags = [];
     }
 
+    const matchEmbedUserId = existing?.id ?? body.email;
+    const matchEmbeds = await computeMatchEmbeddings({
+      userId: matchEmbedUserId,
+      fields: {
+        wantsText: body.wantsText,
+        offersText: body.offersText,
+        bio: body.bio,
+        directoryRole:
+          directoryPatch.directoryRole !== undefined
+            ? directoryPatch.directoryRole
+            : (existing?.directoryRole ?? null),
+        directoryTags:
+          directoryPatch.directoryTags !== undefined
+            ? directoryPatch.directoryTags
+            : (existing?.directoryTags ?? []),
+      },
+      previousWants: existing?.wantsEmbedding,
+      previousOffers: existing?.offersEmbedding,
+    });
+
     const values = {
       handle,
       name: body.name,
@@ -187,6 +208,11 @@ export async function registerOnboardingRoutes(app: FastifyInstance): Promise<vo
       offersText: body.offersText ?? null,
       neverText: body.neverText ?? null,
       profileEmbedding: embedding,
+      wantsEmbedding: matchEmbeds.wantsEmbedding,
+      offersEmbedding: matchEmbeds.offersEmbedding,
+      ...(matchEmbeds.matchEmbeddingsAt
+        ? { matchEmbeddingsAt: matchEmbeds.matchEmbeddingsAt }
+        : {}),
       updatedAt: new Date(),
       ...directoryPatch,
     };
