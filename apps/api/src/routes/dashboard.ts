@@ -29,8 +29,17 @@ import {
   type InterviewAnswers,
 } from '../interview.js';
 import { countInboxFilters, matchesInboxFilter, type InboxFilter } from '../inbox-status.js';
+import { resolveIntroContactEmail } from '../contact-email.js';
 import { computeMatchEmbeddings } from '../match-embeddings.js';
+import { sendIntroEmailToBoth } from '../opt-in.js';
+import {
+  claimOutboundEmailSlot,
+  OUTBOUND_EMAIL_TYPES,
+  releaseOutboundEmailSlot,
+} from '../outbound-email.js';
 import { HANDLE_TAKEN_ERROR, replyForHandleClaimError } from '../pg-errors.js';
+import { consumePostgresRateLimit, retryAfterSeconds } from '../rate-limit.js';
+import { EmailSendError } from '../email.js';
 
 const filterSchema = z.enum(['all', 'accepted', 'rejected', 'spam']).default('all');
 
@@ -55,7 +64,8 @@ const testMessageSchema = z.object({
 });
 
 const settingsSchema = z.object({
-  notificationEmailMode: z.enum(['instant', 'daily_digest', 'off']),
+  notificationEmailMode: z.enum(['instant', 'daily_digest', 'off']).optional(),
+  introContactEmail: z.string().email().nullable().optional(),
 });
 
 const overrideSchema = z.object({
@@ -138,16 +148,81 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
       .limit(1);
     if (!row) return reply.status(404).send({ error: 'Request not found' });
 
+    const contactEmail = await resolveIntroContactEmail(user);
     // Conditional UPDATE … WHERE owner_decision IS NULL; email only if claim wins.
     const result = await approveInboxRequest({
       requestId: id,
-      owner: { id: user.id, email: user.email, name: user.name },
+      owner: { id: user.id, email: contactEmail, name: user.name },
       send: createEmailSender(),
     });
     if (!result.ok) {
       return reply.status(result.status).send({ error: result.error });
     }
-    return { ok: true, status: result.status };
+    return { ok: true, status: result.status, introEmail: result.introEmail };
+  });
+
+  app.post('/v1/dashboard/inbox/:id/resend-intro', async (request, reply) => {
+    const email = request.gatekeeperEmail;
+    if (!email) return reply.status(401).send({ error: 'Unauthorized' });
+
+    const { id } = request.params as { id: string };
+    const user = await loadOwner(email);
+    if (!user) return reply.status(404).send({ error: 'Complete onboarding first' });
+
+    const db = getDb();
+    const [row] = await db
+      .select()
+      .from(requests)
+      .where(and(eq(requests.id, id), eq(requests.targetUserId, user.id)))
+      .limit(1);
+    if (!row) return reply.status(404).send({ error: 'Request not found' });
+    if (row.status !== 'accepted' && row.ownerDecision !== 'accept') {
+      return reply.status(409).send({ error: 'Request not accepted' });
+    }
+
+    const limit = await consumePostgresRateLimit(
+      `inbox-intro-resend:${id}`,
+      3,
+      24 * 60 * 60 * 1000,
+    );
+    if (!limit.ok) {
+      reply.header('retry-after', retryAfterSeconds(limit.resetMs));
+      return reply.status(429).send({
+        error: 'Resend rate limit exceeded',
+        retry_after_ms: limit.resetMs,
+      });
+    }
+
+    const slot = await claimOutboundEmailSlot({
+      requestId: id,
+      emailType: OUTBOUND_EMAIL_TYPES.introConnected,
+    });
+    if (!slot.claimed) {
+      return { ok: true, introEmail: 'skipped' as const };
+    }
+
+    const contactEmail = await resolveIntroContactEmail(user);
+    try {
+      await sendIntroEmailToBoth(createEmailSender(), {
+        receiverEmail: contactEmail,
+        receiverName: user.name,
+        senderEmail: row.senderContact,
+        senderName: row.senderName,
+        message: row.message,
+        requestId: id,
+        ownerId: user.id,
+      });
+      return { ok: true, introEmail: 'sent' as const };
+    } catch (error) {
+      if (error instanceof EmailSendError) {
+        await releaseOutboundEmailSlot({
+          requestId: id,
+          emailType: OUTBOUND_EMAIL_TYPES.introConnected,
+        });
+        return { ok: true, introEmail: 'failed' as const };
+      }
+      throw error;
+    }
   });
 
   app.post('/v1/dashboard/inbox/:id/decline', async (request, reply) => {
@@ -465,6 +540,7 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
       notificationEmailMode: user.notificationEmailMode,
       email: user.email,
       handle: user.handle,
+      introContactEmail: user.introContactEmail,
       directoryOptIn: user.directoryOptIn,
       directoryRole: user.directoryRole,
       directoryTags: user.directoryTags ?? [],
@@ -484,13 +560,31 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
     const user = await loadOwner(email);
     if (!user) return reply.status(404).send({ error: 'Complete onboarding first' });
 
-    const db = getDb();
-    await db
-      .update(users)
-      .set({ notificationEmailMode: parsed.data.notificationEmailMode })
-      .where(eq(users.id, user.id));
+    const patch: {
+      notificationEmailMode?: 'instant' | 'daily_digest' | 'off';
+      introContactEmail?: string | null;
+    } = {};
+    if (parsed.data.notificationEmailMode !== undefined) {
+      patch.notificationEmailMode = parsed.data.notificationEmailMode;
+    }
+    if (parsed.data.introContactEmail !== undefined) {
+      patch.introContactEmail = parsed.data.introContactEmail
+        ? parsed.data.introContactEmail.trim().toLowerCase()
+        : null;
+    }
+    if (Object.keys(patch).length === 0) {
+      return reply.status(400).send({ error: 'No settings to update' });
+    }
 
-    return { ok: true, notificationEmailMode: parsed.data.notificationEmailMode };
+    const db = getDb();
+    await db.update(users).set(patch).where(eq(users.id, user.id));
+
+    return {
+      ok: true,
+      notificationEmailMode: patch.notificationEmailMode ?? user.notificationEmailMode,
+      introContactEmail:
+        patch.introContactEmail !== undefined ? patch.introContactEmail : user.introContactEmail,
+    };
   });
 
   app.get('/v1/dashboard/export', async (request, reply) => {
@@ -532,6 +626,7 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
         neverText: user.neverText,
         plan: user.plan,
         notificationEmailMode: user.notificationEmailMode,
+        introContactEmail: user.introContactEmail,
         directoryOptIn: user.directoryOptIn,
         directoryRole: user.directoryRole,
         directoryTags: user.directoryTags ?? [],

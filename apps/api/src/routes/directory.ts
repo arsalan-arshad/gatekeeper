@@ -10,6 +10,7 @@ import {
   directoryQuerySchema,
   directoryUpdateSchema,
   findMemoryDirectoryByEmailForTests,
+  isMemoryDirectoryEnabledForTests,
   listDirectory,
   parseDirectoryTagsQuery,
   updateMemoryDirectoryUserForTests,
@@ -24,6 +25,7 @@ const DIRECTORY_IP_WINDOW_MS = 60_000;
 async function loadOwnerByEmail(email: string) {
   const memory = findMemoryDirectoryByEmailForTests(email);
   if (memory) return memory;
+  if (isMemoryDirectoryEnabledForTests()) return null;
   const db = getDb();
   const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
   return user ?? null;

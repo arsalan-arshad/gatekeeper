@@ -82,6 +82,11 @@ export const users = pgTable('users', {
     dimensions: PROFILE_EMBEDDING_DIMENSIONS,
   }),
   matchEmbeddingsAt: timestamp('match_embeddings_at', { withTimezone: true }),
+  /**
+   * Optional contact email for intros. When null or unverified, login email is used.
+   * Never returned by public/directory/match endpoints.
+   */
+  introContactEmail: text('intro_contact_email'),
   /** Profile last update — used for sitemap lastmod on `/@handle`. */
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });

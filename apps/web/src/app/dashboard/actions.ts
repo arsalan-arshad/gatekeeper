@@ -191,14 +191,32 @@ export async function acceptMatch(id: string) {
   const email = await requireEmail();
   if (!email) return { error: 'Sign in required' };
   try {
-    await apiFetch(`/v1/dashboard/matches/${id}/accept`, {
+    const data = await apiFetch<{
+      ok: true;
+      status: 'accepted';
+      introEmail?: 'sent' | 'failed' | 'skipped';
+    }>(`/v1/dashboard/matches/${id}/accept`, {
       method: 'POST',
       email,
       body: '{}',
     });
-    return { ok: true as const };
+    return data;
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Accept failed' };
+  }
+}
+
+export async function resendMatchIntro(id: string) {
+  const email = await requireEmail();
+  if (!email) return { error: 'Sign in required' };
+  try {
+    const data = await apiFetch<{ ok: true; introEmail: 'sent' | 'failed' | 'skipped' }>(
+      `/v1/dashboard/matches/${id}/resend-intro`,
+      { method: 'POST', email, body: '{}' },
+    );
+    return data;
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Resend failed' };
   }
 }
 

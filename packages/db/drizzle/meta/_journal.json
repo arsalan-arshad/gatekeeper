@@ -120,6 +120,13 @@
       "when": 1795800000000,
       "tag": "0016_intro_matches",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1795900000000,
+      "tag": "0017_intro_contact_email",
+      "breakpoints": true
     }
   ]
 }

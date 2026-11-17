@@ -239,6 +239,10 @@ export function useMemoryDirectoryForTests(enabled = true): void {
   memorySuppressed = new Set();
 }
 
+export function isMemoryDirectoryEnabledForTests(): boolean {
+  return memoryDirectory !== null;
+}
+
 export function resetMemoryDirectoryForTests(): void {
   if (memoryDirectory) memoryDirectory = [];
   memorySuppressed = new Set();

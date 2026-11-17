@@ -79,14 +79,20 @@ export function MatchesClient({
                       setError(null);
                       startTransition(async () => {
                         const result = await acceptMatch(item.matchId);
-                        if (result.error) {
+                        if ('error' in result && result.error) {
                           setError(
                             result.error === 'Already decided' ? 'Already decided' : result.error,
                           );
                           return;
                         }
                         setResolvedIncoming((prev) => new Set(prev).add(item.matchId));
-                        setMessage('Intro accepted.');
+                        if ('introEmail' in result && result.introEmail === 'failed') {
+                          setMessage(
+                            "Intro accepted, but we couldn't send the email right now. Try again in a few minutes.",
+                          );
+                        } else {
+                          setMessage('Intro accepted.');
+                        }
                       });
                     }}
                   >

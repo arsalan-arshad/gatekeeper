@@ -17,12 +17,14 @@ import {
   isDirectoryExcludedEmail,
   toDirectoryPublicEntry,
 } from '../directory.js';
+import { resolveIntroContactEmail } from '../contact-email.js';
 import { createEmailSender } from '../email.js';
 import { buildMatchRequestEmail } from '../email-templates.js';
 import { isEmailSuppressed } from '../email-suppression.js';
 import { judgeRequest } from '../judge.js';
 import { createLlm } from '../llm.js';
 import { claimMatchDecision, writeMatchDismissalsBothWays } from '../match-decision.js';
+import { sendMatchIntroEmail } from '../match-intro.js';
 import { claimMatchEmailSlot, MATCH_EMAIL_TYPES } from '../match-outbound-email.js';
 import {
   emptyExclusions,
@@ -555,8 +557,84 @@ export async function registerMatchRoutes(app: FastifyInstance): Promise<void> {
       score_band: scoreBandFromSimilarity(claim.row.similarity),
     });
 
-    // Phase 3 sends the intro email; accept is durable here even if email fails later.
-    return { ok: true, status: 'accepted' as const, introEmail: 'pending' as const };
+    const db = getDb();
+    const [requester] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, claim.row.requesterId))
+      .limit(1);
+    const introEmail = requester
+      ? await sendMatchIntroEmail({
+          send: createEmailSender(),
+          matchId: claim.row.id,
+          note: claim.row.note,
+          personA: {
+            name: requester.name,
+            contactEmail: await resolveIntroContactEmail(requester),
+            summary: publicSummary(requester),
+          },
+          personB: {
+            name: user.name,
+            contactEmail: await resolveIntroContactEmail(user),
+            summary: publicSummary(user),
+          },
+        })
+      : ('failed' as const);
+
+    return { ok: true, status: 'accepted' as const, introEmail };
+  });
+
+  app.post('/v1/dashboard/matches/:id/resend-intro', async (request, reply) => {
+    const email = request.gatekeeperEmail;
+    if (!email) return reply.status(401).send({ error: 'Unauthorized' });
+    const { id } = request.params as { id: string };
+    const user = await loadOwner(email);
+    if (!user) return reply.status(404).send({ error: 'Complete onboarding first' });
+
+    const db = getDb();
+    const [row] = await db.select().from(introMatches).where(eq(introMatches.id, id)).limit(1);
+    if (!row || (row.requesterId !== user.id && row.recipientId !== user.id)) {
+      return reply.status(404).send({ error: 'Not found' });
+    }
+    if (row.status !== 'accepted') {
+      return reply.status(409).send({ error: 'Match not accepted' });
+    }
+
+    const limit = await consumePostgresRateLimit(
+      `match-intro-resend:${id}`,
+      3,
+      24 * 60 * 60 * 1000,
+    );
+    if (!limit.ok) {
+      reply.header('retry-after', retryAfterSeconds(limit.resetMs));
+      return reply.status(429).send({
+        error: 'Resend rate limit exceeded',
+        retry_after_ms: limit.resetMs,
+      });
+    }
+
+    const [requester] = await db.select().from(users).where(eq(users.id, row.requesterId)).limit(1);
+    const [recipient] = await db.select().from(users).where(eq(users.id, row.recipientId)).limit(1);
+    if (!requester || !recipient) {
+      return reply.status(404).send({ error: 'Not found' });
+    }
+
+    const introEmail = await sendMatchIntroEmail({
+      send: createEmailSender(),
+      matchId: row.id,
+      note: row.note,
+      personA: {
+        name: requester.name,
+        contactEmail: await resolveIntroContactEmail(requester),
+        summary: publicSummary(requester),
+      },
+      personB: {
+        name: recipient.name,
+        contactEmail: await resolveIntroContactEmail(recipient),
+        summary: publicSummary(recipient),
+      },
+    });
+    return { ok: true, introEmail };
   });
 
   app.post('/v1/dashboard/matches/:id/decline', async (request, reply) => {

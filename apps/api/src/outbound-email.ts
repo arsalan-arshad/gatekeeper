@@ -1,4 +1,5 @@
 import { outboundEmails } from '@gatekeeper/db';
+import { and, eq } from 'drizzle-orm';
 
 import { getDb } from './db.js';
 
@@ -67,4 +68,24 @@ export async function claimOutboundEmailSlot(input: {
     });
 
   return { claimed: inserted.length > 0 };
+}
+
+/** Release a claimed slot so a failed send can be retried. */
+export async function releaseOutboundEmailSlot(input: {
+  requestId: string;
+  emailType: OutboundEmailType | string;
+}): Promise<void> {
+  if (forceMemory || !process.env.DATABASE_URL) {
+    memorySlots.delete(slotKey(input.requestId, input.emailType));
+    return;
+  }
+  const db = getDb();
+  await db
+    .delete(outboundEmails)
+    .where(
+      and(
+        eq(outboundEmails.requestId, input.requestId),
+        eq(outboundEmails.emailType, input.emailType),
+      ),
+    );
 }
