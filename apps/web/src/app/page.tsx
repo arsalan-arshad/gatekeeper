@@ -1,6 +1,5 @@
-import Link from 'next/link';
-
 import { HeroDemo } from '@/components/hero-demo';
+import { LandingCta } from '@/components/landing-cta';
 import { LandingSections } from '@/components/landing-sections';
 import { SiteFooter } from '@/components/site-footer';
 import { SiteNav } from '@/components/site-nav';
@@ -92,12 +91,7 @@ export default function HomePage() {
               {BRAND.summary}
             </p>
             <div className="animate-rise-delay-2 mt-8 flex flex-wrap items-center gap-4">
-              <Link
-                href="/start"
-                className="rounded-md bg-[var(--accent)] px-5 py-3 text-sm font-semibold text-[#062015] transition hover:brightness-110"
-              >
-                Start free
-              </Link>
+              <LandingCta appearance="button" />
               <a
                 href="#try"
                 className="text-sm text-[var(--muted)] underline decoration-[var(--accent-deep)] underline-offset-4 hover:text-[var(--fg)]"

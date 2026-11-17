@@ -1,5 +1,6 @@
 import Link from 'next/link';
 
+import { LandingCta } from '@/components/landing-cta';
 import { BRAND, studioLink } from '@/lib/brand';
 
 export function SiteFooter() {
@@ -14,9 +15,7 @@ export function SiteFooter() {
           </p>
         </div>
         <div className="flex flex-wrap gap-x-8 gap-y-3">
-          <Link href="/start" className="hover:text-[var(--fg)]">
-            Start free
-          </Link>
+          <LandingCta appearance="link" className="hover:text-[var(--fg)]" />
           <Link href="/@demo" className="hover:text-[var(--fg)]">
             Try @demo
           </Link>

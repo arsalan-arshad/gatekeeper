@@ -1,13 +1,14 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 
 import { auth } from '@/auth';
 import { AnalyticsIdentify } from '@/components/analytics-identify';
-import { CopyHandleLink } from '@/components/copy-handle-link';
 import { MagicLinkForm } from '@/components/magic-link-form';
 import { SignOutButton } from '@/components/sign-out-button';
 import { SiteFooter } from '@/components/site-footer';
 import { apiFetch } from '@/lib/api';
 import { publicPageMetadata } from '@/lib/seo';
+import { resolveStartDestination } from '@/lib/start-flow';
 
 import { InterviewClient } from './interview-client';
 
@@ -28,7 +29,7 @@ export default async function StartPage({
   const params = await searchParams;
   const redo = params.redo === '1' || params.redo === 'true';
 
-  let onboardedHandle: string | null = null;
+  let hasPublishedHandle = false;
   let userId: string | null = null;
   if (email) {
     try {
@@ -37,12 +38,22 @@ export default async function StartPage({
         user: { id: string; handle: string } | null;
       }>('/v1/onboarding/me', { email });
       if (me.onboarded && me.user) {
-        onboardedHandle = me.user.handle;
+        hasPublishedHandle = true;
         userId = me.user.id;
       }
     } catch {
-      onboardedHandle = null;
+      hasPublishedHandle = false;
     }
+  }
+
+  const destination = resolveStartDestination({
+    signedIn: Boolean(email),
+    hasPublishedHandle,
+    redo,
+  });
+
+  if (destination === 'dashboard') {
+    redirect('/dashboard');
   }
 
   return (
@@ -54,7 +65,7 @@ export default async function StartPage({
         {email ? <SignOutButton className="text-sm text-[var(--muted)] underline" /> : null}
       </div>
 
-      {!email ? (
+      {destination === 'magic_link' ? (
         <>
           <div>
             <h1 className="text-4xl" style={{ fontFamily: 'var(--font-display), Georgia, serif' }}>
@@ -67,38 +78,6 @@ export default async function StartPage({
           </div>
           <MagicLinkForm />
         </>
-      ) : onboardedHandle && !redo ? (
-        <div className="flex flex-col gap-5">
-          <h1 className="text-4xl" style={{ fontFamily: 'var(--font-display), Georgia, serif' }}>
-            You&apos;re live as @{onboardedHandle}
-          </h1>
-          <p className="max-w-xl text-[var(--muted)]">
-            Your Gatekeeper is published. Manage intros from the dashboard or share your public
-            page.
-          </p>
-          <div className="flex flex-wrap items-center gap-3">
-            <Link
-              href="/dashboard"
-              className="rounded-md bg-[var(--accent)] px-4 py-2 font-medium text-black"
-            >
-              Dashboard
-            </Link>
-            <Link
-              href={`/@${onboardedHandle}`}
-              className="rounded-md border border-white/15 px-4 py-2 font-medium"
-            >
-              Public page
-            </Link>
-            <CopyHandleLink handle={onboardedHandle} />
-          </div>
-          <p className="text-sm text-[var(--muted)]">
-            Need a fresh interview?{' '}
-            <Link href="/start?redo=1" className="text-[var(--accent)] underline">
-              Redo interview
-            </Link>{' '}
-            (optional — not the default).
-          </p>
-        </div>
       ) : (
         <>
           <div>
@@ -109,7 +88,8 @@ export default async function StartPage({
               Answer five questions, edit the plain-English rules, and publish.
             </p>
           </div>
-          <InterviewClient email={email} />
+          {/* Sessioned users always land on interview — never the magic-link form. */}
+          <InterviewClient email={email!} />
         </>
       )}
       {userId ? <AnalyticsIdentify userId={userId} /> : null}

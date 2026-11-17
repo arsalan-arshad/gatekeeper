@@ -145,6 +145,7 @@ export async function registerOnboardingRoutes(app: FastifyInstance): Promise<vo
       offersText: body.offersText ?? null,
       neverText: body.neverText ?? null,
       profileEmbedding: embedding,
+      updatedAt: new Date(),
     };
 
     let userId: string;
