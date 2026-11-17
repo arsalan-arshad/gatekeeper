@@ -267,6 +267,40 @@ export function buildSenderVerifyEmail(input: {
   return { subject, html, text };
 }
 
+export function buildIntroContactVerifyEmail(input: {
+  name: string;
+  verifyUrl: string;
+  env?: NodeJS.ProcessEnv;
+}): { subject: string; html: string; text: string } {
+  const links = getEmailBrandLinks(input.env);
+  const subject = sanitizeEmailSubject('Confirm your Gatekeeper intro email');
+  const text = [
+    `Hi ${input.name},`,
+    '',
+    'Confirm this address to use it on Gatekeeper intro emails.',
+    'Until you confirm, intros keep using your login email.',
+    '',
+    `Confirm (valid 24h): ${input.verifyUrl}`,
+    '',
+    "If you didn't request this, you can ignore this email.",
+    footerText(links),
+  ].join('\n');
+  const html = layoutHtml({
+    title: 'Confirm intro email',
+    links,
+    bodyHtml: `
+      <p style="margin:0 0 12px;line-height:1.55;color:#c9d6cf;">Hi ${escapeHtml(input.name)},</p>
+      <p style="margin:0 0 16px;line-height:1.55;color:#c9d6cf;">
+        Confirm this address to use it on Gatekeeper intros. Until then, your login email is used.
+      </p>
+      <p style="margin:0 0 12px;">${buttonHtml(input.verifyUrl, 'Confirm intro email')}</p>
+      <p style="margin:16px 0 0;font-size:13px;color:#8fa399;word-break:break-all;">${escapeHtml(input.verifyUrl)}</p>
+      <p style="margin:16px 0 0;font-size:13px;line-height:1.5;color:#8fa399;">If you didn&apos;t request this, you can ignore this email.</p>
+    `,
+  });
+  return { subject, html, text };
+}
+
 export function buildDeclineAutoReplyEmail(input: {
   senderName: string;
   receiverName: string;

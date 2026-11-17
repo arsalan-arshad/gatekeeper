@@ -37,6 +37,9 @@ export default async function SettingsPage() {
         initialMode={data.notificationEmailMode}
         email={data.email}
         handle={data.handle}
+        initialIntroContactEmail={data.introContactEmail}
+        initialIntroContactVerified={data.introContactVerified}
+        initialIntroContactNeedsVerification={data.introContactNeedsVerification}
         initialDirectoryOptIn={data.directoryOptIn}
         initialDirectoryRole={data.directoryRole}
         initialDirectoryTags={data.directoryTags}

@@ -16,6 +16,9 @@ export async function loadSettings() {
       notificationEmailMode: 'instant' | 'daily_digest' | 'off';
       email: string;
       handle: string;
+      introContactEmail: string | null;
+      introContactVerified: boolean;
+      introContactNeedsVerification: boolean;
       directoryOptIn: boolean;
       directoryRole: string | null;
       directoryTags: string[];
@@ -47,18 +50,44 @@ export async function saveDirectorySettings(input: {
   }
 }
 
-export async function saveSettings(notificationEmailMode: 'instant' | 'daily_digest' | 'off') {
+export async function saveSettings(input: {
+  notificationEmailMode?: 'instant' | 'daily_digest' | 'off';
+  introContactEmail?: string | null;
+}) {
   const email = await requireEmail();
   if (!email) return { error: 'Sign in required' };
   try {
-    await apiFetch('/v1/dashboard/settings', {
+    const data = await apiFetch<{
+      ok: true;
+      introContactNeedsVerification?: boolean;
+      verificationEmailSent?: boolean;
+    }>('/v1/dashboard/settings', {
       method: 'PUT',
       email,
-      body: JSON.stringify({ notificationEmailMode }),
+      body: JSON.stringify(input),
+    });
+    return {
+      ok: true as const,
+      introContactNeedsVerification: data.introContactNeedsVerification,
+      verificationEmailSent: data.verificationEmailSent,
+    };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Save failed' };
+  }
+}
+
+export async function resendIntroContactVerify() {
+  const email = await requireEmail();
+  if (!email) return { error: 'Sign in required' };
+  try {
+    await apiFetch('/v1/dashboard/settings/intro-contact/resend-verify', {
+      method: 'POST',
+      email,
+      body: '{}',
     });
     return { ok: true as const };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : 'Save failed' };
+    return { error: error instanceof Error ? error.message : 'Resend failed' };
   }
 }
 

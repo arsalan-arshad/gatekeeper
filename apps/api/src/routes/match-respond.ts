@@ -144,12 +144,12 @@ export async function registerMatchRespondRoutes(app: FastifyInstance): Promise<
         note: result.row.note,
         personA: {
           name: requester.name,
-          contactEmail: await resolveIntroContactEmail(requester),
+          contactEmail: resolveIntroContactEmail(requester),
           summary: publicSummary(requester),
         },
         personB: {
           name: recipient.name,
-          contactEmail: await resolveIntroContactEmail(recipient),
+          contactEmail: resolveIntroContactEmail(recipient),
           summary: publicSummary(recipient),
         },
       });

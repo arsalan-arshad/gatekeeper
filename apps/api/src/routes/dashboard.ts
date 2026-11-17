@@ -29,7 +29,11 @@ import {
   type InterviewAnswers,
 } from '../interview.js';
 import { countInboxFilters, matchesInboxFilter, type InboxFilter } from '../inbox-status.js';
-import { resolveIntroContactEmail } from '../contact-email.js';
+import {
+  introContactNeedsVerification,
+  resolveIntroContactEmail,
+  sendIntroContactVerificationEmail,
+} from '../contact-email.js';
 import { computeMatchEmbeddings } from '../match-embeddings.js';
 import { sendIntroEmailToBoth } from '../opt-in.js';
 import {
@@ -148,7 +152,7 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
       .limit(1);
     if (!row) return reply.status(404).send({ error: 'Request not found' });
 
-    const contactEmail = await resolveIntroContactEmail(user);
+    const contactEmail = resolveIntroContactEmail(user);
     // Conditional UPDATE … WHERE owner_decision IS NULL; email only if claim wins.
     const result = await approveInboxRequest({
       requestId: id,
@@ -201,7 +205,7 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
       return { ok: true, introEmail: 'skipped' as const };
     }
 
-    const contactEmail = await resolveIntroContactEmail(user);
+    const contactEmail = resolveIntroContactEmail(user);
     try {
       await sendIntroEmailToBoth(createEmailSender(), {
         receiverEmail: contactEmail,
@@ -541,6 +545,12 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
       email: user.email,
       handle: user.handle,
       introContactEmail: user.introContactEmail,
+      introContactVerified: Boolean(
+        user.introContactEmail &&
+        user.introContactEmail.toLowerCase() !== user.email.toLowerCase() &&
+        user.introContactVerifiedAt,
+      ),
+      introContactNeedsVerification: introContactNeedsVerification(user),
       directoryOptIn: user.directoryOptIn,
       directoryRole: user.directoryRole,
       directoryTags: user.directoryTags ?? [],
@@ -563,15 +573,44 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
     const patch: {
       notificationEmailMode?: 'instant' | 'daily_digest' | 'off';
       introContactEmail?: string | null;
+      introContactVerifiedAt?: Date | null;
     } = {};
     if (parsed.data.notificationEmailMode !== undefined) {
       patch.notificationEmailMode = parsed.data.notificationEmailMode;
     }
+
+    let verifyEmail: string | null = null;
     if (parsed.data.introContactEmail !== undefined) {
-      patch.introContactEmail = parsed.data.introContactEmail
+      const login = user.email.trim().toLowerCase();
+      const nextRaw = parsed.data.introContactEmail
         ? parsed.data.introContactEmail.trim().toLowerCase()
         : null;
+      // Same as login → clear alternate (login is already proven by magic link).
+      const next = nextRaw && nextRaw !== login ? nextRaw : null;
+      const previous = user.introContactEmail?.trim().toLowerCase() || null;
+
+      if (next) {
+        const dbCheck = getDb();
+        const [taken] = await dbCheck
+          .select({ id: users.id })
+          .from(users)
+          .where(eq(users.email, next))
+          .limit(1);
+        if (taken && taken.id !== user.id) {
+          return reply
+            .status(409)
+            .send({ error: 'That email belongs to another Gatekeeper account' });
+        }
+      }
+
+      patch.introContactEmail = next;
+      if (next !== previous) {
+        // Ownership must be re-proven for any new alternate address.
+        patch.introContactVerifiedAt = null;
+        if (next) verifyEmail = next;
+      }
     }
+
     if (Object.keys(patch).length === 0) {
       return reply.status(400).send({ error: 'No settings to update' });
     }
@@ -579,12 +618,63 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
     const db = getDb();
     await db.update(users).set(patch).where(eq(users.id, user.id));
 
+    let verificationSent = false;
+    if (verifyEmail) {
+      const result = await sendIntroContactVerificationEmail({
+        send: createEmailSender(),
+        userId: user.id,
+        name: user.name,
+        introContactEmail: verifyEmail,
+      });
+      verificationSent = result.sent;
+    }
+
+    const effectiveIntro =
+      patch.introContactEmail !== undefined ? patch.introContactEmail : user.introContactEmail;
+    const effectiveVerifiedAt =
+      patch.introContactVerifiedAt !== undefined
+        ? patch.introContactVerifiedAt
+        : user.introContactVerifiedAt;
+
     return {
       ok: true,
       notificationEmailMode: patch.notificationEmailMode ?? user.notificationEmailMode,
-      introContactEmail:
-        patch.introContactEmail !== undefined ? patch.introContactEmail : user.introContactEmail,
+      introContactEmail: effectiveIntro,
+      introContactVerified: Boolean(
+        effectiveIntro &&
+        effectiveIntro.toLowerCase() !== user.email.toLowerCase() &&
+        effectiveVerifiedAt,
+      ),
+      introContactNeedsVerification: introContactNeedsVerification({
+        email: user.email,
+        introContactEmail: effectiveIntro,
+        introContactVerifiedAt: effectiveVerifiedAt,
+      }),
+      verificationEmailSent: verificationSent,
     };
+  });
+
+  app.post('/v1/dashboard/settings/intro-contact/resend-verify', async (request, reply) => {
+    const email = request.gatekeeperEmail;
+    if (!email) return reply.status(401).send({ error: 'Unauthorized' });
+    const user = await loadOwner(email);
+    if (!user) return reply.status(404).send({ error: 'Complete onboarding first' });
+    if (!introContactNeedsVerification(user) || !user.introContactEmail) {
+      return reply.status(409).send({ error: 'No pending intro contact verification' });
+    }
+    const result = await sendIntroContactVerificationEmail({
+      send: createEmailSender(),
+      userId: user.id,
+      name: user.name,
+      introContactEmail: user.introContactEmail,
+    });
+    if (!result.sent) {
+      if (result.reason === 'rate_limited') {
+        return reply.status(429).send({ error: 'Verification email rate limit exceeded' });
+      }
+      return reply.status(400).send({ error: 'Could not send verification email' });
+    }
+    return { ok: true, verificationEmailSent: true };
   });
 
   app.get('/v1/dashboard/export', async (request, reply) => {

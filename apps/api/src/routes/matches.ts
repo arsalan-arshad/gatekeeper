@@ -687,12 +687,12 @@ export async function registerMatchRoutes(app: FastifyInstance): Promise<void> {
           note: claim.row.note,
           personA: {
             name: requester.name,
-            contactEmail: await resolveIntroContactEmail(requester),
+            contactEmail: resolveIntroContactEmail(requester),
             summary: publicSummary(requester),
           },
           personB: {
             name: user.name,
-            contactEmail: await resolveIntroContactEmail(user),
+            contactEmail: resolveIntroContactEmail(user),
             summary: publicSummary(user),
           },
         })
@@ -742,12 +742,12 @@ export async function registerMatchRoutes(app: FastifyInstance): Promise<void> {
       note: row.note,
       personA: {
         name: requester.name,
-        contactEmail: await resolveIntroContactEmail(requester),
+        contactEmail: resolveIntroContactEmail(requester),
         summary: publicSummary(requester),
       },
       personB: {
         name: recipient.name,
-        contactEmail: await resolveIntroContactEmail(recipient),
+        contactEmail: resolveIntroContactEmail(recipient),
         summary: publicSummary(recipient),
       },
     });

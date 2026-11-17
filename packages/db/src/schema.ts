@@ -85,8 +85,12 @@ export const users = pgTable('users', {
   /**
    * Optional contact email for intros. When null or unverified, login email is used.
    * Never returned by public/directory/match endpoints.
+   * Ownership is proven via intro_contact_verified_at (user-scoped magic link) —
+   * never via the global verified_senders table.
    */
   introContactEmail: text('intro_contact_email'),
+  /** Set only after the user completes a verify link sent to intro_contact_email. */
+  introContactVerifiedAt: timestamp('intro_contact_verified_at', { withTimezone: true }),
   /** Profile last update — used for sitemap lastmod on `/@handle`. */
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
