@@ -315,6 +315,7 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
           offersText: body.offersText ?? null,
           neverText: body.neverText ?? null,
           profileEmbedding: embedding,
+          updatedAt: new Date(),
         })
         .where(eq(users.id, user.id));
     } catch (error) {

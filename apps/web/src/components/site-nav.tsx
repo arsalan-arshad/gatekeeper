@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useId, useRef, useState } from 'react';
 
+import { LandingCta } from '@/components/landing-cta';
 import { BRAND } from '@/lib/brand';
 
 function MenuIcon({ open }: { open: boolean }) {
@@ -86,12 +87,7 @@ export function SiteNav({ compact = false }: { compact?: boolean } = {}) {
               Ledger
             </Link>
           )}
-          <Link
-            href="/start"
-            className="rounded-md bg-[var(--accent)] px-3.5 py-2 text-sm font-semibold text-[#062015] transition hover:brightness-110"
-          >
-            Start free
-          </Link>
+          <LandingCta appearance="nav" />
         </div>
 
         <button
@@ -124,13 +120,11 @@ export function SiteNav({ compact = false }: { compact?: boolean } = {}) {
         <Link href="/@demo" className="hover:text-[var(--fg)]" onClick={closeMenu}>
           @demo
         </Link>
-        <Link
-          href="/start"
+        <LandingCta
+          appearance="nav"
           className="rounded-md bg-[var(--accent)] px-3.5 py-2 text-center text-sm font-semibold text-[#062015]"
-          onClick={closeMenu}
-        >
-          Start free
-        </Link>
+          onNavigate={closeMenu}
+        />
       </div>
     </nav>
   );

@@ -54,6 +54,8 @@ export const users = pgTable('users', {
   notificationEmailMode: notificationEmailModeEnum('notification_email_mode')
     .notNull()
     .default('instant'),
+  /** Profile last update — used for sitemap lastmod on `/@handle`. */
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
 /**

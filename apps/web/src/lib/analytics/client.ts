@@ -22,6 +22,7 @@ export type AnalyticsEvent =
   | 'notification_settings_saved'
   | 'data_exported'
   | 'intro_request_submitted'
+  | 'cta_clicked'
   | '$pageview';
 
 let initialized = false;
