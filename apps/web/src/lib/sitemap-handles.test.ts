@@ -1,10 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import {
-  publishedHandleSitemapEntries,
-  shouldIncludeHandleInSitemap,
-} from './sitemap-handles.ts';
+import { publishedHandleSitemapEntries, shouldIncludeHandleInSitemap } from './sitemap-handles.ts';
 
 test('sitemap includes published handle and excludes unpublished', () => {
   const updatedAt = new Date('2024-06-15T12:00:00.000Z');

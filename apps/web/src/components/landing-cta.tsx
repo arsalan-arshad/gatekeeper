@@ -4,11 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { captureEvent } from '@/lib/analytics/client';
-import {
-  resolveLandingCta,
-  type CtaVariant,
-  type LandingCtaResolved,
-} from '@/lib/landing-cta';
+import { resolveLandingCta, type CtaVariant, type LandingCtaResolved } from '@/lib/landing-cta';
 
 type Appearance = 'button' | 'link' | 'nav';
 

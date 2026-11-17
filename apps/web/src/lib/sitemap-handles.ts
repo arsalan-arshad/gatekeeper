@@ -44,9 +44,7 @@ export function publishedHandleSitemapEntries(
     if (seen.has(handle)) continue;
     seen.add(handle);
     const lastModified =
-      profile.updatedAt instanceof Date
-        ? profile.updatedAt
-        : new Date(profile.updatedAt);
+      profile.updatedAt instanceof Date ? profile.updatedAt : new Date(profile.updatedAt);
     entries.push({
       url: `${base}/@${handle}`,
       lastModified: Number.isNaN(lastModified.getTime()) ? new Date() : lastModified,

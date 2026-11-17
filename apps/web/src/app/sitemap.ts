@@ -3,10 +3,14 @@ import type { MetadataRoute } from 'next';
 import { createDb, users } from '@gatekeeper/db';
 
 import { BRAND } from '@/lib/brand';
-import {
-  publishedHandleSitemapEntries,
-  type SitemapProfile,
-} from '@/lib/sitemap-handles';
+import { publishedHandleSitemapEntries, type SitemapProfile } from '@/lib/sitemap-handles';
+
+/**
+ * Runtime-only: Railway private DATABASE_URL is available on the web
+ * service at request time, not reliably at image build. Avoid baking an
+ * empty handle list into a static sitemap.xml.
+ */
+export const dynamic = 'force-dynamic';
 
 async function loadPublishedProfiles(): Promise<SitemapProfile[]> {
   const url = process.env.DATABASE_URL?.trim();
