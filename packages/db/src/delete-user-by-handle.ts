@@ -13,12 +13,15 @@
  * Does **not** delete billing_accounts / pro_waitlist / email_suppressions /
  * verified_senders (email-keyed, shared across senders) — same as dashboard.
  *
- * Usage (prod):
+ * Usage (prod — export DATABASE_URL first; do not rely on root `.env` auto-load):
  *   # dry-run (default)
  *   DATABASE_URL='postgresql://…' pnpm --filter @gatekeeper/db db:delete-user -- arsalan-a-software-engin
  *
  *   # apply
  *   DATABASE_URL='postgresql://…' pnpm --filter @gatekeeper/db db:delete-user -- arsalan-a-software-engin --yes
+ *
+ * The `--` after the script name is required by pnpm so the handle is passed
+ * through. A lone `--` in argv (from that separator) is ignored.
  *
  * Or run the companion SQL:
  *   packages/db/scripts/delete-handle-arsalan-a-software-engin.sql
@@ -26,28 +29,28 @@
 import { eq, inArray } from 'drizzle-orm';
 
 import { authAccounts, authSessions, authUsers, authVerificationTokens } from './auth-schema.js';
+import { DELETE_USER_USAGE, parseArgs } from './delete-user-args.js';
 import { createDb } from './index.js';
 import { users } from './schema.js';
 
-function parseArgs(argv: string[]): { handle: string; yes: boolean } {
-  const positional = argv.filter((a) => !a.startsWith('-'));
-  const handle = positional[0]?.trim().toLowerCase();
-  if (!handle) {
-    throw new Error(
-      'Usage: db:delete-user -- <handle> [--yes]\n' +
-        '  Omit --yes for dry-run. DATABASE_URL is required.',
-    );
-  }
-  return { handle, yes: argv.includes('--yes') };
-}
-
 async function main() {
+  const { handle, yes, help } = parseArgs(process.argv.slice(2));
+  if (help) {
+    console.log(DELETE_USER_USAGE);
+    process.exit(0);
+  }
+  if (!handle) {
+    throw new Error(DELETE_USER_USAGE);
+  }
+
   const url = process.env.DATABASE_URL?.trim();
   if (!url) {
-    throw new Error('DATABASE_URL is required');
+    throw new Error(
+      'DATABASE_URL is required (export it before running; root .env is not auto-loaded).\n' +
+        DELETE_USER_USAGE,
+    );
   }
 
-  const { handle, yes } = parseArgs(process.argv.slice(2));
   const db = createDb(url);
 
   const [row] = await db.select().from(users).where(eq(users.handle, handle)).limit(1);
