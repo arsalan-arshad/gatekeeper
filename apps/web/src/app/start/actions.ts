@@ -5,26 +5,62 @@ import { redirect } from 'next/navigation';
 
 import { auth, signIn, signOut } from '@/auth';
 import { apiFetch } from '@/lib/api';
+import { MAGIC_LINK_SEND_FAILED_MESSAGE } from '@/lib/magic-link-email';
 
-export async function requestMagicLink(formData: FormData): Promise<void> {
+export type MagicLinkFormState = { error: string } | null;
+
+function isNextRedirect(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'digest' in error &&
+    typeof (error as { digest?: unknown }).digest === 'string' &&
+    String((error as { digest: string }).digest).startsWith('NEXT_REDIRECT')
+  );
+}
+
+function mapMagicLinkError(message: string): string {
+  if (
+    message === MAGIC_LINK_SEND_FAILED_MESSAGE ||
+    /resend/i.test(message) ||
+    message === 'Configuration' ||
+    message === 'Verification'
+  ) {
+    return MAGIC_LINK_SEND_FAILED_MESSAGE;
+  }
+  return message;
+}
+
+export async function requestMagicLink(
+  _prev: MagicLinkFormState,
+  formData: FormData,
+): Promise<MagicLinkFormState> {
   const email = String(formData.get('email') ?? '')
     .trim()
     .toLowerCase();
   if (!email) {
-    throw new Error('Email is required');
+    return { error: 'Email is required' };
   }
 
   try {
-    await signIn('resend', {
+    const result = await signIn('resend', {
       email,
       redirectTo: '/dashboard',
       redirect: false,
     });
-  } catch (error) {
-    if (error instanceof AuthError) {
-      throw new Error(error.message);
+
+    if (result && typeof result === 'object' && 'error' in result && result.error) {
+      return { error: mapMagicLinkError(String(result.error)) };
     }
-    throw error;
+  } catch (error) {
+    if (isNextRedirect(error)) throw error;
+    if (error instanceof AuthError) {
+      return { error: mapMagicLinkError(error.message) };
+    }
+    if (error instanceof Error) {
+      return { error: mapMagicLinkError(error.message) };
+    }
+    return { error: MAGIC_LINK_SEND_FAILED_MESSAGE };
   }
 
   redirect('/start/check-email');
@@ -64,6 +100,11 @@ export async function synthesizeRules(answers: {
   });
 }
 
+function formatApiError(message: string): string {
+  if (message === 'handle_taken') return 'Handle already taken';
+  return message;
+}
+
 export async function completeOnboarding(input: {
   handle: string;
   name: string;
@@ -86,7 +127,9 @@ export async function completeOnboarding(input: {
       body: JSON.stringify({ ...input, email }),
     });
   } catch (error) {
-    return { error: error instanceof Error ? error.message : 'Failed to save profile' };
+    return {
+      error: formatApiError(error instanceof Error ? error.message : 'Failed to save profile'),
+    };
   }
 
   redirect('/dashboard');

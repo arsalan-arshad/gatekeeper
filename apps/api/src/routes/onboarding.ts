@@ -11,6 +11,7 @@ import {
   type InterviewAnswers,
 } from '../interview.js';
 import { createLlm } from '../llm.js';
+import { HANDLE_TAKEN_ERROR, replyForHandleClaimError } from '../pg-errors.js';
 
 const answersSchema = z.object({
   who: z.string().min(1),
@@ -114,7 +115,7 @@ export async function registerOnboardingRoutes(app: FastifyInstance): Promise<vo
       .limit(1);
 
     if (handleTaken && handleTaken.email !== body.email.toLowerCase()) {
-      return reply.status(409).send({ error: 'Handle already taken' });
+      return reply.status(409).send({ error: HANDLE_TAKEN_ERROR });
     }
 
     let embedding: number[] | null = null;
@@ -147,16 +148,24 @@ export async function registerOnboardingRoutes(app: FastifyInstance): Promise<vo
     };
 
     let userId: string;
-    if (existing) {
-      const [updated] = await db
-        .update(users)
-        .set(values)
-        .where(eq(users.id, existing.id))
-        .returning({ id: users.id });
-      userId = updated!.id;
-    } else {
-      const [created] = await db.insert(users).values(values).returning({ id: users.id });
-      userId = created!.id;
+    try {
+      if (existing) {
+        const [updated] = await db
+          .update(users)
+          .set(values)
+          .where(eq(users.id, existing.id))
+          .returning({ id: users.id });
+        userId = updated!.id;
+      } else {
+        const [created] = await db.insert(users).values(values).returning({ id: users.id });
+        userId = created!.id;
+      }
+    } catch (error) {
+      const conflict = replyForHandleClaimError(error);
+      if (conflict) {
+        return reply.status(conflict.status).send(conflict.body);
+      }
+      throw error;
     }
 
     await db

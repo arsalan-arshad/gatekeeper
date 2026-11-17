@@ -18,6 +18,7 @@ test('robots allows public paths and disallows dashboard/auth/u', () => {
     '/e2e/',
     '/api/',
     '/start/check-email',
+    '/handle-not-found',
     '/u/',
   ]) {
     assert.ok(disallow.includes(path), `expected disallow ${path}`);

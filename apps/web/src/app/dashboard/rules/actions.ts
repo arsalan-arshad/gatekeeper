@@ -52,7 +52,8 @@ export async function saveRules(input: {
     });
     return { ok: true as const };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : 'Save failed' };
+    const message = error instanceof Error ? error.message : 'Save failed';
+    return { error: message === 'handle_taken' ? 'Handle already taken' : message };
   }
 }
 

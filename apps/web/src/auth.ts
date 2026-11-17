@@ -12,6 +12,7 @@ import Credentials from 'next-auth/providers/credentials';
 import Resend from 'next-auth/providers/resend';
 
 import { e2eSecretsEqual, isE2eLoginEnabled } from '@/lib/e2e-gate';
+import { sendMagicLinkViaResend } from '@/lib/magic-link-email';
 import { gateMagicLinkSend, MagicLinkLimiterUnavailableError } from '@/lib/magic-rate-limit';
 
 function getDb() {
@@ -74,24 +75,15 @@ const resendProvider = Resend({
       return;
     }
 
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${provider.apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: provider.from,
-        to: identifier,
-        subject: content.subject,
-        html: content.html,
-        text: content.text,
-      }),
+    await sendMagicLinkViaResend({
+      identifier,
+      url,
+      apiKey: String(provider.apiKey),
+      from: String(provider.from),
+      subject: content.subject,
+      html: content.html,
+      text: content.text,
     });
-
-    if (!response.ok) {
-      throw new Error(`Resend error: ${await response.text()}`);
-    }
   },
 });
 
