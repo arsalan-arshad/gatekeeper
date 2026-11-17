@@ -1,12 +1,18 @@
 'use client';
 
-import { requestMagicLink } from '@/app/start/actions';
+import { useActionState } from 'react';
+
+import { requestMagicLink, type MagicLinkFormState } from '@/app/start/actions';
 import { captureEvent } from '@/lib/analytics/client';
 
+const initialState: MagicLinkFormState = null;
+
 export function MagicLinkForm() {
+  const [state, formAction, pending] = useActionState(requestMagicLink, initialState);
+
   return (
     <form
-      action={requestMagicLink}
+      action={formAction}
       onSubmit={() => {
         captureEvent('signup_started');
       }}
@@ -22,11 +28,13 @@ export function MagicLinkForm() {
           className="mt-2 w-full rounded-md border border-white/15 bg-black/30 px-3 py-2"
         />
       </label>
+      {state?.error ? <p className="text-sm text-red-300">{state.error}</p> : null}
       <button
         type="submit"
-        className="w-fit rounded-md bg-[var(--accent)] px-4 py-2 font-medium text-black"
+        disabled={pending}
+        className="w-fit rounded-md bg-[var(--accent)] px-4 py-2 font-medium text-black disabled:opacity-60"
       >
-        Email me a magic link
+        {pending ? 'Sending…' : 'Email me a magic link'}
       </button>
     </form>
   );

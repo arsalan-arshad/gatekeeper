@@ -52,8 +52,10 @@ export async function generateMetadata({
   const { handle } = await params;
   const data = await getPublicUser(handle);
   if (!data) {
-    // Title only — root layout no longer carries homepage canonical/OG, and
-    // robots come from Next's automatic 404 `noindex` + X-Robots-Tag (no duplicate meta).
+    // Title only — no homepage canonical/OG. Next injects a single
+    // `<meta name="robots" content="noindex">` on not-found; nofollow is on
+    // `X-Robots-Tag: noindex, nofollow` from middleware (do not set robots here
+    // or Next duplicates the meta tag).
     return { title: 'Not found · Gatekeeper' };
   }
   const { user } = data;

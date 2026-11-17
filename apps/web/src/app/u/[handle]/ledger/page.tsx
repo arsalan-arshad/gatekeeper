@@ -71,7 +71,8 @@ export async function generateMetadata({
   const normalized = handle.toLowerCase();
   const { data } = await getUserLedger(handle);
   if (!data || !data.user) {
-    // Avoid emitting a canonical/OG URL for a 404 ledger page.
+    // Avoid emitting a canonical/OG URL for a 404 ledger page. Robots: Next's
+    // single noindex meta + middleware X-Robots-Tag noindex,nofollow.
     return { title: 'Not found · Gatekeeper' };
   }
   const title = `@${normalized} public ledger · Gatekeeper`;

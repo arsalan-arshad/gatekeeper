@@ -9,7 +9,7 @@
     "start": "next start --port ${PORT:-3000}",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --import tsx --test src/lib/brand.test.ts src/lib/demo.test.ts src/lib/demo-char-limit.test.ts src/lib/e2e-gate.test.ts src/lib/handle.test.ts src/lib/internal-auth.test.ts src/lib/ledger.test.ts src/lib/magic-rate-limit.test.ts src/lib/email-normalize.test.ts src/lib/seo.test.ts src/lib/trailing-slash.test.ts src/lib/analytics/sanitize.test.ts src/lib/analytics/client.test.ts src/app/robots.test.ts src/app/sitemap.test.ts"
+    "test": "node --import tsx --test src/lib/brand.test.ts src/lib/demo.test.ts src/lib/demo-char-limit.test.ts src/lib/e2e-gate.test.ts src/lib/handle.test.ts src/lib/internal-auth.test.ts src/lib/ledger.test.ts src/lib/magic-rate-limit.test.ts src/lib/magic-link-email.test.ts src/lib/email-normalize.test.ts src/lib/robots-header.test.ts src/lib/seo.test.ts src/lib/trailing-slash.test.ts src/lib/analytics/sanitize.test.ts src/lib/analytics/client.test.ts src/app/robots.test.ts src/app/sitemap.test.ts"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.3",

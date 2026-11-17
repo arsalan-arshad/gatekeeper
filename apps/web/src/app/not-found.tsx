@@ -5,10 +5,11 @@ import { SiteFooter } from '@/components/site-footer';
 import { SiteNav } from '@/components/site-nav';
 
 /**
- * Do not set `robots` here: Next.js already injects
+ * Do not set `robots` here: Next.js already injects exactly one
  * `<meta name="robots" content="noindex"/>` on not-found responses. A second
  * robots meta would duplicate the signal. Nofollow is supplied via
- * `X-Robots-Tag: noindex, nofollow` on `/_not-found` in next.config.ts.
+ * `X-Robots-Tag: noindex, nofollow` (middleware for unknown `/@handle`, and
+ * `/_not-found` headers in next.config.ts for other 404s).
  *
  * Homepage canonical/OG are intentionally not in the root layout, so this
  * page does not inherit them.

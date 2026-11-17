@@ -29,6 +29,7 @@ import {
   type InterviewAnswers,
 } from '../interview.js';
 import { countInboxFilters, matchesInboxFilter, type InboxFilter } from '../inbox-status.js';
+import { HANDLE_TAKEN_ERROR, replyForHandleClaimError } from '../pg-errors.js';
 
 const filterSchema = z.enum(['all', 'accepted', 'rejected', 'spam']).default('all');
 
@@ -282,7 +283,7 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
 
     const [handleTaken] = await db.select().from(users).where(eq(users.handle, handle)).limit(1);
     if (handleTaken && handleTaken.id !== user.id) {
-      return reply.status(409).send({ error: 'Handle already taken' });
+      return reply.status(409).send({ error: HANDLE_TAKEN_ERROR });
     }
 
     let embedding: number[] | null = user.profileEmbedding;
@@ -303,18 +304,26 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
       /* keep previous embedding */
     }
 
-    await db
-      .update(users)
-      .set({
-        handle,
-        name: body.name,
-        bio: body.bio ?? null,
-        wantsText: body.wantsText ?? null,
-        offersText: body.offersText ?? null,
-        neverText: body.neverText ?? null,
-        profileEmbedding: embedding,
-      })
-      .where(eq(users.id, user.id));
+    try {
+      await db
+        .update(users)
+        .set({
+          handle,
+          name: body.name,
+          bio: body.bio ?? null,
+          wantsText: body.wantsText ?? null,
+          offersText: body.offersText ?? null,
+          neverText: body.neverText ?? null,
+          profileEmbedding: embedding,
+        })
+        .where(eq(users.id, user.id));
+    } catch (error) {
+      const conflict = replyForHandleClaimError(error);
+      if (conflict) {
+        return reply.status(conflict.status).send(conflict.body);
+      }
+      throw error;
+    }
 
     await db
       .insert(gateRules)
