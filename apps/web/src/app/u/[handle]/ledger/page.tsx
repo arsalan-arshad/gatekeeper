@@ -1,10 +1,11 @@
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
 
 import { LedgerView } from '@/components/ledger-view';
+import { NotFoundView } from '@/components/not-found-view';
 import { API_URL } from '@/lib/api';
 import { BRAND } from '@/lib/brand';
 import { DEMO_LEDGER_FALLBACK } from '@/lib/demo';
+import { handleNotFoundMetadata } from '@/lib/handle-not-found-meta';
 import { emptyGlobalLedger, type LedgerPayload } from '@/lib/ledger';
 
 async function getUserLedger(handle: string): Promise<{
@@ -71,9 +72,8 @@ export async function generateMetadata({
   const normalized = handle.toLowerCase();
   const { data } = await getUserLedger(handle);
   if (!data || !data.user) {
-    // Avoid emitting a canonical/OG URL for a 404 ledger page. Robots: Next's
-    // single noindex meta + middleware X-Robots-Tag noindex,nofollow.
-    return { title: 'Not found · Gatekeeper' };
+    // Soft fallback — hard 404 for known-missing handles is middleware.
+    return handleNotFoundMetadata;
   }
   const title = `@${normalized} public ledger · Gatekeeper`;
   const description = `Public Gatekeeper ledger for @${normalized} — accept rates, spam blocked, and trust signals.`;
@@ -100,7 +100,8 @@ export async function generateMetadata({
 export default async function UserLedgerPage({ params }: { params: Promise<{ handle: string }> }) {
   const { handle } = await params;
   const { data, unavailable, demoData } = await getUserLedger(handle);
-  if (!data || !data.user) notFound();
+  // Avoid notFound() so we keep a single noindex,nofollow meta (see handle page).
+  if (!data || !data.user) return <NotFoundView />;
 
   return (
     <LedgerView

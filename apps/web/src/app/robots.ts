@@ -15,6 +15,7 @@ export default function robots(): MetadataRoute.Robots {
           '/e2e/',
           '/api/',
           '/start/check-email',
+          '/handle-not-found',
           '/u/',
         ],
       },

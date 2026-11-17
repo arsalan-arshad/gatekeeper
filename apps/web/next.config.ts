@@ -67,6 +67,10 @@ const nextConfig: NextConfig = {
         source: '/start/check-email',
         headers: noindexHeaders,
       },
+      {
+        source: '/handle-not-found',
+        headers: noindexHeaders,
+      },
       // Next always injects `<meta name="robots" content="noindex"/>` on not-found;
       // keep a single meta tag and supply nofollow via the HTTP header instead.
       {

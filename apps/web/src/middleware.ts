@@ -8,6 +8,11 @@ import {
   shouldSetNoindexNofollow,
 } from '@/lib/robots-header';
 import { stripTrailingSlashForRedirect } from '@/lib/trailing-slash';
+import {
+  HANDLE_NOT_FOUND_PATH,
+  INTERNAL_HANDLE_NOT_FOUND_HEADER,
+  buildUnknownHandleNotFoundResponse,
+} from '@/lib/unknown-handle-not-found';
 
 /**
  * With `skipTrailingSlashRedirect: true` (required so PostHog `/ingest/.../`
@@ -16,13 +21,25 @@ import { stripTrailingSlashForRedirect } from '@/lib/trailing-slash';
  *
  * Matcher excludes `/ingest` so the PostHog rewrite keeps the trailing slash.
  *
- * Robots: static public pages stay indexable. `/@handle` is indexable only when
- * the handle exists; unknown handles get `X-Robots-Tag: noindex, nofollow` so
- * nofollow is present even though Next's 404 meta is `noindex` only (exactly one
- * robots meta — nofollow via the header).
+ * Unknown `/@handle`: middleware returns a hard 404 by re-wrapping the soft
+ * `/handle-not-found` HTML (exactly one `<meta name="robots" content="noindex, nofollow">`)
+ * plus `X-Robots-Tag: noindex, nofollow`. Valid handles stay indexable.
  */
 export async function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
+
+  // Internal subrequest used to render the soft 404 document — do not recurse.
+  if (request.headers.get(INTERNAL_HANDLE_NOT_FOUND_HEADER) === '1') {
+    const response = NextResponse.next();
+    response.headers.set('X-Robots-Tag', NOINDEX_NOFOLLOW);
+    return response;
+  }
+
+  if (pathname === HANDLE_NOT_FOUND_PATH) {
+    const response = NextResponse.next();
+    response.headers.set('X-Robots-Tag', NOINDEX_NOFOLLOW);
+    return response;
+  }
 
   const stripped = stripTrailingSlashForRedirect(pathname);
   if (stripped) {
@@ -31,14 +48,18 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(destination, 308);
   }
 
-  const response = NextResponse.next();
   const profile = matchPublicProfilePath(pathname);
-  let handleExists: boolean | null | undefined;
   if (profile) {
-    handleExists = await publicHandleExists(profile.handle);
+    const handleExists = await publicHandleExists(profile.handle);
+    if (handleExists === false) {
+      return buildUnknownHandleNotFoundResponse({ origin: request.nextUrl.origin });
+    }
+    // Valid (or unknown): leave indexable — no X-Robots-Tag.
+    return NextResponse.next();
   }
 
-  if (shouldSetNoindexNofollow(pathname, handleExists)) {
+  const response = NextResponse.next();
+  if (shouldSetNoindexNofollow(pathname)) {
     response.headers.set('X-Robots-Tag', NOINDEX_NOFOLLOW);
   }
   return response;

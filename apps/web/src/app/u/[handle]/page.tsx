@@ -1,12 +1,13 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
 
+import { NotFoundView } from '@/components/not-found-view';
 import { SiteFooter } from '@/components/site-footer';
 import { SiteNav } from '@/components/site-nav';
 import { API_URL } from '@/lib/api';
 import { BRAND } from '@/lib/brand';
 import { DEMO_USER_FALLBACK } from '@/lib/demo';
+import { handleNotFoundMetadata } from '@/lib/handle-not-found-meta';
 
 import { DemoIntroForm } from './demo-intro-form';
 import { IntroRequestForm } from './intro-form';
@@ -52,11 +53,10 @@ export async function generateMetadata({
   const { handle } = await params;
   const data = await getPublicUser(handle);
   if (!data) {
-    // Title only — no homepage canonical/OG. Next injects a single
-    // `<meta name="robots" content="noindex">` on not-found; nofollow is on
-    // `X-Robots-Tag: noindex, nofollow` from middleware (do not set robots here
-    // or Next duplicates the meta tag).
-    return { title: 'Not found · Gatekeeper' };
+    // Soft fallback when middleware could not confirm missing (API down).
+    // Hard 404 for known-missing handles is served by middleware from
+    // `/handle-not-found` (exactly one noindex,nofollow meta + header).
+    return handleNotFoundMetadata;
   }
   const { user } = data;
   const title = `${user.name} (@${user.handle}) · Gatekeeper`;
@@ -91,7 +91,10 @@ export default async function PublicHandlePage({
 }) {
   const { handle } = await params;
   const data = await getPublicUser(handle);
-  if (!data) notFound();
+  // Avoid notFound() — Next would inject meta content="noindex" only (or
+  // duplicate if we also set nofollow). Middleware already hard-404s known
+  // missing handles; this is the soft fallback path.
+  if (!data) return <NotFoundView />;
 
   const { user, demoFallback } = data;
   const isDemo = user.handle === 'demo' || demoFallback;
