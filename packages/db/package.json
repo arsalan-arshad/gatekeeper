@@ -24,6 +24,7 @@
     "db:migrate": "tsx src/migrate.ts",
     "db:migrate:kit": "drizzle-kit migrate",
     "db:seed": "tsx src/seed.ts",
+    "db:delete-user": "tsx src/delete-user-by-handle.ts",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
