@@ -22,6 +22,7 @@ test('static public pages stay indexable; dashboard/auth do not', () => {
   assert.equal(shouldSetNoindexNofollow('/'), false);
   assert.equal(shouldSetNoindexNofollow('/start'), false);
   assert.equal(shouldSetNoindexNofollow('/ledger'), false);
+  assert.equal(shouldSetNoindexNofollow('/explore'), false);
   assert.equal(shouldSetNoindexNofollow('/privacy'), false);
   assert.equal(shouldSetNoindexNofollow('/terms'), false);
   assert.equal(shouldSetNoindexNofollow('/dashboard'), true);

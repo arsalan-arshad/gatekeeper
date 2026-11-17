@@ -15,6 +15,7 @@ import { assertEmailLinkSecretConfigured } from './tokens.js';
 import { registerAgentRoutes } from './routes/agent.js';
 import { registerDashboardRoutes } from './routes/dashboard.js';
 import { registerDemoRoutes } from './routes/demo.js';
+import { registerDirectoryRoutes } from './routes/directory.js';
 import { registerKeyRoutes } from './routes/keys.js';
 import { registerLedgerRoutes } from './routes/ledger.js';
 import { registerOnboardingRoutes } from './routes/onboarding.js';
@@ -185,6 +186,7 @@ export async function buildServer() {
 
   await registerOnboardingRoutes(app);
   await registerDashboardRoutes(app);
+  await registerDirectoryRoutes(app);
   await registerPublicRoutes(app);
   await registerSenderVerifyRoutes(app);
   await registerResendWebhookRoutes(app);

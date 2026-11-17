@@ -34,7 +34,12 @@ function isBlockedKey(key: string): boolean {
     lower === 'message' ||
     lower === 'body' ||
     lower === 'sendercontact' ||
-    lower === 'sendername'
+    lower === 'sendername' ||
+    lower === 'handle' ||
+    lower === 'query' ||
+    lower === 'q' ||
+    lower === 'tags' ||
+    lower === 'tag'
   );
 }
 

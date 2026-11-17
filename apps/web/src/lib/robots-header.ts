@@ -5,7 +5,7 @@
  * Dynamic `/@handle` profile URLs are handled separately: valid handles stay
  * indexable; missing handles get noindex,nofollow once existence is known.
  */
-export const STATIC_INDEXABLE_PATH = /^\/(?:|start|ledger|privacy|terms)$/i;
+export const STATIC_INDEXABLE_PATH = /^\/(?:|start|ledger|explore|privacy|terms)$/i;
 
 const PROFILE_PATH = /^\/@([a-z0-9_.-]+)(\/ledger)?$/i;
 

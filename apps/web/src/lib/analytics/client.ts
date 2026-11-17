@@ -23,6 +23,8 @@ export type AnalyticsEvent =
   | 'data_exported'
   | 'intro_request_submitted'
   | 'cta_clicked'
+  | 'directory_opt_in'
+  | 'explore_search'
   | '$pageview';
 
 let initialized = false;

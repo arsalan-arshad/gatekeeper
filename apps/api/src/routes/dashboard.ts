@@ -446,6 +446,10 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
       notificationEmailMode: user.notificationEmailMode,
       email: user.email,
       handle: user.handle,
+      directoryOptIn: user.directoryOptIn,
+      directoryRole: user.directoryRole,
+      directoryTags: user.directoryTags ?? [],
+      directoryPromptDismissed: Boolean(user.directoryPromptDismissedAt),
     };
   });
 
@@ -509,6 +513,10 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
         neverText: user.neverText,
         plan: user.plan,
         notificationEmailMode: user.notificationEmailMode,
+        directoryOptIn: user.directoryOptIn,
+        directoryRole: user.directoryRole,
+        directoryTags: user.directoryTags ?? [],
+        directoryPromptDismissed: Boolean(user.directoryPromptDismissedAt),
       },
       gateRules: rules ?? null,
       requests: inbox,

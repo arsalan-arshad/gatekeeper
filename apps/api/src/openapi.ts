@@ -97,6 +97,57 @@ export function buildOpenApiDocument(baseUrl: string) {
           },
         },
       },
+      '/v1/directory': {
+        get: {
+          summary: 'Opt-in public directory (no emails, rules, or private fields)',
+          parameters: [
+            {
+              name: 'q',
+              in: 'query',
+              required: false,
+              schema: { type: 'string', maxLength: 100 },
+            },
+            {
+              name: 'role',
+              in: 'query',
+              required: false,
+              schema: { type: 'string', maxLength: 80 },
+            },
+            {
+              name: 'tag',
+              in: 'query',
+              required: false,
+              schema: { type: 'string' },
+              description: 'Repeatable; at most 5',
+            },
+            {
+              name: 'want',
+              in: 'query',
+              required: false,
+              schema: { type: 'string', maxLength: 100 },
+            },
+            {
+              name: 'cursor',
+              in: 'query',
+              required: false,
+              schema: { type: 'string' },
+            },
+            {
+              name: 'limit',
+              in: 'query',
+              required: false,
+              schema: { type: 'integer', minimum: 1, maximum: 50, default: 20 },
+            },
+          ],
+          responses: {
+            '200': {
+              description:
+                'Whitelisted public profiles only (handle, name, role, tags, bio, wants/offers summaries)',
+            },
+            '429': { description: 'IP rate limited (60/min)' },
+          },
+        },
+      },
       '/llms.txt': {
         get: {
           summary: 'Instructions for AI agents',

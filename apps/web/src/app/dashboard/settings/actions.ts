@@ -16,10 +16,34 @@ export async function loadSettings() {
       notificationEmailMode: 'instant' | 'daily_digest' | 'off';
       email: string;
       handle: string;
+      directoryOptIn: boolean;
+      directoryRole: string | null;
+      directoryTags: string[];
+      directoryPromptDismissed: boolean;
     }>('/v1/dashboard/settings', { email });
     return { data };
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Failed to load settings' };
+  }
+}
+
+export async function saveDirectorySettings(input: {
+  optIn: boolean;
+  role?: string | null;
+  tags?: string[];
+  dismissPrompt?: boolean;
+}) {
+  const email = await requireEmail();
+  if (!email) return { error: 'Sign in required' };
+  try {
+    await apiFetch('/v1/dashboard/directory', {
+      method: 'PUT',
+      email,
+      body: JSON.stringify(input),
+    });
+    return { ok: true as const };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Save failed' };
   }
 }
 

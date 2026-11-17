@@ -1,19 +1,31 @@
 'use client';
 
+import Link from 'next/link';
 import { useState, useTransition } from 'react';
 
 import { captureEvent, resetAnalytics } from '@/lib/analytics/client';
 
-import { deleteAccount, exportData, saveSettings } from './actions';
+import { deleteAccount, exportData, saveDirectorySettings, saveSettings } from './actions';
 
 export function SettingsClient({
   initialMode,
   email,
+  handle,
+  initialDirectoryOptIn,
+  initialDirectoryRole,
+  initialDirectoryTags,
 }: {
   initialMode: 'instant' | 'daily_digest' | 'off';
   email: string;
+  handle: string;
+  initialDirectoryOptIn: boolean;
+  initialDirectoryRole: string | null;
+  initialDirectoryTags: string[];
 }) {
   const [mode, setMode] = useState(initialMode);
+  const [directoryOptIn, setDirectoryOptIn] = useState(initialDirectoryOptIn);
+  const [directoryRole, setDirectoryRole] = useState(initialDirectoryRole ?? '');
+  const [directoryTags, setDirectoryTags] = useState(initialDirectoryTags.join(', '));
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -29,6 +41,28 @@ export function SettingsClient({
       }
       captureEvent('notification_settings_saved', { notification_mode: mode });
       setMessage('Notification settings saved.');
+    });
+  }
+
+  function onSaveDirectory() {
+    setError(null);
+    setMessage(null);
+    startTransition(async () => {
+      const tags = directoryTags
+        .split(/[,\s]+/)
+        .map((t) => t.trim().toLowerCase())
+        .filter(Boolean);
+      const result = await saveDirectorySettings({
+        optIn: directoryOptIn,
+        role: directoryRole.trim() || null,
+        tags,
+      });
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      captureEvent('directory_opt_in', { enabled: directoryOptIn, surface: 'settings' });
+      setMessage(directoryOptIn ? 'Listed in the directory.' : 'Removed from the directory.');
     });
   }
 
@@ -68,7 +102,66 @@ export function SettingsClient({
 
   return (
     <div className="flex flex-col gap-8">
-      <section>
+      <section id="directory">
+        <h2 className="text-xl" style={{ fontFamily: 'var(--font-display), Georgia, serif' }}>
+          Directory
+        </h2>
+        <p className="mt-2 text-sm text-[var(--muted)]">
+          Opt in to appear on{' '}
+          <Link href="/explore" className="text-[var(--accent)] hover:brightness-110">
+            /explore
+          </Link>
+          . Every intro still goes through your rules.
+        </p>
+        <label className="mt-4 flex items-start gap-3 text-sm">
+          <input
+            type="checkbox"
+            className="mt-1"
+            checked={directoryOptIn}
+            onChange={(e) => setDirectoryOptIn(e.target.checked)}
+          />
+          <span>List me in the Gatekeeper directory</span>
+        </label>
+        {directoryOptIn ? (
+          <div className="mt-4 flex flex-col gap-3">
+            <label className="flex flex-col gap-2 text-sm">
+              Role
+              <input
+                className="rounded-md border border-white/15 bg-black/30 px-3 py-2"
+                value={directoryRole}
+                onChange={(e) => setDirectoryRole(e.target.value)}
+                maxLength={80}
+                placeholder="e.g. Founder"
+              />
+            </label>
+            <label className="flex flex-col gap-2 text-sm">
+              Tags (comma-separated)
+              <input
+                className="rounded-md border border-white/15 bg-black/30 px-3 py-2"
+                value={directoryTags}
+                onChange={(e) => setDirectoryTags(e.target.value)}
+                placeholder="saas, mobile"
+              />
+            </label>
+            <Link
+              href={`/@${handle}?ref=explore`}
+              className="text-sm text-[var(--accent)] hover:brightness-110"
+            >
+              See yourself on /explore →
+            </Link>
+          </div>
+        ) : null}
+        <button
+          type="button"
+          disabled={pending}
+          onClick={onSaveDirectory}
+          className="mt-4 rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-[#062015] disabled:opacity-50"
+        >
+          Save directory
+        </button>
+      </section>
+
+      <section className="border-t border-white/10 pt-6">
         <h2 className="text-xl" style={{ fontFamily: 'var(--font-display), Georgia, serif' }}>
           Email notifications
         </h2>

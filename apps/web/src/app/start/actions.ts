@@ -113,6 +113,9 @@ export async function completeOnboarding(input: {
   offersText: string;
   neverText: string;
   ruleText: string;
+  directoryOptIn?: boolean;
+  directoryRole?: string | null;
+  directoryTags?: string[];
 }) {
   const session = await auth();
   const email = session?.user?.email;

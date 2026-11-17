@@ -19,6 +19,27 @@ test('sanitizeAnalyticsProps strips email, message, token, and related PII keys'
   assert.deepEqual(cleaned, { band: 'accept', surface: 'landing' });
 });
 
+test('sanitizeAnalyticsProps strips explore query text, handles, and tags', () => {
+  const cleaned = sanitizeAnalyticsProps({
+    has_query: true,
+    role_filter: false,
+    tag_count: 2,
+    results_bucket: '1-5',
+    query: 'mobile engineer',
+    q: 'secret search',
+    handle: 'arsalandev',
+    tags: 'saas,mobile',
+    tag: 'saas',
+    name: 'Ada',
+  });
+  assert.deepEqual(cleaned, {
+    has_query: true,
+    role_filter: false,
+    tag_count: 2,
+    results_bucket: '1-5',
+  });
+});
+
 test('sanitizeAnalyticsProps returns undefined for empty or fully blocked input', () => {
   assert.equal(sanitizeAnalyticsProps(undefined), undefined);
   assert.equal(sanitizeAnalyticsProps({ email: 'a@b.com' }), undefined);

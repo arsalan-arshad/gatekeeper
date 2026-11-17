@@ -14,6 +14,7 @@ test('GET /openapi.json describes POST /v1/requests', async () => {
     info: { contact?: { name?: string; url?: string } };
   };
   assert.ok(body.paths['/v1/requests']);
+  assert.ok(body.paths['/v1/directory']);
   assert.equal(body.info.contact?.name, 'Arsalan');
   assert.equal(body.info.contact?.url, 'https://arsalandev.studio');
 

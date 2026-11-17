@@ -11,6 +11,7 @@ import {
   type InterviewAnswers,
 } from '../interview.js';
 import { createLlm } from '../llm.js';
+import { DIRECTORY_ROLE_MAX, validateDirectoryTags } from '../directory.js';
 import { HANDLE_TAKEN_ERROR, replyForHandleClaimError } from '../pg-errors.js';
 
 const answersSchema = z.object({
@@ -35,6 +36,10 @@ const completeSchema = z.object({
   neverText: z.string().max(2000).optional(),
   ruleText: z.string().min(1).max(8000),
   minRelevance: z.number().int().min(0).max(100).optional(),
+  /** Opt-in directory listing; defaults false — never auto-opt existing users. */
+  directoryOptIn: z.boolean().optional(),
+  directoryRole: z.string().max(DIRECTORY_ROLE_MAX).nullable().optional(),
+  directoryTags: z.array(z.string().max(32)).max(10).optional(),
 });
 
 export async function registerOnboardingRoutes(app: FastifyInstance): Promise<void> {
@@ -87,6 +92,10 @@ export async function registerOnboardingRoutes(app: FastifyInstance): Promise<vo
         wantsText: user.wantsText,
         offersText: user.offersText,
         neverText: user.neverText,
+        directoryOptIn: user.directoryOptIn,
+        directoryRole: user.directoryRole,
+        directoryTags: user.directoryTags ?? [],
+        directoryPromptDismissed: Boolean(user.directoryPromptDismissedAt),
       },
       gateRules: rules ? { ruleText: rules.ruleText, minRelevance: rules.minRelevance } : null,
     };
@@ -136,6 +145,39 @@ export async function registerOnboardingRoutes(app: FastifyInstance): Promise<vo
       embedding = null;
     }
 
+    // Directory fields: only apply when explicitly provided so re-onboarding
+    // does not silently flip an existing opt-in when omitted.
+    const directoryPatch: {
+      directoryOptIn?: boolean;
+      directoryOptInAt?: Date | null;
+      directoryRole?: string | null;
+      directoryTags?: string[];
+    } = {};
+    if (body.directoryOptIn !== undefined) {
+      const optIn = body.directoryOptIn;
+      directoryPatch.directoryOptIn = optIn;
+      directoryPatch.directoryOptInAt = optIn
+        ? existing?.directoryOptIn
+          ? (existing.directoryOptInAt ?? new Date())
+          : new Date()
+        : null;
+    } else if (!existing) {
+      directoryPatch.directoryOptIn = false;
+      directoryPatch.directoryOptInAt = null;
+    }
+    if (body.directoryRole !== undefined) {
+      directoryPatch.directoryRole = body.directoryRole?.trim() || null;
+    }
+    if (body.directoryTags !== undefined) {
+      const validated = validateDirectoryTags(body.directoryTags);
+      if (!validated.ok) {
+        return reply.status(400).send({ error: validated.error });
+      }
+      directoryPatch.directoryTags = validated.tags;
+    } else if (!existing) {
+      directoryPatch.directoryTags = [];
+    }
+
     const values = {
       handle,
       name: body.name,
@@ -146,6 +188,7 @@ export async function registerOnboardingRoutes(app: FastifyInstance): Promise<vo
       neverText: body.neverText ?? null,
       profileEmbedding: embedding,
       updatedAt: new Date(),
+      ...directoryPatch,
     };
 
     let userId: string;

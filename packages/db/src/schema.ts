@@ -54,6 +54,23 @@ export const users = pgTable('users', {
   notificationEmailMode: notificationEmailModeEnum('notification_email_mode')
     .notNull()
     .default('instant'),
+  /**
+   * Opt-in public directory listing. Default false — never auto-opt anyone in.
+   * Existing users stay opted out until they explicitly enable it.
+   */
+  directoryOptIn: boolean('directory_opt_in').notNull().default(false),
+  directoryOptInAt: timestamp('directory_opt_in_at', { withTimezone: true }),
+  /** Short public role label for /explore (e.g. "Mobile engineer"). */
+  directoryRole: text('directory_role'),
+  /** Skill/topic tags (lowercase slugs); max 10 enforced in API. */
+  directoryTags: text('directory_tags')
+    .array()
+    .notNull()
+    .default(sql`'{}'::text[]`),
+  /** When set, hide the dashboard "list yourself" banner. */
+  directoryPromptDismissedAt: timestamp('directory_prompt_dismissed_at', {
+    withTimezone: true,
+  }),
   /** Profile last update — used for sitemap lastmod on `/@handle`. */
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });

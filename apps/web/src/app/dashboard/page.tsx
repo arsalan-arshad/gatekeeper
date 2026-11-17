@@ -7,6 +7,7 @@ import { SiteFooter } from '@/components/site-footer';
 import { apiFetch } from '@/lib/api';
 
 import { loadInbox } from './actions';
+import { DirectoryBanner } from './directory-banner';
 import { InboxClient } from './inbox-client';
 
 export default async function DashboardPage({
@@ -23,15 +24,22 @@ export default async function DashboardPage({
   const filter = params.filter ?? 'all';
 
   let handle: string | null = null;
+  let showDirectoryBanner = false;
   try {
-    const me = await apiFetch<{ onboarded: boolean; user: { handle: string } | null }>(
-      '/v1/onboarding/me',
-      { email: session.user.email },
-    );
+    const me = await apiFetch<{
+      onboarded: boolean;
+      user: {
+        handle: string;
+        directoryOptIn?: boolean;
+        directoryPromptDismissed?: boolean;
+      } | null;
+    }>('/v1/onboarding/me', { email: session.user.email });
     if (!me.onboarded || !me.user) {
       redirect('/start');
     }
     handle = me.user.handle;
+    showDirectoryBanner =
+      me.user.directoryOptIn === false && me.user.directoryPromptDismissed !== true;
   } catch {
     redirect('/start');
   }
@@ -50,6 +58,7 @@ export default async function DashboardPage({
           verdict and shows a separate Owner badge.
         </p>
       </div>
+      {showDirectoryBanner ? <DirectoryBanner /> : null}
       {'error' in inbox && inbox.error ? (
         <p className="text-sm text-red-300">{inbox.error}</p>
       ) : (

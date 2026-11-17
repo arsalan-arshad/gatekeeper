@@ -12,6 +12,7 @@ test('sitemap lists public URLs and excludes dashboard/auth/u', async () => {
     `${BRAND.siteUrl}/`,
     `${BRAND.siteUrl}/start`,
     `${BRAND.siteUrl}/ledger`,
+    `${BRAND.siteUrl}/explore`,
     `${BRAND.siteUrl}/@demo`,
     `${BRAND.siteUrl}/@demo/ledger`,
     `${BRAND.siteUrl}/privacy`,

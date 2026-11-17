@@ -75,6 +75,9 @@ export function SiteNav({ compact = false }: { compact?: boolean } = {}) {
               <a href="/#how-it-works" className="hover:text-[var(--fg)]">
                 How it works
               </a>
+              <Link href="/explore" className="hover:text-[var(--fg)]">
+                Explore
+              </Link>
               <Link href="/ledger" className="hover:text-[var(--fg)]">
                 Ledger
               </Link>
@@ -83,9 +86,14 @@ export function SiteNav({ compact = false }: { compact?: boolean } = {}) {
               </Link>
             </>
           ) : (
-            <Link href="/ledger" className="hover:text-[var(--fg)]">
-              Ledger
-            </Link>
+            <>
+              <Link href="/explore" className="hover:text-[var(--fg)]">
+                Explore
+              </Link>
+              <Link href="/ledger" className="hover:text-[var(--fg)]">
+                Ledger
+              </Link>
+            </>
           )}
           <LandingCta appearance="nav" />
         </div>
@@ -114,6 +122,9 @@ export function SiteNav({ compact = false }: { compact?: boolean } = {}) {
             How it works
           </a>
         ) : null}
+        <Link href="/explore" className="hover:text-[var(--fg)]" onClick={closeMenu}>
+          Explore
+        </Link>
         <Link href="/ledger" className="hover:text-[var(--fg)]" onClick={closeMenu}>
           Ledger
         </Link>
