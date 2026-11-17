@@ -93,6 +93,8 @@ async function main() {
       2,
     ),
   );
+  // postgres.js keeps the pool open; exit like db:seed so --yes does not hang.
+  process.exit(0);
 }
 
 main().catch((err) => {
