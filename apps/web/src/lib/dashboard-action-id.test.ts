@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { validateActionId } from '../app/dashboard/actions.ts';
+import { validateActionId } from './dashboard-action-id.ts';
 
 test('validateActionId accepts UUIDs and rejects path traversal', () => {
   assert.deepEqual(validateActionId('11111111-1111-4111-8111-111111111111'), {
