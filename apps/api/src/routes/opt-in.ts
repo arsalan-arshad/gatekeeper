@@ -7,10 +7,40 @@ import {
   approveInboxRequest,
   declineInboxRequest,
 } from '../approve-request.js';
+import { resolveIntroContactEmail } from '../contact-email.js';
 import { getDb } from '../db.js';
 import { createEmailSender } from '../email.js';
 import { escapeHtml } from '../email-templates.js';
+import { getMemoryRequestForTests, type ClaimedRequest } from '../owner-decision.js';
 import { verifyOptInToken, type OptInAction } from '../tokens.js';
+
+type RespondReceiver = {
+  id: string;
+  email: string;
+  name: string;
+  introContactEmail?: string | null;
+  introContactVerifiedAt?: Date | string | null;
+};
+
+/** In-memory request+receiver for email-link respond unit tests (no DATABASE_URL). */
+let memoryRespond: {
+  request: ClaimedRequest;
+  receiver: RespondReceiver;
+} | null = null;
+
+export function seedMemoryOptInRespondForTests(input: {
+  request: ClaimedRequest;
+  receiver: RespondReceiver;
+}): void {
+  memoryRespond = {
+    request: { ...input.request },
+    receiver: { ...input.receiver },
+  };
+}
+
+export function resetMemoryOptInRespondForTests(): void {
+  memoryRespond = null;
+}
 
 function htmlPage(title: string, body: string): string {
   return `<!doctype html>
@@ -51,8 +81,32 @@ export async function registerOptInRoutes(app: FastifyInstance): Promise<void> {
         .send(htmlPage('Invalid link', `<p>${verified.error}.</p>`));
     }
 
-    const db = getDb();
-    const [row] = await db.select().from(requests).where(eq(requests.id, id)).limit(1);
+    let row: ClaimedRequest | undefined;
+    let receiver: RespondReceiver | undefined;
+
+    if (memoryRespond && memoryRespond.request.id === id) {
+      row = memoryRespond.request;
+      receiver = memoryRespond.receiver;
+    } else if (!process.env.DATABASE_URL) {
+      const mem = getMemoryRequestForTests(id);
+      if (mem) {
+        row = mem;
+        receiver = memoryRespond?.receiver;
+      }
+    } else {
+      const db = getDb();
+      const [dbRow] = await db.select().from(requests).where(eq(requests.id, id)).limit(1);
+      row = dbRow;
+      if (row) {
+        const [dbReceiver] = await db
+          .select()
+          .from(users)
+          .where(eq(users.id, row.targetUserId))
+          .limit(1);
+        receiver = dbReceiver;
+      }
+    }
+
     if (!row) {
       return reply
         .status(404)
@@ -60,15 +114,18 @@ export async function registerOptInRoutes(app: FastifyInstance): Promise<void> {
         .send(htmlPage('Not found', '<p>Request not found.</p>'));
     }
 
-    const [receiver] = await db.select().from(users).where(eq(users.id, row.targetUserId)).limit(1);
-    if (!receiver) {
+    if (!receiver || receiver.id !== row.targetUserId) {
       return reply
         .status(404)
         .type('text/html')
         .send(htmlPage('Not found', '<p>Receiver profile missing.</p>'));
     }
 
-    const owner = { id: receiver.id, email: receiver.email, name: receiver.name };
+    const owner = {
+      id: receiver.id,
+      email: resolveIntroContactEmail(receiver),
+      name: receiver.name,
+    };
     const send = createEmailSender();
 
     // Owner may Approve/Decline from notification links even when AI rejected —
@@ -108,6 +165,23 @@ export async function registerOptInRoutes(app: FastifyInstance): Promise<void> {
         .status(409)
         .type('text/html')
         .send(htmlPage('Already decided', `<p>${ALREADY_DECIDED_ERROR}.</p>`));
+    }
+
+    if (result.introEmail === 'failed') {
+      return reply
+        .type('text/html')
+        .send(
+          htmlPage(
+            'Accepted',
+            "<p>Accepted, but we couldn't send the intro email right now. Open your Gatekeeper dashboard and use Resend intro email.</p>",
+          ),
+        );
+    }
+
+    if (result.introEmail === 'skipped') {
+      return reply
+        .type('text/html')
+        .send(htmlPage('Accepted', '<p>Accepted. The intro email was already sent.</p>'));
     }
 
     return reply

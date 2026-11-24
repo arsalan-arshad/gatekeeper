@@ -1,6 +1,7 @@
 'use server';
 
 import { AuthError } from 'next-auth';
+import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 
 import { auth, signIn, signOut } from '@/auth';
@@ -135,6 +136,7 @@ export async function completeOnboarding(input: {
     };
   }
 
+  revalidatePath('/explore');
   redirect('/dashboard');
 }
 

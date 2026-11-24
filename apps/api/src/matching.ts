@@ -138,6 +138,26 @@ export function seedMemoryExclusionsForTests(viewerId: string, exclusions: Exclu
   memoryExclusions.set(viewerId, exclusions);
 }
 
+export function isMemoryMatchingEnabledForTests(): boolean {
+  return memoryMatchesEnabled;
+}
+
+export function findMemoryMatchCandidateByEmail(email: string): MatchCandidate | null {
+  if (!memoryMatchesEnabled) return null;
+  const normalized = email.trim().toLowerCase();
+  return memoryCandidates.find((c) => c.email.toLowerCase() === normalized) ?? null;
+}
+
+export function findMemoryMatchCandidateByHandle(handle: string): MatchCandidate | null {
+  if (!memoryMatchesEnabled) return null;
+  const normalized = handle.trim().toLowerCase();
+  return memoryCandidates.find((c) => c.handle.toLowerCase() === normalized) ?? null;
+}
+
+export function getMemoryExclusionsForTests(viewerId: string): ExclusionSets {
+  return memoryExclusions.get(viewerId) ?? emptyExclusions();
+}
+
 export function emptyExclusions(): ExclusionSets {
   return {
     matchedUserIds: new Set(),

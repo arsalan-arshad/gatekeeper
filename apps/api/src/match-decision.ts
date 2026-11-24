@@ -45,6 +45,65 @@ export function resetMatchDecisionsForTests(): void {
   memoryRows.clear();
 }
 
+export function isMemoryMatchDecisionsEnabledForTests(): boolean {
+  return forceMemory || !process.env.DATABASE_URL;
+}
+
+export function listMemoryMatchesForTests(): ClaimedMatch[] {
+  return Array.from(memoryRows.values()).map((row) => ({ ...row }));
+}
+
+export function findMemoryMatchPairForTests(
+  userA: string,
+  userB: string,
+): ClaimedMatch | undefined {
+  for (const row of memoryRows.values()) {
+    if (
+      (row.requesterId === userA && row.recipientId === userB) ||
+      (row.requesterId === userB && row.recipientId === userA)
+    ) {
+      return { ...row };
+    }
+  }
+  return undefined;
+}
+
+/** Insert a pending match in memory (unique live pair — pending|accepted only). */
+export function insertMemoryMatchForTests(
+  row: Omit<ClaimedMatch, 'id' | 'createdAt' | 'recipientDecision' | 'decidedAt'> & {
+    id?: string;
+    createdAt?: Date;
+  },
+): { ok: true; id: string } | { ok: false; reason: 'pair_exists'; existingId: string | null } {
+  forceMemory = true;
+  const live = Array.from(memoryRows.values()).find(
+    (existing) =>
+      (existing.status === 'pending' || existing.status === 'accepted') &&
+      ((existing.requesterId === row.requesterId && existing.recipientId === row.recipientId) ||
+        (existing.requesterId === row.recipientId && existing.recipientId === row.requesterId)),
+  );
+  if (live) {
+    return { ok: false, reason: 'pair_exists', existingId: live.id };
+  }
+  const id = row.id ?? crypto.randomUUID();
+  memoryRows.set(id, {
+    id,
+    requesterId: row.requesterId,
+    recipientId: row.recipientId,
+    note: row.note,
+    similarity: row.similarity,
+    aiScore: row.aiScore,
+    aiDecision: row.aiDecision,
+    aiReasonPublic: row.aiReasonPublic,
+    status: row.status,
+    recipientDecision: null,
+    decidedAt: null,
+    expiresAt: row.expiresAt,
+    createdAt: row.createdAt ?? new Date(),
+  });
+  return { ok: true, id };
+}
+
 /**
  * Conditional claim modelled on claimOwnerDecision:
  * UPDATE intro_matches SET recipient_decision, status, decided_at

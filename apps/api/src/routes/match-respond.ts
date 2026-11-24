@@ -27,13 +27,16 @@ function withNoindex(reply: { header: (k: string, v: string) => unknown }) {
   reply.header('X-Robots-Tag', 'noindex, nofollow');
 }
 
-function publicSummary(user: {
-  name: string;
+/**
+ * Role + offers/bio only — buildMatchIntroEmail already prefixes the person name.
+ * Keep a name-prefixed variant only if needed for judge/message context elsewhere.
+ */
+function introEmailSummary(user: {
   directoryRole: string | null;
   offersText: string | null;
   bio: string | null;
 }): string {
-  return [user.name, user.directoryRole, user.offersText || user.bio]
+  return [user.directoryRole, user.offersText || user.bio]
     .filter(Boolean)
     .join(' — ')
     .slice(0, 280);
@@ -145,12 +148,12 @@ export async function registerMatchRespondRoutes(app: FastifyInstance): Promise<
         personA: {
           name: requester.name,
           contactEmail: resolveIntroContactEmail(requester),
-          summary: publicSummary(requester),
+          summary: introEmailSummary(requester),
         },
         personB: {
           name: recipient.name,
           contactEmail: resolveIntroContactEmail(recipient),
-          summary: publicSummary(recipient),
+          summary: introEmailSummary(recipient),
         },
       });
     }
