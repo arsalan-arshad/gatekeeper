@@ -34,12 +34,21 @@ import {
 } from '../match-outbound-email.js';
 import {
   emptyExclusions,
+  findMemoryMatchCandidateByEmail,
+  findMemoryMatchCandidateByHandle,
+  getMemoryExclusionsForTests,
+  isMemoryMatchingEnabledForTests,
   matchMinSimilarity,
   mutualFitSimilarity,
   rankMatchesForViewer,
   scoreBandFromSimilarity,
   type MatchCandidate,
 } from '../matching.js';
+import {
+  findMemoryMatchPairForTests,
+  insertMemoryMatchForTests,
+  isMemoryMatchDecisionsEnabledForTests,
+} from '../match-decision.js';
 import { isIntroMatchPairUniqueViolation } from '../pg-errors.js';
 import { captureServerEvent } from '../posthog.js';
 import { consumePostgresRateLimit, retryAfterSeconds } from '../rate-limit.js';
@@ -66,11 +75,19 @@ const dismissSchema = z.object({
 });
 
 async function loadOwner(email: string) {
+  if (isMemoryMatchingEnabledForTests()) {
+    return findMemoryMatchCandidateByEmail(email);
+  }
   const db = getDb();
   const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
   return user ?? null;
 }
 
+function memoryMatchRequestMode(): boolean {
+  return isMemoryMatchingEnabledForTests() && isMemoryMatchDecisionsEnabledForTests();
+}
+
+/** Full summary including name — used in judge/message context. */
 function publicSummary(user: {
   name: string;
   directoryRole: string | null;
@@ -78,6 +95,21 @@ function publicSummary(user: {
   bio: string | null;
 }): string {
   return [user.name, user.directoryRole, user.offersText || user.bio]
+    .filter(Boolean)
+    .join(' — ')
+    .slice(0, 280);
+}
+
+/**
+ * Role + offers/bio only — buildMatchIntroEmail already prefixes the person name,
+ * so including name here would duplicate it ("Ada — Ada — Founder — …").
+ */
+export function introEmailSummary(user: {
+  directoryRole: string | null;
+  offersText: string | null;
+  bio: string | null;
+}): string {
+  return [user.directoryRole, user.offersText || user.bio]
     .filter(Boolean)
     .join(' — ')
     .slice(0, 280);
@@ -401,8 +433,12 @@ export async function registerMatchRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(400).send({ error: 'Cannot request intro with yourself' });
     }
 
-    const db = getDb();
-    const [recipient] = await db.select().from(users).where(eq(users.handle, handle)).limit(1);
+    const useMemory = memoryMatchRequestMode();
+    const db = useMemory ? null : getDb();
+
+    const recipient = useMemory
+      ? findMemoryMatchCandidateByHandle(handle)
+      : ((await db!.select().from(users).where(eq(users.handle, handle)).limit(1))[0] ?? null);
     if (
       !recipient ||
       !recipient.directoryOptIn ||
@@ -412,29 +448,35 @@ export async function registerMatchRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(404).send({ error: 'User not found' });
     }
 
-    const exclusions = await loadExclusionsForViewer(requester.id, requester.email);
+    const exclusions = useMemory
+      ? getMemoryExclusionsForTests(requester.id)
+      : await loadExclusionsForViewer(requester.id, requester.email);
     if (
       exclusions.matchedUserIds.has(recipient.id) ||
       exclusions.dismissedUserIds.has(recipient.id) ||
       exclusions.priorRequestUserIds.has(recipient.id) ||
       exclusions.spamBlockedUserIds.has(recipient.id)
     ) {
-      const [existing] = await db
-        .select({ id: introMatches.id })
-        .from(introMatches)
-        .where(
-          or(
-            and(
-              eq(introMatches.requesterId, requester.id),
-              eq(introMatches.recipientId, recipient.id),
-            ),
-            and(
-              eq(introMatches.requesterId, recipient.id),
-              eq(introMatches.recipientId, requester.id),
-            ),
-          ),
-        )
-        .limit(1);
+      const existing = useMemory
+        ? findMemoryMatchPairForTests(requester.id, recipient.id)
+        : (
+            await db!
+              .select({ id: introMatches.id })
+              .from(introMatches)
+              .where(
+                or(
+                  and(
+                    eq(introMatches.requesterId, requester.id),
+                    eq(introMatches.recipientId, recipient.id),
+                  ),
+                  and(
+                    eq(introMatches.requesterId, recipient.id),
+                    eq(introMatches.recipientId, requester.id),
+                  ),
+                ),
+              )
+              .limit(1)
+          )[0];
       return {
         status: 'already_requested' as const,
         matchId: existing?.id ?? null,
@@ -488,93 +530,116 @@ export async function registerMatchRoutes(app: FastifyInstance): Promise<void> {
         },
       ) ?? 0;
 
-    const [rules] = await db
-      .select()
-      .from(gateRules)
-      .where(eq(gateRules.userId, recipient.id))
-      .limit(1);
-
     let aiScore: number | null = null;
     let aiDecision: 'accept' | 'reject' | 'spam' | null = null;
     let aiReasonPublic: string | null = null;
     let gated = false;
 
-    if (rules) {
-      try {
-        const llm = createLlm({ maxRetries: 1 });
-        const judgment = await judgeRequest(
-          {
-            message: `${parsed.data.note}\n\nRequester: ${publicSummary(requester)}`,
-            senderName: requester.name,
-            senderType: 'human',
-            senderContact: requester.email,
-            userId: recipient.id,
-            target: {
-              profileEmbedding: recipient.profileEmbedding,
-              ruleText: rules.ruleText,
-              minRelevance: rules.minRelevance,
-              name: recipient.name,
-              wantsText: recipient.wantsText,
-              neverText: recipient.neverText,
+    if (!useMemory) {
+      const [rules] = await db!
+        .select()
+        .from(gateRules)
+        .where(eq(gateRules.userId, recipient.id))
+        .limit(1);
+
+      if (rules) {
+        try {
+          const llm = createLlm({ maxRetries: 1 });
+          const judgment = await judgeRequest(
+            {
+              message: `${parsed.data.note}\n\nRequester: ${publicSummary(requester)}`,
+              senderName: requester.name,
+              senderType: 'human',
+              senderContact: requester.email,
+              userId: recipient.id,
+              target: {
+                profileEmbedding: recipient.profileEmbedding ?? null,
+                ruleText: rules.ruleText,
+                minRelevance: rules.minRelevance,
+                name: recipient.name,
+                wantsText: recipient.wantsText,
+                neverText: recipient.neverText,
+              },
             },
-          },
-          llm,
-        );
-        aiScore = judgment.score;
-        aiDecision = judgment.decision;
-        aiReasonPublic = judgment.reason_public;
-        if (judgment.decision !== 'accept' || judgment.score < rules.minRelevance) {
+            llm,
+          );
+          aiScore = judgment.score;
+          aiDecision = judgment.decision;
+          aiReasonPublic = judgment.reason_public;
+          if (judgment.decision !== 'accept' || judgment.score < rules.minRelevance) {
+            gated = true;
+          }
+        } catch (error) {
+          request.log.error({ err: error }, 'match judge failed');
           gated = true;
+          aiReasonPublic = 'Could not evaluate fit right now';
         }
-      } catch (error) {
-        request.log.error({ err: error }, 'match judge failed');
-        gated = true;
-        aiReasonPublic = 'Could not evaluate fit right now';
       }
     }
 
     const expiresAt = new Date(Date.now() + MATCH_EXPIRES_DAYS * 24 * 60 * 60 * 1000);
     let matchId: string;
-    try {
-      const [created] = await db
-        .insert(introMatches)
-        .values({
-          requesterId: requester.id,
-          recipientId: recipient.id,
-          note: parsed.data.note,
-          similarity,
-          aiScore,
-          aiDecision,
-          aiReasonPublic,
-          status: gated ? 'gated' : 'pending',
-          expiresAt,
-        })
-        .returning({ id: introMatches.id });
-      matchId = created!.id;
-    } catch (error) {
-      if (isIntroMatchPairUniqueViolation(error)) {
-        const [existing] = await db
-          .select({ id: introMatches.id })
-          .from(introMatches)
-          .where(
-            or(
-              and(
-                eq(introMatches.requesterId, requester.id),
-                eq(introMatches.recipientId, recipient.id),
-              ),
-              and(
-                eq(introMatches.requesterId, recipient.id),
-                eq(introMatches.recipientId, requester.id),
-              ),
-            ),
-          )
-          .limit(1);
+    if (useMemory) {
+      const inserted = insertMemoryMatchForTests({
+        requesterId: requester.id,
+        recipientId: recipient.id,
+        note: parsed.data.note,
+        similarity,
+        aiScore,
+        aiDecision,
+        aiReasonPublic,
+        status: gated ? 'gated' : 'pending',
+        expiresAt,
+      });
+      if (!inserted.ok) {
         return {
           status: 'already_requested' as const,
-          matchId: existing?.id ?? null,
+          matchId: inserted.existingId,
         };
       }
-      throw error;
+      matchId = inserted.id;
+    } else {
+      try {
+        const [created] = await db!
+          .insert(introMatches)
+          .values({
+            requesterId: requester.id,
+            recipientId: recipient.id,
+            note: parsed.data.note,
+            similarity,
+            aiScore,
+            aiDecision,
+            aiReasonPublic,
+            status: gated ? 'gated' : 'pending',
+            expiresAt,
+          })
+          .returning({ id: introMatches.id });
+        matchId = created!.id;
+      } catch (error) {
+        if (isIntroMatchPairUniqueViolation(error)) {
+          const [existing] = await db!
+            .select({ id: introMatches.id })
+            .from(introMatches)
+            .where(
+              or(
+                and(
+                  eq(introMatches.requesterId, requester.id),
+                  eq(introMatches.recipientId, recipient.id),
+                ),
+                and(
+                  eq(introMatches.requesterId, recipient.id),
+                  eq(introMatches.recipientId, requester.id),
+                ),
+              ),
+            )
+            .limit(1);
+          return {
+            status: 'already_requested' as const,
+            matchId: existing?.id ?? null,
+          };
+        }
+        throw error;
+      }
     }
 
     const band = scoreBandFromSimilarity(similarity);
@@ -688,12 +753,12 @@ export async function registerMatchRoutes(app: FastifyInstance): Promise<void> {
           personA: {
             name: requester.name,
             contactEmail: resolveIntroContactEmail(requester),
-            summary: publicSummary(requester),
+            summary: introEmailSummary(requester),
           },
           personB: {
             name: user.name,
             contactEmail: resolveIntroContactEmail(user),
-            summary: publicSummary(user),
+            summary: introEmailSummary(user),
           },
         })
       : ('failed' as const);
@@ -743,12 +808,12 @@ export async function registerMatchRoutes(app: FastifyInstance): Promise<void> {
       personA: {
         name: requester.name,
         contactEmail: resolveIntroContactEmail(requester),
-        summary: publicSummary(requester),
+        summary: introEmailSummary(requester),
       },
       personB: {
         name: recipient.name,
         contactEmail: resolveIntroContactEmail(recipient),
-        summary: publicSummary(recipient),
+        summary: introEmailSummary(recipient),
       },
     });
     return { ok: true, introEmail };

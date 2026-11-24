@@ -46,7 +46,7 @@ async function loadDirectory(searchParams: {
 
   try {
     const res = await fetch(`${API_URL}/v1/directory?${params.toString()}`, {
-      next: { revalidate: 60 },
+      next: { revalidate: 10 },
     });
     if (!res.ok) return { results: [], nextCursor: null };
     const body = (await res.json()) as {

@@ -16,6 +16,8 @@ const BLOCKED = new Set([
   'suggested_rewrite',
   'score',
   'handle',
+  'note',
+  'similarity',
 ]);
 
 function blocked(key: string): boolean {
@@ -28,7 +30,9 @@ function blocked(key: string): boolean {
     lower.includes('secret') ||
     lower === 'message' ||
     lower === 'body' ||
-    lower === 'handle'
+    lower === 'handle' ||
+    lower === 'note' ||
+    lower === 'similarity'
   );
 }
 

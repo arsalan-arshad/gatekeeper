@@ -102,8 +102,16 @@ export function createResendEmailSender(options: {
   };
 }
 
+/** Test-only override so route inject tests can force EmailSendError paths. */
+let emailSenderOverride: EmailSender | null = null;
+
+export function setEmailSenderForTests(sender: EmailSender | null): void {
+  emailSenderOverride = sender;
+}
+
 /** Prefer Resend when `RESEND_API_KEY` is set; otherwise log to the API console. */
 export function createEmailSender(env: NodeJS.ProcessEnv = process.env): EmailSender {
+  if (emailSenderOverride) return emailSenderOverride;
   const apiKey = env.RESEND_API_KEY?.trim();
   const from = env.EMAIL_FROM?.trim() || 'Gatekeeper <onboarding@resend.dev>';
   if (!apiKey) {

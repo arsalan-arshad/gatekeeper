@@ -1,5 +1,7 @@
 'use server';
 
+import { revalidatePath } from 'next/cache';
+
 import { auth, signOut } from '@/auth';
 import { apiFetch } from '@/lib/api';
 
@@ -44,6 +46,7 @@ export async function saveDirectorySettings(input: {
       email,
       body: JSON.stringify(input),
     });
+    revalidatePath('/explore');
     return { ok: true as const };
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Save failed' };

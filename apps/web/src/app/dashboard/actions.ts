@@ -2,6 +2,7 @@
 
 import { auth } from '@/auth';
 import { apiFetch } from '@/lib/api';
+import { validateActionId } from '@/lib/dashboard-action-id';
 
 async function requireEmail(): Promise<string | null> {
   const session = await auth();
@@ -39,10 +40,16 @@ export async function loadInbox(filter: string = 'all') {
 }
 
 export async function approveRequest(id: string) {
+  const valid = validateActionId(id);
+  if (!valid.ok) return { error: valid.error };
   const email = await requireEmail();
   if (!email) return { error: 'Sign in required' };
   try {
-    await apiFetch(`/v1/dashboard/inbox/${id}/approve`, { method: 'POST', email, body: '{}' });
+    await apiFetch(`/v1/dashboard/inbox/${encodeURIComponent(valid.id)}/approve`, {
+      method: 'POST',
+      email,
+      body: '{}',
+    });
     return { ok: true as const };
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Approve failed' };
@@ -50,10 +57,16 @@ export async function approveRequest(id: string) {
 }
 
 export async function declineRequest(id: string) {
+  const valid = validateActionId(id);
+  if (!valid.ok) return { error: valid.error };
   const email = await requireEmail();
   if (!email) return { error: 'Sign in required' };
   try {
-    await apiFetch(`/v1/dashboard/inbox/${id}/decline`, { method: 'POST', email, body: '{}' });
+    await apiFetch(`/v1/dashboard/inbox/${encodeURIComponent(valid.id)}/decline`, {
+      method: 'POST',
+      email,
+      body: '{}',
+    });
     return { ok: true as const };
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Decline failed' };
@@ -61,10 +74,12 @@ export async function declineRequest(id: string) {
 }
 
 export async function overrideRequest(id: string, decision: 'accept' | 'reject' | 'spam') {
+  const valid = validateActionId(id);
+  if (!valid.ok) return { error: valid.error };
   const email = await requireEmail();
   if (!email) return { error: 'Sign in required' };
   try {
-    await apiFetch(`/v1/dashboard/inbox/${id}/override`, {
+    await apiFetch(`/v1/dashboard/inbox/${encodeURIComponent(valid.id)}/override`, {
       method: 'POST',
       email,
       body: JSON.stringify({ decision }),
@@ -76,10 +91,16 @@ export async function overrideRequest(id: string, decision: 'accept' | 'reject' 
 }
 
 export async function markSpam(id: string) {
+  const valid = validateActionId(id);
+  if (!valid.ok) return { error: valid.error };
   const email = await requireEmail();
   if (!email) return { error: 'Sign in required' };
   try {
-    await apiFetch(`/v1/dashboard/inbox/${id}/spam`, { method: 'POST', email, body: '{}' });
+    await apiFetch(`/v1/dashboard/inbox/${encodeURIComponent(valid.id)}/spam`, {
+      method: 'POST',
+      email,
+      body: '{}',
+    });
     return { ok: true as const };
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Mark spam failed' };
@@ -203,6 +224,8 @@ export async function dismissMatchSuggestion(handle: string) {
 }
 
 export async function acceptMatch(id: string) {
+  const valid = validateActionId(id);
+  if (!valid.ok) return { error: valid.error };
   const email = await requireEmail();
   if (!email) return { error: 'Sign in required' };
   try {
@@ -210,7 +233,7 @@ export async function acceptMatch(id: string) {
       ok: true;
       status: 'accepted';
       introEmail?: 'sent' | 'failed' | 'skipped';
-    }>(`/v1/dashboard/matches/${id}/accept`, {
+    }>(`/v1/dashboard/matches/${encodeURIComponent(valid.id)}/accept`, {
       method: 'POST',
       email,
       body: '{}',
@@ -222,11 +245,13 @@ export async function acceptMatch(id: string) {
 }
 
 export async function resendMatchIntro(id: string) {
+  const valid = validateActionId(id);
+  if (!valid.ok) return { error: valid.error };
   const email = await requireEmail();
   if (!email) return { error: 'Sign in required' };
   try {
     const data = await apiFetch<{ ok: true; introEmail: 'sent' | 'failed' | 'skipped' }>(
-      `/v1/dashboard/matches/${id}/resend-intro`,
+      `/v1/dashboard/matches/${encodeURIComponent(valid.id)}/resend-intro`,
       { method: 'POST', email, body: '{}' },
     );
     return data;
@@ -236,10 +261,12 @@ export async function resendMatchIntro(id: string) {
 }
 
 export async function declineMatch(id: string) {
+  const valid = validateActionId(id);
+  if (!valid.ok) return { error: valid.error };
   const email = await requireEmail();
   if (!email) return { error: 'Sign in required' };
   try {
-    await apiFetch(`/v1/dashboard/matches/${id}/decline`, {
+    await apiFetch(`/v1/dashboard/matches/${encodeURIComponent(valid.id)}/decline`, {
       method: 'POST',
       email,
       body: '{}',
